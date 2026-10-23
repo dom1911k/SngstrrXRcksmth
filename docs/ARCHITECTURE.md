@@ -540,4 +540,12 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
 * **Rocksmith polish:** title card on play from the start (hidden on pause/seek),
   pause screen in full highway view (pointer-events only on its buttons), note-streak
   milestones (10, 25, 50, 75, 100, 150…), a bright core line in every sustain tail.
+* **0.9.1:** hit animation: `hitGem()` spawns a copy of the gem at the strike line
+  (pool of 10; flare 0–30%, then squash into the string and fade, 280 ms);
+  `addStringWave()` bends the string locally (cylinder with 160 segments; vertices
+  displaced by a damped 13 Hz sine × Gaussian around the fret, 0.28 s decay; open
+  notes ripple the whole string). Both run every frame while active (careful: no
+  short-circuit with the particles check). Library: `coverOf()` (FNV hash → two hues
+  + initials), "Now practising" hero, 52-week heat map (`practiceByDay`), staggered
+  row animation, drawer slide-in, `prefers-reduced-motion` respected.
 

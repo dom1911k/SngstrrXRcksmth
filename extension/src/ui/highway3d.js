@@ -366,9 +366,13 @@ export class Highway3D {
     for (let s = 0; s < n; s++) {
       const row = this.options.invertStrings ? n - 1 - s : s;
       const radius = radii[s] || 0.013;
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, MAX_FRET + 3, 8), this.stringMats[s]);
+      // Many segments along the string so it can bend locally when you hit a note.
+      const geo = new THREE.CylinderGeometry(radius, radius, MAX_FRET + 3, 8, 160);
+      const m = new THREE.Mesh(geo, this.stringMats[s]);
       m.rotation.z = Math.PI / 2;
       m.position.set(MAX_FRET / 2, this.stringY(s), 0);
+      m.userData.base = Float32Array.from(geo.attributes.position.array);
+      m.userData.waves = [];
       this.scene.add(m);
       this.stringMeshes.push(m);
     }
@@ -383,6 +387,7 @@ export class Highway3D {
     this.glowMats = colors.map((c) => new THREE.SpriteMaterial({ map: this.glowTex, color: c, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
     // Rounded gems with a bright outline and a soft shadow on the floor.
     const { geo: gemGeo, outline: edgeGeo } = roundedGemGeometry(GEM_W, GEM_H, GEM_D);
+    this.gemGeo = gemGeo;
     gemGeo.userData.shared = true; edgeGeo.userData.shared = true;
     const edgeMat = this.edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: this.theme().outline });
     const shadowGeo = new THREE.PlaneGeometry(1, 1); shadowGeo.userData.shared = true;
@@ -710,7 +715,10 @@ export class Highway3D {
     // Nothing moves while paused: skip drawing the same picture again.
     const camX = this.follow.x, camSpan = this.follow.span;
     this.particles.update(dt);
-    const key = `${this.particles.active ? nowMs : ''}|${t.toFixed(4)}|${camX.toFixed(3)}|${camSpan.toFixed(3)}|${this.w}x${this.h}|${this.dpr}|${k.toFixed(4)}|${this.chart ? this.chart.notes.length : 0}`;
+    const gemsAnimating = this.updateHitAnims(nowMs);        // (each must run every frame)
+    const stringsAnimating = this.updateStringWaves(nowMs);
+    const animating = this.particles.active || gemsAnimating || stringsAnimating;
+    const key = `${animating ? nowMs : ''}|${t.toFixed(4)}|${camX.toFixed(3)}|${camSpan.toFixed(3)}|${this.w}x${this.h}|${this.dpr}|${k.toFixed(4)}|${this.chart ? this.chart.notes.length : 0}`;
     if (!state.playing && key === this.lastRenderKey) return;
     this.lastRenderKey = key;
 
@@ -780,7 +788,11 @@ export class Highway3D {
     const o = this.noteObjs[r.index];
     if (!o) return;
     const color = this.colors[o.note.string] || '#ffffff';
-    if (this.options.sparks) this.particles.burst(o.obj.position.x, o.obj.position.y, color, o.note.fret === 0);
+    if (this.options.sparks) {
+      this.particles.burst(o.obj.position.x, o.obj.position.y, color, o.note.fret === 0);
+      this.hitGem(o, color);
+      this.addStringWave(o.note.string, o.note.fret === 0 ? null : o.obj.position.x, o.note.fret === 0 ? 0.035 : 0.05);
+    }
     if (this.options.timingMarks && r.offsetMs !== null) {
       const k = DEPTH / (this.options.lookahead * speed);
       const z = Math.max(-2.5, Math.min(1.2, (r.offsetMs / 1000) * speed * k));
@@ -788,6 +800,88 @@ export class Highway3D {
       this.particles.spawn({ x: o.obj.position.x, y: o.obj.position.y + 0.3, z, color: c, life: 0.9, size: 0.32, opacity: 0.95 });
     }
     this.lastRenderKey = '';
+  }
+
+  // The hit gem flares and sinks into the string (a copy at the strike line:
+  // the note itself has already passed when the hit is recognised).
+  hitGem(o, color) {
+    if (!this.gemGeo) return;
+    if (!this.hitPool) this.hitPool = [];
+    let a = this.hitPool.find((x) => !x.mesh.visible);
+    if (!a) {
+      if (this.hitPool.length >= 10) a = this.hitPool.reduce((p, x) => (x.t0 < p.t0 ? x : p));
+      else {
+        const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1, transparent: true, depthWrite: false });
+        a = { mesh: new THREE.Mesh(this.gemGeo, mat), t0: 0 };
+        a.mesh.renderOrder = 6;
+        this.scene.add(a.mesh);
+        this.hitPool.push(a);
+      }
+    }
+    a.mesh.geometry = this.gemGeo;
+    a.mesh.material.color.set(color);
+    a.mesh.material.emissive.set(color);
+    a.sx = (o.note.fret === 0 ? 4 / GEM_W * 0.96 : 1) * (this.options.largeNotes ? 1.3 : 1);
+    a.sy = (o.note.fret === 0 ? 0.55 : 1) * (this.options.largeNotes ? 1.3 : 1);
+    a.mesh.position.set(o.obj.position.x, o.obj.position.y, 0.06);
+    a.t0 = performance.now();
+    a.mesh.visible = true;
+  }
+
+  updateHitAnims(nowMs) {
+    if (!this.hitPool) return false;
+    let any = false;
+    for (const a of this.hitPool) {
+      if (!a.mesh.visible) continue;
+      const k = (nowMs - a.t0) / 280;
+      if (k >= 1) { a.mesh.visible = false; continue; }
+      any = true;
+      // 0–0.3: flare up; 0.3–1: squash flat into the string and fade.
+      const up = k < 0.3 ? 1 + 0.35 * (k / 0.3) : 1.35;
+      const flat = k < 0.3 ? 1 : 1 - 0.93 * ((k - 0.3) / 0.7);
+      a.mesh.scale.set(a.sx * (up + 0.25 * Math.max(0, k - 0.3)), a.sy * up * flat, 1);
+      a.mesh.material.opacity = k < 0.3 ? 1 : 1 - (k - 0.3) / 0.7;
+      a.mesh.material.emissiveIntensity = 1.1 - 0.8 * k;
+    }
+    return any;
+  }
+
+  // A damped ripple on the string around the fret you hit (x = null: whole string).
+  addStringWave(string, x, amp) {
+    const m = this.stringMeshes && this.stringMeshes[string];
+    if (!m) return;
+    m.userData.waves.push({ x, amp, t0: performance.now() });
+    if (m.userData.waves.length > 4) m.userData.waves.shift();
+  }
+
+  updateStringWaves(nowMs) {
+    if (!this.stringMeshes) return false;
+    let any = false;
+    for (const m of this.stringMeshes) {
+      const w = m.userData.waves;
+      if (!w || (!w.length && !m.userData.bent)) continue;
+      for (let i = w.length - 1; i >= 0; i--) if (nowMs - w[i].t0 > 900) w.splice(i, 1);
+      const pos = m.geometry.attributes.position;
+      const base = m.userData.base;
+      const arr = pos.array;
+      // Local y runs along the string; world x = centre − local y (rotated cylinder).
+      for (let v = 0; v < pos.count; v++) {
+        const ly = base[v * 3 + 1];
+        const wx = MAX_FRET / 2 - ly;
+        let d = 0;
+        for (const wave of w) {
+          const age = (nowMs - wave.t0) / 1000;
+          const env = Math.exp(-age / 0.28) * Math.sin(age * 2 * Math.PI * 13);
+          const shape = wave.x === null ? 1 : Math.exp(-((wx - wave.x) ** 2) / 1.6);
+          d += wave.amp * env * shape;
+        }
+        arr[v * 3] = base[v * 3] + d;
+      }
+      pos.needsUpdate = true;
+      m.userData.bent = w.length > 0;
+      if (w.length) any = true;
+    }
+    return any;
   }
 
   // If the PC can't keep up (< ~50 fps for 2 s while playing), render at a

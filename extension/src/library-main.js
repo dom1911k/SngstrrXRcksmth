@@ -3,7 +3,7 @@
 import { h } from './ui/dom.js';
 import { idbHistory, idbLibrary, idbSessions } from './core/history-db.js';
 import { aggregate } from './core/history.js';
-import { STATUSES, songStats, overallStats, setPending, dueInfo, goalProgress, goalLabel } from './core/library.js';
+import { STATUSES, songStats, overallStats, setPending, dueInfo, goalProgress, goalLabel, practiceByDay, coverOf } from './core/library.js';
 import { drillById } from './core/drills.js';
 import { accuracyColor } from './ui/progress-ui.js';
 
@@ -71,15 +71,82 @@ function renderOverview() {
     card(o.streak ? `${o.streak} 🔥` : '0', o.streak === 1 ? 'day in a row' : 'days in a row', 'flame'),
     card(dur(o.totalSeconds), (() => { const n = entries.filter((e) => e.kind !== 'drill').length; return `total · ${n} song${n === 1 ? '' : 's'}`; })()),
   );
-  const max = Math.max(60, ...o.days.map((d) => d.seconds));
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  $('practiceChart').replaceChildren(...o.days.map((d, i) => {
-    const date = new Date(d.day);
-    return h('div', { class: `d${d.seconds ? '' : ' zero'}${d.day === today.getTime() ? ' today' : ''}`, title: `${date.toLocaleDateString()}: ${dur(d.seconds)}` },
-      h('i', { style: { height: `${Math.max(2, (d.seconds / max) * 100)}%` } }),
-      i % 7 === 6 || i === 27 ? h('span', {}, i === 27 ? 'today' : date.toLocaleDateString([], { day: 'numeric', month: 'short' })) : null);
-  }));
+  renderHeatmap();
   $('practiceNote').textContent = o.streak >= 2 ? `${o.streak} days in a row. Keep it going!` : o.weekSeconds ? '' : 'Nothing practised this week yet.';
+}
+
+// Practice heat map: the last 52 weeks, one square per day (like GitHub).
+function renderHeatmap() {
+  const byDay = practiceByDay(records);
+  const DAY = 86400000;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const dow = (today.getDay() + 6) % 7;                     // Monday = 0
+  const WEEKS = 52;
+  const start = today.getTime() - ((WEEKS - 1) * 7 + dow) * DAY; // Monday 51 weeks ago
+  const level = (sec) => (!sec ? 0 : sec < 10 * 60 ? 1 : sec < 20 * 60 ? 2 : sec < 40 * 60 ? 3 : 4);
+  const cols = [];
+  let lastMonth = -1, lastLabel = -9;
+  for (let w = 0; w < WEEKS; w++) {
+    const first = new Date(start + w * 7 * DAY);
+    const month = first.getMonth();
+    const cells = [];
+    for (let d = 0; d < 7; d++) {
+      const t = start + (w * 7 + d) * DAY;
+      if (t > today.getTime()) { cells.push(h('i', { class: 'c future' })); continue; }
+      const sec = byDay.get(t) || 0;
+      cells.push(h('i', { class: `c l${level(sec)}${t === today.getTime() ? ' today' : ''}`, title: `${new Date(t).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}: ${dur(sec)}` }));
+    }
+    const label = month !== lastMonth && w - lastLabel >= 3 && w < WEEKS - 1;
+    if (label) lastLabel = w;
+    cols.push(h('div', { class: 'wk' }, h('span', { class: 'mo' }, label ? first.toLocaleDateString([], { month: 'short' }) : ''), ...cells));
+    lastMonth = month;
+  }
+  $('practiceChart').replaceChildren(
+    h('div', { class: 'days' }, ...['Mon', '', 'Wed', '', 'Fri', '', ''].map((d) => h('span', {}, d))),
+    h('div', { class: 'weeks' }, ...cols),
+    h('div', { class: 'legend' }, 'less', ...[0, 1, 2, 3, 4].map((l) => h('i', { class: `c l${l}` })), 'more'));
+}
+
+// A song's cover tile (generated colours and initials).
+function cover(e, size = 44) {
+  const c = coverOf(e.title, e.artist);
+  return h('div', { class: `cover${e.kind === 'drill' ? ' drill' : ''}`, style: {
+    width: `${size}px`, height: `${size}px`, fontSize: `${Math.round(size * 0.38)}px`,
+    background: `linear-gradient(${c.angle}deg, hsl(${c.hue1} 62% 42%), hsl(${c.hue2} 70% 22%))`,
+  } }, e.kind === 'drill' ? '♩' : c.initials);
+}
+
+// "Now practising": the song you played most recently, with quick actions.
+function renderHero() {
+  const songs = entries.filter((e) => e.kind !== 'drill' && (e.stats.lastAt || e.lastOpenedAt));
+  const e = songs.sort((a, b) => Math.max(b.stats.lastAt || 0, b.lastOpenedAt || 0) - Math.max(a.stats.lastAt || 0, a.lastOpenedAt || 0))[0];
+  $('hero').hidden = !e;
+  if (!e) return;
+  const st = e.stats;
+  let weakest = null;
+  if (e.layout && e.records.length) {
+    const agg = aggregate(e.records.filter((r) => r.barCount === e.layout.bars.length), { bars: e.layout.bars, sections: e.layout.sections });
+    weakest = agg.sections.filter((x) => x.accuracy !== null).sort((a, b) => a.accuracy - b.accuracy)[0] || null;
+  }
+  const g = e.goal ? e.goalProg : null;
+  $('hero').replaceChildren(
+    cover(e, 112),
+    h('div', { class: 'hero-body' },
+      h('div', { class: 'kicker' }, 'NOW PRACTISING'),
+      h('div', { class: 'hero-title' }, e.title),
+      h('div', { class: 'small' }, [e.artist, e.track, e.tuning].filter(Boolean).join(' · ')),
+      h('div', { class: 'hero-stats' },
+        statusBadge(e),
+        h('span', {}, h('b', {}, pct(st.bestFull ?? st.best)), ' best'),
+        h('span', {}, h('b', {}, pct(st.last)), ' last'),
+        h('span', {}, h('b', {}, dur(st.seconds)), ' practised'),
+        st.trend !== null ? h('span', { class: st.trend >= 0 ? 'good' : 'bad' }, st.trend >= 0 ? '↑ improving' : '↓ dropping') : null),
+      g ? h('div', { class: 'hero-goal' }, h('span', { class: 'small' }, `🎯 ${goalLabel(e.goal)}`),
+        h('div', { class: 'meter big' }, h('i', { style: { width: `${Math.round(g.fraction * 100)}%`, background: e.goal.reachedAt ? '#5fd38d' : '#f2c418' } }))) : null,
+      h('div', { class: 'bar-row' },
+        h('button', { class: 'btn primary', onclick: () => openSong(e) }, '▶ Continue'),
+        weakest && weakest.accuracy < 0.98 ? h('button', { class: 'btn', title: 'Open the song and loop this section', onclick: () => openSong(e, { loopBars: [weakest.firstBar, weakest.lastBar] }) }, `Practise "${weakest.name}" (${pct(weakest.accuracy)})`) : null,
+        h('button', { class: 'btn', onclick: () => showDetail(e) }, 'Details'))));
 }
 
 // ---------- list ----------
@@ -163,10 +230,12 @@ function render() {
   $('filters').replaceChildren(...FILTERS.map(([k, label]) => h('button', { class: `chip${k === filter ? ' on' : ''}`, onclick: () => { filter = k; render(); } },
     label, h('span', { class: 'n' }, counts[k]))));
   renderDue();
+  renderHero();
   const list = sorted(entries.filter((e) => matches(e)));
-  $('list').replaceChildren(...list.map((e) => {
+  $('list').replaceChildren(...list.map((e, i) => {
     const st = e.stats;
-    const row = h('div', { class: `row${selected === e.songKey ? ' sel' : ''}`, onclick: () => showDetail(e) },
+    const row = h('div', { class: `row${selected === e.songKey ? ' sel' : ''}`, style: { '--i': String(Math.min(i, 20)) }, onclick: () => showDetail(e) },
+      cover(e, 40),
       h('button', { class: `fav${e.favorite ? ' on' : ''}`, title: e.favorite ? 'Remove from favourites' : 'Add to favourites', onclick: (ev) => { ev.stopPropagation(); setFav(e, !e.favorite); } }, e.favorite ? '★' : '☆'),
       h('div', { class: 'title' }, h('b', {}, e.title, e.due && e.due.due ? h('span', { class: 'duetag', title: e.due.reason }, 'due') : null),
         h('span', { class: 'sub' }, [e.artist, e.track, `played ${ago(st.lastAt || e.lastOpenedAt)}`].filter(Boolean).join(' · ')),
@@ -202,7 +271,7 @@ function renderDue() {
   const due = entries.filter((e) => e.due && e.due.due).sort((a, b) => b.due.overdueDays - a.due.overdueDays).slice(0, 6);
   $('dueBox').hidden = !due.length;
   $('dueList').replaceChildren(...due.map((e) => h('div', { class: 'duecard', onclick: () => showDetail(e) },
-    h('b', {}, e.title), h('span', { class: 'small' }, e.artist),
+    h('div', { class: 'duetop' }, cover(e, 38), h('div', {}, h('b', {}, e.title), h('span', { class: 'small' }, e.artist))),
     h('span', { class: 'why' }, e.due.reason),
     h('button', { class: 'btn small primary', onclick: (ev) => { ev.stopPropagation(); openSong(e); } }, 'Practise'))));
   const nDue = entries.filter((e) => e.due && e.due.due).length;
@@ -280,8 +349,8 @@ function showDetail(e) {
   const canLoop = e.kind !== 'drill';
   $('detail').replaceChildren(...[
     h('button', { class: 'btn small close', onclick: () => { $('detail').hidden = true; selected = null; render(); } }, 'Close'),
-    h('h3', {}, e.title),
-    h('div', { class: 'small' }, [e.artist, e.track, e.tuning, e.kind === 'songsterr' ? 'Songsterr' : e.kind === 'local' ? 'own chart' : 'drill'].filter(Boolean).join(' · ')),
+    h('div', { class: 'dhead' }, cover(e, 64), h('div', {}, h('h3', {}, e.title),
+    h('div', { class: 'small' }, [e.artist, e.track, e.tuning, e.kind === 'songsterr' ? 'Songsterr' : e.kind === 'local' ? 'own chart' : 'drill'].filter(Boolean).join(' · ')))),
     h('div', { class: 'bar-row' },
       h('button', { class: 'btn primary', onclick: () => openSong(e) }, e.kind === 'drill' ? `Play${st.bestBpm ? ` at ${st.bestBpm + 5} BPM` : ''}` : 'Open song'),
       h('button', { class: 'btn', onclick: () => setFav(e, !e.favorite).then(() => showDetail(e)) }, e.favorite ? '★ Favourite' : '☆ Add to favourites'),

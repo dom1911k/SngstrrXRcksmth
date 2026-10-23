@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.9.0.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.9.1.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -127,7 +127,8 @@ Good Riddance, can be played too.
     at the exact moment to play. The string glows and vibrates while the note
     sounds, and the lit hand lane pulses gently on every beat (stronger on the
     first beat of a bar).
-  - When you hit a note, it **sparks** on the strings, as in Rocksmith (only hits;
+  - When you hit a note, the note flashes and sinks into the string, the string
+    ripples around that fret, and it **sparks**, as in Rocksmith (only hits;
     nothing is shown for misses). While you hold a long note at the right pitch, a
     bright flare stays on the string.
   - As a note arrives, its fret lights up on the fretboard in the string's colour.
@@ -289,8 +290,11 @@ the player) to open it.
 - Every bass track you open is remembered automatically, with its Songsterr link.
   Press **☆ Save** (bottom left of the highway) to make the song a **favourite**.
   Favourites are listed first.
-- At the top: practice time this week, songs, accuracy, your **streak** (days in a
-  row) and total time, plus a bar chart of practice minutes for the last 4 weeks.
+- At the top: **Now practising** (the song you played last, with *Continue*,
+  *Practise* its weakest section and your goal), then practice time this week,
+  songs, accuracy, your **streak** (days in a row) and total time, and a **heat map**
+  of the last 12 months (one square per day, brighter = longer practice).
+- Every song has a coloured cover tile made from its title (drills have a note).
 - Each song shows status (New / Learning / Practising / Mastered; you set it),
   tuning, practice time, best score at full speed with its trend (↑ ↓), and a small
   curve of your recent passes. **Open** opens it on Songsterr (or in the player).
@@ -495,6 +499,8 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.9.1:** hit animation (note sinks into the string, string ripples); Library
+  covers, "Now practising", 12-month heat map, smoother animations.
 - **0.9.0:** session report, Rocksmith-style end-of-song screen, "Due today"
   (spaced repetition), goals per song, fretboard trainer, themes and larger notes;
   title card, pause screen, note-streak banners, bright cores in held-note tails.

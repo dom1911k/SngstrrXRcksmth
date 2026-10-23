@@ -39,7 +39,7 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
     h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Look (3D)'),
       select('theme', [['classic', 'Classic (Rocksmith blue)'], ['stage', 'Stage (warm lights)'], ['minimal', 'Minimal (calm, no effects)'], ['contrast', 'High contrast']])),
     check('largeNotes', 'Larger notes (easier to read from a distance)'),
-    check('hitSparks', 'Sparks when you hit a note (3D)'),
+    check('hitSparks', 'Hit effects: sparks, the note flashes into the string, the string wobbles (3D)'),
     check('timingMarks', 'Small timing dot after each hit: blue = early, green = on time, orange = late (3D)'),
     check('glowEffects', 'Glow effects (3D; turns itself off if the PC is too slow)'),
     check('showSectionBar', 'Section strip with your weak spots at the top of the highway'),

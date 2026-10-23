@@ -103,6 +103,23 @@ export function songStats(records) {
   };
 }
 
+// Practice seconds per day (local midnight -> seconds), for the heat map.
+export function practiceByDay(records) {
+  const m = new Map();
+  for (const r of records) { const d = dayStart(r.at); m.set(d, (m.get(d) || 0) + passSeconds(r)); }
+  return m;
+}
+
+// A stable cover for a song: two colours from its title + artist, and initials.
+export function coverOf(title = '', artist = '') {
+  let h = 2166136261;
+  for (const ch of `${title}|${artist}`.toLowerCase()) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  const hue1 = h % 360, hue2 = (hue1 + 40 + ((h >>> 9) % 80)) % 360;
+  const words = title.replace(/^Drill:\s*/i, '').split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w));
+  const initials = (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || '?').slice(0, 2)).toUpperCase();
+  return { hue1, hue2, angle: (h >>> 3) % 180, initials };
+}
+
 // Practice overview over all songs.
 export function overallStats(records, now = Date.now()) {
   const today = dayStart(now);
