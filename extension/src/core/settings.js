@@ -13,6 +13,7 @@ export const DEFAULTS = {
   calibrationSpreadMs: null,
   calibratedAt: null,
   fineTuneMs: 0,
+  lowLatency: true,
 };
 
 const hasChromeStorage = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;

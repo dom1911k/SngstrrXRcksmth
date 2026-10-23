@@ -137,6 +137,43 @@ through the browser. You'll hear a clear delay. That's the real latency, and it'
 why the trainer compensates for it. It's useful for checking the signal, not for
 playing along. For playing, use an amp or the cable's direct sound if you have one.
 
+### Reducing delay
+
+There are two different delays. It helps to keep them apart:
+
+- **Scoring delay:** fully corrected by calibration. You don't need to do
+  anything except calibrate once. The *Fine-tune* slider only affects scoring
+  (from Phase 3 on) and **does not change what you hear**. Leave it at 0 for now.
+- **What you hear while monitoring:** cannot be corrected, only reduced. The sound
+  travels cable → Windows → Chrome → 2.4 GHz dongle → headset, and every step
+  adds a few milliseconds. Through a browser and a wireless headset, roughly
+  40–80 ms is normal. That's just enough to feel "a tiny bit after I play".
+
+To make the monitoring delay as small as possible:
+
+1. **Same sample rate on both devices (most important).** The cable runs at
+   48 kHz. In Windows: **Settings → System → Sound → (your headset under
+   Output) → Output settings / Format** → **48000 Hz** (16 or 24 bit). Do the same
+   for the cable under Input if it offers a choice. If the rates differ, the
+   panel shows a warning, because Chrome then has to convert between them.
+2. Keep **Smallest audio buffer** (Monitoring section) ticked. Untick it only if
+   you hear crackling.
+3. Headset: use the **2.4 GHz dongle, never Bluetooth** (Bluetooth adds 150 ms+).
+   Plug the dongle directly into the PC, not a hub. If your headset has a
+   USB-cable (wired) mode, that is faster still.
+4. Turn off extra processing on the headset: **THX Spatial Audio** / EQ in Razer
+   Synapse, and **Spatial sound** + **Audio enhancements** in Windows for the
+   headset.
+5. Close other audio programs (Discord, DAWs, Rocksmith).
+6. After changing any of these: click **Stop input** → **Start input** (or reload the page),
+   then **re-run the calibration**.
+
+**Zero delay:** hear your bass *directly* instead of through the computer, and
+leave monitoring at 0. For example, use an amp or a bass headphone amp fed from a
+passive splitter/Y-cable, with the second output going into the Real Tone Cable.
+This is how Rocksmith players avoid lag too. The trainer only needs the cable signal
+for detection.
+
 ## 5. Troubleshooting
 
 | Problem | Fix |

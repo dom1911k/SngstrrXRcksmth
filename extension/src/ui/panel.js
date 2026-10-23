@@ -70,10 +70,16 @@ export function createPanel(engine) {
   } });
   const monitorValue = h('span', { class: 'muted' }, 'Off');
   const monitorLatency = h('div', { class: 'muted' });
+  const lowLatencyBox = h('input', { type: 'checkbox', checked: settings.lowLatency, onchange: async () => {
+    await updateSettings({ lowLatency: lowLatencyBox.checked });
+    if (engine.running) await toggleInput(true);
+  } });
 
   const monitorSection = h('section', {},
     h('h2', {}, 'Hear yourself (monitoring)'),
     h('div', { class: 'row' }, h('div', { class: 'grow' }, monitorSlider), monitorValue),
+    h('div', { class: 'muted' }, 'What you hear here is always a little late: the sound goes cable → Windows → Chrome → wireless headset. Calibration can correct scoring for this delay, but not what you hear. See "Reducing delay" in the README.'),
+    h('label', { class: 'row muted' }, lowLatencyBox, 'Smallest audio buffer (less delay; turn off if you hear crackles)'),
     monitorLatency,
   );
 
@@ -98,7 +104,7 @@ export function createPanel(engine) {
     h('div', { class: 'row' }, calBtn),
     calDots, calStatus, calResult,
     h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Fine-tune'), h('div', { class: 'grow' }, fineSlider), fineValue),
-    h('div', { class: 'muted' }, 'If hits feel consistently judged "late", move right; if "early", move left.'),
+    h('div', { class: 'muted' }, 'Fine-tune only changes how scoring judges your timing (from Phase 3 on). It does not change what you hear. Leave it at 0 until scoring exists; then, if correct notes are judged "late", move right; if "early", move left.'),
     chromeInfo,
   );
 
@@ -129,8 +135,8 @@ export function createPanel(engine) {
     renderStrings();
   }
 
-  async function toggleInput() {
-    if (engine.running) {
+  async function toggleInput(restart = false) {
+    if (engine.running && !restart) {
       await engine.stop();
       return;
     }
@@ -138,7 +144,7 @@ export function createPanel(engine) {
     inputInfo.textContent = 'Starting… (allow microphone access if Chrome asks)';
     try {
       const s = getSettings();
-      await engine.start({ deviceId: s.deviceId, deviceLabel: s.deviceLabel, minFreq: detectorMinFreq(tuning, s.refA) });
+      await engine.start({ deviceId: s.deviceId, deviceLabel: s.deviceLabel, minFreq: detectorMinFreq(tuning, s.refA), lowLatency: s.lowLatency });
     } catch (err) {
       inputInfo.innerHTML = '';
       inputInfo.append(h('span', { class: 'bad' }, describeError(err)));
@@ -152,7 +158,7 @@ export function createPanel(engine) {
     const label = deviceSelect.selectedOptions[0] ? deviceSelect.selectedOptions[0].textContent : '';
     await updateSettings({ deviceId: id, deviceLabel: label });
     if (engine.running) {
-      await engine.start({ deviceId: id, deviceLabel: label, minFreq: detectorMinFreq(tuning, settings.refA) });
+      await engine.start({ deviceId: id, deviceLabel: label, minFreq: detectorMinFreq(tuning, settings.refA), lowLatency: getSettings().lowLatency });
     }
   }
 
@@ -175,6 +181,9 @@ export function createPanel(engine) {
           off ? h('span', { class: 'good' }, 'voice processing off')
             : h('span', { class: 'bad' }, 'Chrome voice processing is ON (echo/noise/gain). Detection may suffer.')),
         looksLikeCable ? null : h('div', { class: 'warn' }, 'This input does not look like the Real Tone Cable. Pick it in the list above.'),
+        st.inputSampleRate && st.inputSampleRate !== st.sampleRate
+          ? h('div', { class: 'warn' }, `Cable runs at ${st.inputSampleRate / 1000} kHz but your headphones at ${st.sampleRate / 1000} kHz, so Chrome has to convert, which adds delay. Set the headphones to 48000 Hz in Windows (see README, "Reducing delay").`)
+          : null,
         st.message ? h('div', { class: 'bad' }, st.message) : null,
       ].filter(Boolean));
       chromeInfo.textContent = `Chrome reports ${st.baseLatencyMs + st.outputLatencyMs} ms of output buffering (wireless headset latency comes on top).`;

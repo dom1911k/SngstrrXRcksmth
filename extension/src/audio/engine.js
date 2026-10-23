@@ -21,6 +21,7 @@ export class AudioEngine {
     this.deviceLabel = '';
     this.minFreq = 36;
     this.monitorLevel = 0;
+    this.lowLatency = true;
   }
 
   on(type, fn) {
@@ -52,12 +53,20 @@ export class AudioEngine {
     );
   }
 
-  async start({ deviceId = '', deviceLabel = '', minFreq } = {}) {
+  async start({ deviceId = '', deviceLabel = '', minFreq, lowLatency } = {}) {
     if (minFreq) this.minFreq = minFreq;
+    if (lowLatency !== undefined) this.lowLatency = lowLatency;
     await this.stop();
 
+    if (this.ctx && this.ctxLowLatency !== this.lowLatency) {
+      await this.ctx.close();
+      this.ctx = null;
+    }
     if (!this.ctx) {
-      this.ctx = new AudioContext({ latencyHint: 'interactive' });
+      // latencyHint 0 asks Chrome for the smallest output buffer the device
+      // allows; 'interactive' is Chrome's usual (slightly safer) default.
+      this.ctx = new AudioContext({ latencyHint: this.lowLatency ? 0 : 'interactive' });
+      this.ctxLowLatency = this.lowLatency;
       await this.loadWorklet();
     }
     if (this.ctx.state !== 'running') await this.ctx.resume();
@@ -192,6 +201,7 @@ export class AudioEngine {
       deviceId: this.deviceId,
       deviceLabel: this.deviceLabel,
       sampleRate: ctx ? ctx.sampleRate : 0,
+      inputSampleRate: settings.sampleRate || 0,
       // What Chrome reports about its own buffering (does not include the
       // wireless headset or the input path; calibration measures the total).
       baseLatencyMs: ctx ? Math.round((ctx.baseLatency || 0) * 1000) : 0,
