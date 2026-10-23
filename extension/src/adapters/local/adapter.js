@@ -37,7 +37,10 @@ export class LocalAdapter {
         this.seek(this.loop.start);
         if (this.settingOr('countInLoops', true) && !this.countInSuppressed) { this.stopPlayback(); this.startWithCountIn(); }
       }
+      // Without an audio file (drills, charts on their own) stop after the end.
+      if (!this.hasAudio() && this.isPlaying() && this.chart && !this.loop && time > this.chart.duration + 1.5) this.pause();
       this.clock.update({ perf: performance.now(), time: this.rawTime(), playing: this.isPlaying(), speed: this.speed });
+      this.tickMetronome();
     };
     requestAnimationFrame(tick);
   }
@@ -99,6 +102,7 @@ export class LocalAdapter {
     this.audio.src = URL.createObjectURL(file);
     this.audio.playbackRate = this.speed;
     this.audioName = file.name;
+    this.lastFile = file;
     this.emit('audio', { name: file.name });
   }
 
@@ -145,6 +149,48 @@ export class LocalAdapter {
     else this.startPlayback();
   }
 
+  // ---- metronome (drills, or switched on in the player) ----
+  metronomeOn() { return this.metronome || !!(this.chart && this.chart.meta && this.chart.meta.metronome); }
+  setMetronome(on) { this.metronome = on; this.metroNext = null; }
+
+  audioCtx() {
+    if (!this.clickCtx) this.clickCtx = new AudioContext({ latencyHint: 'interactive' });
+    if (this.clickCtx.state !== 'running') this.clickCtx.resume();
+    return this.clickCtx;
+  }
+
+  click(when, accent) {
+    const ctx = this.audioCtx();
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.frequency.value = accent ? 1760 : 1320;
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(accent ? 0.7 : 0.45, when + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.05);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(when);
+    osc.stop(when + 0.06);
+  }
+
+  // Schedules the clicks of the next ~0.2 s of beats (song time -> context time).
+  tickMetronome() {
+    const beats = this.chart ? this.chart.beats : null;
+    if (!this.metronomeOn() || !beats || !beats.length || !this.isPlaying()) { this.metroNext = null; return; }
+    const now = this.rawTime();
+    if (this.metroNext === null || this.metroNext === undefined || this.metroJump !== this.clock.lastJumpPerf) {
+      this.metroJump = this.clock.lastJumpPerf;
+      let i = 0;
+      while (i < beats.length && beats[i].t < now - 0.005) i++;
+      this.metroNext = i;
+    }
+    const ctx = this.audioCtx();
+    while (this.metroNext < beats.length && beats[this.metroNext].t <= now + 0.2 * this.speed) {
+      const b = beats[this.metroNext++];
+      const when = ctx.currentTime + Math.max(0, (b.t - now) / this.speed);
+      this.click(when, b.downbeat);
+    }
+  }
+
   // One bar of clicks at the song's tempo (and current speed), then play.
   startWithCountIn() {
     const t = this.rawTime();
@@ -154,22 +200,9 @@ export class LocalAdapter {
     const beats = bar && bar.sig ? bar.sig[0] : 4;
     const bpm = (bar && bar.bpm) || 120;
     const beat = 60 / bpm / this.speed;
-    if (!this.clickCtx) this.clickCtx = new AudioContext({ latencyHint: 'interactive' });
-    const ctx = this.clickCtx;
-    if (ctx.state !== 'running') ctx.resume();
+    const ctx = this.audioCtx();
     const start = ctx.currentTime + 0.08;
-    for (let i = 0; i < beats; i++) {
-      const when = start + i * beat;
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      osc.frequency.value = i === 0 ? 1760 : 1320;
-      g.gain.setValueAtTime(0, when);
-      g.gain.linearRampToValueAtTime(i === 0 ? 0.7 : 0.45, when + 0.001);
-      g.gain.exponentialRampToValueAtTime(0.001, when + 0.05);
-      osc.connect(g).connect(ctx.destination);
-      osc.start(when);
-      osc.stop(when + 0.06);
-    }
+    for (let i = 0; i < beats; i++) this.click(start + i * beat, i === 0);
     const ms = (0.08 + beats * beat) * 1000;
     this.counting = { until: performance.now() + ms, timer: setTimeout(() => { this.counting = null; this.startPlayback(); }, ms) };
     this.emit('play', this.getState());

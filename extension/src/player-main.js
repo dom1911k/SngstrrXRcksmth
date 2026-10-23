@@ -11,6 +11,11 @@ import { AutoMute } from './core/auto-mute.js';
 import { createPracticeSection } from './ui/practice-section.js';
 import { createShortcutActions, installShortcuts } from './core/shortcuts.js';
 import { createPracticeTools } from './core/practice-tools.js';
+import { DRILLS, drillById, makeDrill } from './core/drills.js';
+import { songStats } from './core/library.js';
+import { historyStore } from './core/history.js';
+import { getSettings } from './core/settings.js';
+import { TUNINGS } from './core/music.js';
 import { createTrainingSections } from './ui/training-section.js';
 
 const $ = (id) => document.getElementById(id);
@@ -127,3 +132,85 @@ function ui() {
   $('loopB').classList.toggle('on', !!adapter.loop);
 }
 requestAnimationFrame(ui);
+
+// ---- Metronome ----
+$('metro').addEventListener('change', (e) => adapter.setMetronome(e.target.checked));
+
+// ---- Drills ----
+let drillSel = null;
+async function openDrills() {
+  let records = [];
+  try { records = await (await historyStore()).all(); } catch { /* no history yet */ }
+  const list = $('drillList');
+  list.replaceChildren();
+  for (const d of DRILLS) {
+    const st = songStats(records.filter((r) => r.songKey === `drill:${d.id}`).sort((a, b) => a.at - b.at));
+    const b = document.createElement('button');
+    b.className = 'drill';
+    b.innerHTML = `<b></b><span class="small"></span><span class="best"></span>`;
+    b.querySelector('b').textContent = d.name;
+    b.querySelector('.small').textContent = d.description;
+    b.querySelector('.best').textContent = st.passes ? `${st.passes} runs · best ${Math.round(st.best * 100)}%${st.bestBpm ? ` · 90%+ at ${st.bestBpm} BPM` : ''}` : 'Not played yet';
+    b.addEventListener('click', () => selectDrill(d, st));
+    list.append(b);
+    if (!drillSel) selectDrill(d, st);
+  }
+  $('drills').hidden = false;
+}
+function selectDrill(d, st) {
+  drillSel = d;
+  for (const el of $('drillList').children) el.classList.toggle('on', el.querySelector('b').textContent === d.name);
+  // Suggest the next tempo: 5 BPM above your best clean (90%+) run.
+  const bpm = st && st.bestBpm ? st.bestBpm + 5 : d.defaults.bpm;
+  $('drillBpm').value = bpm;
+  $('drillBars').value = d.defaults.bars;
+  $('drillPos').value = d.defaults.position;
+  $('drillPos').disabled = d.id === 'lock-in';
+  $('drillHint').textContent = st && st.bestBpm ? `You played this cleanly at ${st.bestBpm} BPM, so the tempo is set 5 BPM higher.` : '';
+}
+function startDrill(id, opts) {
+  const tuning = TUNINGS[getSettings().tuningName] || TUNINGS['E Standard'];
+  adapter.setChart(makeDrill(id, { ...opts, tuning }));
+  $('empty').hidden = true;
+  $('drills').hidden = true;
+  status(`${drillById(id).name}: press play (Space). The click counts you in.`, true);
+}
+$('drillsBtn').addEventListener('click', openDrills);
+$('drillCancel').addEventListener('click', () => { $('drills').hidden = true; });
+$('drillStart').addEventListener('click', () => {
+  if (!drillSel) return;
+  startDrill(drillSel.id, { bpm: Number($('drillBpm').value), bars: Number($('drillBars').value), position: Number($('drillPos').value) });
+});
+
+// ---- Opened from the Library: ?song=<key> (saved chart + audio) or ?drill=<id> ----
+const params = new URLSearchParams(location.search);
+if (params.get('drill') && drillById(params.get('drill'))) {
+  const d = drillById(params.get('drill'));
+  const num = (k) => (params.get(k) ? { [k === 'pos' ? 'position' : k]: Number(params.get(k)) } : {});
+  startDrill(d.id, { ...d.defaults, ...num('bpm'), ...num('bars'), ...num('pos') });
+} else if (params.get('song')) {
+  (async () => {
+    const { idbLibrary } = await import('./core/history-db.js');
+    const entry = await idbLibrary.get(params.get('song'));
+    if (!entry || !entry.chart) { status('This song is not saved with its chart. Open the chart file again.'); return; }
+    adapter.setChart(entry.chart);
+    const audio = await idbLibrary.getAudio(entry.songKey);
+    if (audio) adapter.loadAudioFile(new File([audio.blob], audio.name || 'audio', { type: audio.blob.type }));
+    if (entry.audioOffset) { adapter.setOffset(entry.audioOffset); $('offset').value = Math.round(entry.audioOffset * 1000); }
+    $('empty').hidden = true;
+    status(`${entry.title} loaded from the library${audio ? ' with its audio' : ' (open the audio file to play along)'}.`, true);
+  })();
+}
+if (location.hash === '#drills') openDrills();
+
+// Saving a player song in the library (★) keeps its audio file too.
+async function saveAudio(entry) {
+  const file = adapter.lastFile;
+  if (!entry || entry.kind !== 'local' || !entry.favorite || !file || entry.hasAudio === file.name) return;
+  const { idbLibrary } = await import('./core/history-db.js');
+  await idbLibrary.putAudio(entry.songKey, file, file.name);
+  await idbLibrary.patch(entry.songKey, { hasAudio: file.name, audioOffset: adapter.offset });
+  entry.hasAudio = file.name;
+}
+tools.library.onChange(saveAudio);
+adapter.on('audio', () => saveAudio(tools.library.entry));

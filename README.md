@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.7.0.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.8.0.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -130,6 +130,9 @@ Good Riddance, can be played too.
   - When you hit a note, it **sparks** on the strings, as in Rocksmith (only hits;
     nothing is shown for misses). While you hold a long note at the right pitch, a
     bright flare stays on the string.
+  - As a note arrives, its fret lights up on the fretboard in the string's colour.
+    The fretboard has inlay dots, the lane flashes briefly when a new section
+    starts, and slow light beams move behind the horizon.
   - Notes are rounded gems with a bright outline and a soft shadow on the floor.
     Section names (VERSE, CHORUS…) float above the highway where a section starts.
     The lit hand lane slides over to the next hand position, and the fret numbers
@@ -276,6 +279,49 @@ upper notes of chords. A note that keeps ringing never counts twice; you have to
 play it again. Soft plucks with hardly any attack still count if the pitch is
 right. Details: [`docs/SCORING.md`](docs/SCORING.md).
 
+### Library (your songs, favourites and statistics)
+Click the **Bass Trainer icon** in Chrome's toolbar (or **Library** in the panel or
+the player) to open it.
+
+- Every bass track you open is remembered automatically, with its Songsterr link.
+  Press **☆ Save** (bottom left of the highway) to make the song a **favourite**.
+  Favourites are listed first.
+- At the top: practice time this week, songs, accuracy, your **streak** (days in a
+  row) and total time, plus a bar chart of practice minutes for the last 4 weeks.
+- Each song shows status (New / Learning / Practising / Mastered; you set it),
+  tuning, practice time, best score at full speed with its trend (↑ ↓), and a small
+  curve of your recent passes. **Open** opens it on Songsterr (or in the player).
+- Click a song for its details: passes, practice time, days, best at 100%, best
+  overall, the fastest speed you played it at 90%+, a chart of the last 40 passes
+  (faded = slowed down), every section with its accuracy, your weak spots, and
+  **notes** (saved as you type).
+  **Practise** next to a section or weak spot opens the song and loops those bars
+  automatically.
+- Filters (All, Favourites, by status, Drills), search (also searches your notes)
+  and sorting (last played, most practised, best score, recently added, title).
+- *Remove from library* deletes the song and its history.
+- Songs from the standalone player are saved with their chart; starred player
+  songs also keep their audio file, so **Open** loads both again.
+
+### Warm-up & technique drills
+**Drills** (player toolbar, the Library, or the panel on Songsterr) opens a list
+of exercises. They are played in the player with a metronome click and scored like
+a song:
+
+| Drill | What it trains |
+|---|---|
+| Chromatic 1-2-3-4 | one finger per fret, across all strings, moving up |
+| Spider (string crossing) | clean string changes, finger independence |
+| Octaves | root + octave through I–IV–V–I, muting |
+| Root–fifth–octave | the classic R–5–8–5 pattern |
+| Major scale (one octave) | the major scale shape, a new key every two bars |
+| Metronome lock-in | steady eighths on open strings, tempo rising 4 BPM every two bars |
+| Sixteenth-note endurance | even sixteenths, alternating fingers |
+
+Choose the tempo (BPM), number of bars and start fret. Your best clean tempo (90%+)
+is saved per drill. Next time the tempo is set **5 BPM higher** automatically.
+The player's **Click** box adds the metronome to any chart.
+
 ### Standalone player (your own audio)
 Click the extension's icon in Chrome's toolbar, or **Open standalone player** in the
 panel. A page opens where you can practise without Songsterr:
@@ -411,6 +457,9 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.8.0:** Library (favourites, status, notes, statistics, streaks, "practise
+  these bars"), warm-up & technique drills with a metronome; highway: fret lights
+  on the fretboard, inlay dots, stage light beams, section flash, softer lighting.
 - **0.7.0:** input check ("hearing …" and warnings), timing dots (optional),
   timing correction per sound source, 5-string check; Rocksmith feel: hit sparks,
   sustain flare, rounded gems with shadows, section names on the highway, sliding
@@ -431,6 +480,7 @@ node tests/e2e-player.mjs /tmp/a.wav [shot.png]   # standalone player: chart + a
 node tests/e2e-scoring.mjs [shot.png]             # scoring in the browser with a synthesized performance
 node tests/e2e-phase4.mjs /tmp/a.wav [shot.png]   # real Songsterr: count-in, shortcuts, mute status
 node tests/e2e-v2.mjs [shot-prefix]               # takes, history + progress card, wait mode, riff repeater
+node tests/e2e-library.mjs [shot-prefix]          # drill scored + saved, ☆ Save, Library page, "practise these bars"
 npx http-server -p 8123                           # then open /tests/highway-preview.html?t=78&style=3d
 ```
 

@@ -86,6 +86,15 @@ results.muteStatus = await page.evaluate(() => {
   return sec ? [...sec.querySelectorAll('div.muted')].map((d) => d.innerText).filter(Boolean)[0] : null;
 });
 results.songsterrCountIn = await page.evaluate(() => window.__st.get().player.isCountin);
+// 4. Library: the open song is remembered (with its Songsterr link); ☆ Save makes it a favourite.
+await page.locator('#bass-trainer-highway >> css=button.star').click();
+await page.waitForTimeout(800);
+results.library = await page.evaluate(() => document.getElementById('bass-trainer-highway').shadowRoot.querySelector('button.star').textContent);
+const libPage = await ctx.newPage();
+await libPage.goto(`chrome-extension://${new URL((ctx.serviceWorkers()[0]).url()).host}/library/library.html`);
+await libPage.waitForTimeout(1200);
+results.libraryRows = await libPage.evaluate(() => [...document.querySelectorAll('.row')].map((r) => r.querySelector('.title').innerText.replace(/\n/g, ' · ') + (r.querySelector('.fav.on') ? ' ★' : '')));
+await libPage.close();
 if (shot) await page.screenshot({ path: shot });
 console.log(JSON.stringify(results, null, 1));
 await ctx.close();

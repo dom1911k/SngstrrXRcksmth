@@ -11,6 +11,8 @@
   <div class="group">
     <label class="btn">Open chart… <input id="chartFile" type="file" accept=".json,application/json" hidden></label>
     <label class="btn">Open audio… <input id="audioFile" type="file" accept="audio/*,.mp3,.ogg,.wav,.m4a,.flac,.opus" hidden></label>
+    <button id="drillsBtn" class="btn" title="Warm-up and technique drills">Drills</button>
+    <a class="btn" href="../library/library.html" title="Your songs, favourites and statistics">Library</a>
   </div>
   <div class="group transport">
     <button id="restart" class="btn" title="Back to start (R / Home)">⏮</button>
@@ -36,6 +38,7 @@
   <div class="group">
     <label class="small" title="Shift the chart against the audio if notes are early/late compared to the recording">Audio offset
       <input id="offset" type="number" value="0" step="10"> ms</label>
+    <label class="small" title="Metronome click on every beat (always on for drills)"><input id="metro" type="checkbox"> Click</label>
   </div>
   <div class="spacer"></div>
   <a class="small link" href="../updater/updater.html" target="_blank">Updates</a>
@@ -49,6 +52,23 @@
     Songsterr panel or made by your own tool) and the matching <b>audio file</b> (MP3, OGG, WAV, M4A, FLAC).
     You can also drag both files onto this page.</p>
   <p class="small">Keys: Space play/pause · ← → 5 s back/forward · R restart · A / B loop start/end at the current bar · C clear loop · − + speed · all changeable in the BASS TRAINER panel (Practice)</p>
+</div>
+<div id="drills" class="dialog" hidden>
+  <div class="dialog-box">
+    <h2>Warm-up &amp; technique drills</h2>
+    <p class="small">Played with a click and scored like a song. Your best tempo per drill is saved in the Library.</p>
+    <div id="drillList" class="drill-list"></div>
+    <div class="drill-opts">
+      <label>Tempo <input id="drillBpm" type="number" min="30" max="240" step="5"> BPM</label>
+      <label>Bars <input id="drillBars" type="number" min="2" max="64" step="1"></label>
+      <label>Start fret <input id="drillPos" type="number" min="0" max="15" step="1"></label>
+    </div>
+    <p id="drillHint" class="small"></p>
+    <div class="dialog-row">
+      <button id="drillCancel" class="btn">Cancel</button>
+      <button id="drillStart" class="btn primary">Start drill</button>
+    </div>
+  </div>
 </div>
 <script type="module" src="../src/player-main.js"></script>
 </body>

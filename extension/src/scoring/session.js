@@ -114,6 +114,7 @@ export class ScoringSession {
     this.scorer.beginPass(from - 0.02, to);
     this.passKind = kind;
     this.ended = false;
+    this.passStartPerf = performance.now();
     this.emit('pass', { reason, from, to, kind });
     this.emit('stats', this.stats());
   }
@@ -258,7 +259,8 @@ export class ScoringSession {
   }
 
   summaryOf(kind, speed) {
-    return { kind, speed, at: Date.now(), ...this.scorer.summary(this.chart) };
+    const seconds = Math.round((performance.now() - (this.passStartPerf || performance.now())) / 1000);
+    return { kind, speed, at: Date.now(), seconds, ...this.scorer.summary(this.chart) };
   }
 
   currentSummary() {

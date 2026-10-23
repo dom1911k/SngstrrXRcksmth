@@ -43,6 +43,54 @@ export function sparkTexture() {
   return radialTexture([[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.7)'], [1, 'rgba(255,255,255,0)']]);
 }
 
+// Fret slot light on the fretboard: soft rectangle, brightest at the strings.
+export function slotTexture() {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 128;
+  const g = c.getContext('2d');
+  const v = g.createLinearGradient(0, 0, 0, 128);
+  v.addColorStop(0, 'rgba(255,255,255,0)');
+  v.addColorStop(0.45, 'rgba(255,255,255,0.9)');
+  v.addColorStop(0.6, 'rgba(255,255,255,0.9)');
+  v.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = v;
+  g.fillRect(0, 0, 64, 128);
+  g.globalCompositeOperation = 'destination-in';
+  const hgr = g.createLinearGradient(0, 0, 64, 0);
+  hgr.addColorStop(0, 'rgba(0,0,0,0)');
+  hgr.addColorStop(0.15, 'rgba(0,0,0,1)');
+  hgr.addColorStop(0.85, 'rgba(0,0,0,1)');
+  hgr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = hgr;
+  g.fillRect(0, 0, 64, 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// A soft vertical light beam (stage backdrop).
+export function beamTexture() {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 256;
+  const g = c.getContext('2d');
+  const v = g.createLinearGradient(0, 0, 0, 256);
+  v.addColorStop(0, 'rgba(255,255,255,0)');
+  v.addColorStop(0.55, 'rgba(255,255,255,0.55)');
+  v.addColorStop(1, 'rgba(255,255,255,0.9)');
+  g.fillStyle = v;
+  g.fillRect(0, 0, 64, 256);
+  g.globalCompositeOperation = 'destination-in';
+  const hgr = g.createLinearGradient(0, 0, 64, 0);
+  hgr.addColorStop(0, 'rgba(0,0,0,0)');
+  hgr.addColorStop(0.5, 'rgba(0,0,0,1)');
+  hgr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = hgr;
+  g.fillRect(0, 0, 64, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // Wide text (section names): canvas 512x128.
 export function wideLabelTexture(text, color = '#dfe5ff') {
   const c = document.createElement('canvas');

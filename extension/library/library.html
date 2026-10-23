@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bass Trainer: library</title>
+<link rel="stylesheet" href="library.css">
+</head>
+<body>
+<header>
+  <div class="brand">Bass Trainer <span>library</span></div>
+  <input id="search" type="search" placeholder="Search songs…" autocomplete="off">
+  <div class="spacer"></div>
+  <a class="btn" href="https://www.songsterr.com" target="_blank" rel="noopener">Songsterr</a>
+  <a class="btn" href="../player/player.html#drills">Drills</a>
+  <a class="btn" href="../player/player.html">Player</a>
+  <a class="small link" href="../updater/updater.html" target="_blank">Updates</a>
+</header>
+<main>
+  <section id="overview" class="overview"></section>
+  <section class="practice">
+    <div class="head"><h2>Practice time, last 4 weeks</h2><span id="practiceNote" class="small"></span></div>
+    <div id="practiceChart" class="daychart"></div>
+  </section>
+  <section>
+    <div class="head">
+      <div id="filters" class="chips"></div>
+      <label class="small">Sort
+        <select id="sort">
+          <option value="recent">Last played</option>
+          <option value="time">Most practised</option>
+          <option value="best">Best score</option>
+          <option value="added">Recently added</option>
+          <option value="title">Title</option>
+        </select>
+      </label>
+    </div>
+    <div id="list" class="list"></div>
+    <p id="empty" class="emptymsg" hidden></p>
+  </section>
+</main>
+<aside id="detail" class="detail" hidden></aside>
+<script type="module" src="../src/library-main.js"></script>
+</body>
+</html>

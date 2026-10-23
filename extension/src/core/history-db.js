@@ -5,6 +5,8 @@
 
 const DB_NAME = 'bass-trainer';
 const STORE = 'passes';
+const SONGS = 'songs';        // song library (favourites, status, notes, layout)
+const AUDIO = 'audio';        // audio files of saved player songs
 const MAX_PER_SONG = 500;
 
 let dbPromise = null;
@@ -12,10 +14,15 @@ let dbPromise = null;
 function open() {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 1);
+      const req = indexedDB.open(DB_NAME, 2);
       req.onupgradeneeded = () => {
-        const store = req.result.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
-        store.createIndex('song', 'songKey');
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE)) {
+          const store = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+          store.createIndex('song', 'songKey');
+        }
+        if (!db.objectStoreNames.contains(SONGS)) db.createObjectStore(SONGS, { keyPath: 'songKey' });
+        if (!db.objectStoreNames.contains(AUDIO)) db.createObjectStore(AUDIO, { keyPath: 'songKey' });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => { dbPromise = null; reject(req.error); };
@@ -31,8 +38,8 @@ function done(req) {
   });
 }
 
-async function store(mode) {
-  return (await open()).transaction(STORE, mode).objectStore(STORE);
+async function store(mode, name = STORE) {
+  return (await open()).transaction(name, mode).objectStore(name);
 }
 
 export const idbHistory = {
@@ -56,6 +63,9 @@ export const idbHistory = {
     for (const k of keys) s.delete(k);
     return keys.length;
   },
+  async all() {
+    return done((await store('readonly')).getAll());
+  },
   async songs() {
     const recs = await done((await store('readonly')).getAll());
     const map = new Map();
@@ -69,9 +79,33 @@ export const idbHistory = {
   },
 };
 
+// Song library entries: { songKey, title, artist, track, kind, url, tuning,
+// favorite, status, notes, addedAt, lastOpenedAt, layout, chart?, hasAudio }.
+export const idbLibrary = {
+  async get(songKey) { return (await done((await store('readonly', SONGS)).get(songKey))) || null; },
+  async all() { return done((await store('readonly', SONGS)).getAll()); },
+  async put(entry) { await done((await store('readwrite', SONGS)).put(entry)); return entry; },
+  // Merge fields into an entry (created if missing).
+  async patch(songKey, fields) {
+    const cur = (await this.get(songKey)) || { songKey, addedAt: Date.now(), favorite: false, status: 'new', notes: '' };
+    return this.put({ ...cur, ...fields, songKey });
+  },
+  async remove(songKey) {
+    await done((await store('readwrite', SONGS)).delete(songKey));
+    await done((await store('readwrite', AUDIO)).delete(songKey));
+    return true;
+  },
+  async putAudio(songKey, blob, name) { await done((await store('readwrite', AUDIO)).put({ songKey, blob, name })); return true; },
+  async getAudio(songKey) { return (await done((await store('readonly', AUDIO)).get(songKey))) || null; },
+};
+
 // Message handler for the background service worker.
 export async function handleHistoryMessage(msg) {
   const { op, args = [] } = msg;
-  if (!['add', 'list', 'clear', 'songs'].includes(op)) throw new Error(`unknown history op ${op}`);
+  if (msg.store === 'library') {
+    if (!['get', 'all', 'put', 'patch', 'remove'].includes(op)) throw new Error(`unknown library op ${op}`);
+    return idbLibrary[op](...args);
+  }
+  if (!['add', 'list', 'clear', 'songs', 'all'].includes(op)) throw new Error(`unknown history op ${op}`);
   return idbHistory[op](...args);
 }

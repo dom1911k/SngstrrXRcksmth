@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
+Status: **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -83,7 +83,9 @@ extension/
       adapter.js          (isolated world: talks to bridge, emits typed events)
       to-chart.js         (Songsterr part JSON + playback timeline → chart JSON)
   core/
-    history.js, history-db.js  practice history (IndexedDB) and weak-spot statistics
+    history.js, history-db.js  practice history + song library (IndexedDB) and weak-spot statistics
+    library.js            song library: tracker, statistics, "practise these bars" hand-off
+    drills.js             warm-up / technique drills generated as charts
     riff-repeater.js      loop a section, automatic speed-up
     wait-mode.js          stop at each note until it is played
     takes.js              record takes, play them back in sync, WAV export
@@ -458,4 +460,48 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
     the fret numbers.
 * 5-string: verified with a synthetic 5-string chart in the player (5 strings, low
   B green, detector minimum from the tab's tuning).
+
+---
+
+## 14. Library and drills (0.8.0)
+
+* **Storage:** IndexedDB `bass-trainer` version 2 adds `songs` (keyPath `songKey`) and
+  `audio` (saved player audio files). Content scripts use the background service
+  worker (`{ type: 'history', store: 'library', op, args }`).
+* **LibraryTracker** (`core/library.js`): on every bass chart, patches the entry with
+  title/artist/track/kind/url (`location.href`, so the track is in the link)/tuning/
+  layout (`bars` + `sections`, enough for statistics without the chart) and
+  `lastOpenedAt`; player charts also store the chart. ☆ Save (overlay bar) sets
+  `favorite` (and status learning). Starred player songs store the audio file.
+* **Pass length:** summaries carry `seconds` (real time since the pass started) →
+  records → practice time. `songStats()` / `overallStats()` (pure, tested): passes,
+  time, days, best, best at 100%, fastest speed at 90%+, trend (last 5 vs previous 5),
+  streak (consecutive days up to today or yesterday), last 28 days, drills' best BPM.
+* **Library page** (`library/library.html`, `src/library-main.js`): overview cards,
+  28-day chart, filter chips, sort, rows (★, status, tuning, time, best + trend,
+  sparkline, Open), detail drawer (stats, pass chart in SVG, sections and weak spots
+  via `aggregate()` on the stored layout, notes, status, remove). Songs that only
+  exist in the history (older versions) are listed too; Songsterr links fall back to
+  `https://www.songsterr.com/a/wa/song?id=…`.
+* **"Practise these bars":** the Library stores `libraryPending` `{ songKey, loopBars }`
+  in `chrome.storage.local` (10 min) and opens the song; the tracker takes it when the
+  chart loads and loops the bars.
+* **Drills** (`core/drills.js`): `makeDrill(id, { bpm, bars, position, tuning })` builds
+  a normal chart (one empty "get ready" bar, then the pattern; `meta.source =
+  { type: 'drill', id, bpm }`, `meta.metronome`). Lock-in ramps the tempo per two
+  bars. History key `drill:<id>`, records carry `bpm`. Player: drill dialog (best runs,
+  suggested tempo = best clean BPM + 5), URL `player.html?drill=id&bpm=&bars=&pos=`,
+  `#drills`.
+* **Metronome** (`LocalAdapter.tickMetronome`): schedules clicks of the chart's beats
+  ~0.2 s ahead in an AudioContext (song time → context time by speed); resyncs after
+  jumps. On for drills, or via the player's Click box. Charts without audio stop 1.5 s
+  after their end, so the end-of-song summary is saved.
+* **Highway (0.8.0):** fret-slot lights on the floor under arriving notes (additive
+  quads, pool of 8), inlay dots, four slowly swaying additive light beams behind the
+  horizon, a lane flash at section starts (`sectionFlash`), hemisphere light;
+  section labels fade out in the near 12–37% of the lane.
+* Tests: `tests/library.test.mjs`; `tests/e2e-library.mjs` (drill played by the fake
+  microphone: metronome clicks, 100%, saved with BPM, auto-stop, ☆ Save; Library page
+  rows, cards, detail sections/weak spots/chart; "Practise" hand-off); `e2e-phase4`
+  checks ☆ Save + Library on the real Songsterr page.
 

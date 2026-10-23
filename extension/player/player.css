@@ -7,7 +7,7 @@ header { position: fixed; top: 0; left: 0; right: 0; height: 56px; display: flex
 .group { display: flex; align-items: center; gap: 6px; }
 #seekRow { position: fixed; top: 56px; left: 0; right: 0; height: 22px; background: #101217; border-bottom: 1px solid #2c2f36; z-index: 10; display: flex; align-items: center; padding: 0 10px; }
 #seekRow input { width: 100%; margin: 0; accent-color: #f2c418; }
-.btn { background: #2a2e36; color: #fff; border: 1px solid #3a3f49; border-radius: 6px; padding: 6px 11px; font: inherit; cursor: pointer; display: inline-block; }
+.btn { background: #2a2e36; color: #fff; border: 1px solid #3a3f49; border-radius: 6px; padding: 6px 11px; font: inherit; cursor: pointer; display: inline-block; text-decoration: none; }
 .btn:hover { background: #343944; }
 .btn.primary { background: #e8202a; border-color: #e8202a; min-width: 42px; }
 .btn.on { background: #f2c418; color: #111; border-color: #f2c418; }
@@ -29,3 +29,17 @@ input[type=number] { width: 70px; }
 .empty[hidden] { display: none; }
 .empty h1 { color: #f2c418; font-size: 22px; margin-top: 0; }
 code { background: #0e1014; padding: 1px 5px; border-radius: 4px; }
+
+.dialog { position: fixed; inset: 0; z-index: 2147483003; background: rgba(4,5,8,.72); display: flex; align-items: center; justify-content: center; }
+.dialog[hidden] { display: none; }
+.dialog-box { width: min(720px, 94vw); max-height: 88vh; overflow: auto; background: #15171c; border: 1px solid #2c2f36; border-radius: 12px; padding: 18px 22px; }
+.dialog-box h2 { margin: 0 0 4px; color: #f2c418; font-size: 18px; }
+.drill-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin: 12px 0; }
+.drill { text-align: left; background: #0e1014; border: 1px solid #2c2f36; border-radius: 10px; padding: 10px 12px; color: #e8e8ea; cursor: pointer; font: inherit; }
+.drill:hover { border-color: #5a6170; }
+.drill.on { border-color: #f2c418; box-shadow: 0 0 0 1px #f2c418 inset; }
+.drill b { display: block; margin-bottom: 4px; }
+.drill .small { display: block; }
+.drill .best { color: #5fd38d; font-size: 12px; margin-top: 6px; display: block; }
+.drill-opts { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.dialog-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }

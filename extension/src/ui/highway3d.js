@@ -12,7 +12,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { stringColors } from '../core/music.js';
 import { computeAnchors, anchorAt, firstNoteAtOrAfter } from '../core/chart.js';
 import { CameraFollow, planCameraSegments } from '../core/camera-follow.js';
-import { roundedGemGeometry, shadowTexture, wideLabelTexture, Particles, Bloom } from './highway3d-fx.js';
+import { roundedGemGeometry, shadowTexture, wideLabelTexture, slotTexture, beamTexture, Particles, Bloom } from './highway3d-fx.js';
 
 const DEPTH = 40;            // world units from the strike line to the far end
 const MAX_FRET = 24;
@@ -99,6 +99,7 @@ export class Highway3D {
     this.follow = new CameraFollow();
     this.lit = new Float32Array(6);
     this.sustainLit = new Float32Array(6);
+    this.sectionLabels = [];
     this.litPrev = new Float32Array(6);
     this.labelKey = '';
     this.lastRenderKey = '';
@@ -119,7 +120,18 @@ export class Highway3D {
     this.horizon.renderOrder = -10;
     this.scene.add(this.horizon);
 
-    this.scene.add(new THREE.AmbientLight(0xffffff, 1.4));
+    // Stage backdrop: a few slow, faint light beams behind the horizon.
+    this.beams = [-26, -9, 9, 26].map((x, i) => {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: beamTexture(), color: [0x3a4f9a, 0x5a3d8f, 0x3d6d9a, 0x4a3a8a][i], transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, fog: false }));
+      sp.scale.set(9, 46, 1);
+      sp.renderOrder = -9;
+      sp.userData = { x, phase: i * 1.7 };
+      this.scene.add(sp);
+      return sp;
+    });
+
+    this.scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x20242e, 0.6));
+    this.scene.add(new THREE.AmbientLight(0xffffff, 1.1));
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(2, 8, 6);
     this.scene.add(sun);
@@ -132,6 +144,7 @@ export class Highway3D {
     this.labelCache = new Map();
     this.glowTex = glowTexture();
     this.shadowTex = shadowTexture();
+    this.slotTex = slotTexture();
     this.particles = new Particles(this.scene);
     this.buildStatic();
     this.timeGroup = new THREE.Group();   // children in seconds along -z; scaled per frame
@@ -176,6 +189,17 @@ export class Highway3D {
       S.add(m);
       return m;
     });
+    // Inlay dots on the fretboard (3, 5, 7, 9, 12 double, …) between the strings and the numbers.
+    const inlayMat = new THREE.MeshBasicMaterial({ color: 0x8c96ad, transparent: true, opacity: 0.35, depthWrite: false });
+    const inlayGeo = new THREE.CircleGeometry(0.11, 20);
+    inlayGeo.rotateX(-Math.PI / 2);
+    for (const f of [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]) {
+      for (const dz of f % 12 === 0 ? [-0.14, 0.14] : [0]) {
+        const m = new THREE.Mesh(inlayGeo, inlayMat);
+        m.position.set(f - 0.5 + dz, 0.014, -0.45);
+        S.add(m);
+      }
+    }
     // Fret numbers on the floor in front of the strings.
     this.fretLabels = [];
     for (let f = 1; f <= MAX_FRET; f++) {
@@ -201,9 +225,20 @@ export class Highway3D {
         return sp;
       });
     }
+    if (!this.slotPool) {
+      const geo = new THREE.PlaneGeometry(1, 1);
+      geo.rotateX(-Math.PI / 2);
+      this.slotPool = Array.from({ length: 8 }, () => {
+        const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: this.slotTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+        m.visible = false;
+        m.renderOrder = 2;
+        this.scene.add(m);
+        return m;
+      });
+    }
     const notes = this.chart.notes;
     const before = 0.6 * speed, after = 0.16 * speed;
-    let used = 0;
+    let used = 0, slots = 0;
     for (let i = firstNoteAtOrAfter(notes, t - after); i < notes.length && notes[i].t <= t + before && used < this.targetPool.length; i++) {
       const n = notes[i];
       if (n.flags.ghost) continue;
@@ -221,7 +256,17 @@ export class Highway3D {
       sp.scale.set(open ? 4.2 : 1.0, real > -0.04 && real < 0.04 ? 0.42 : 0.3, 1);
       sp.position.set(o.obj.position.x, o.obj.position.y, 0.03);
       sp.visible = true;
+      // The fret on the fretboard lights up under the note as it arrives.
+      if (slots < this.slotPool.length) {
+        const m = this.slotPool[slots++];
+        m.material.color.set(this.colors[n.string] || '#ffffff');
+        m.material.opacity = Math.min(0.55, alpha * 0.6);
+        m.scale.set(open ? 3.9 : 0.94, 1, 2.2);
+        m.position.set(o.obj.position.x, 0.016, 0.25);
+        m.visible = true;
+      }
     }
+    for (let k = slots; k < this.slotPool.length; k++) this.slotPool[k].visible = false;
     // Held notes: while you hold the right pitch, a bright flare stays on the
     // string at the note's fret (Rocksmith's sustain feedback).
     this.sustainLit.fill(0);
@@ -272,6 +317,7 @@ export class Highway3D {
     if (this.stringMeshes) for (const m of this.stringMeshes) { this.scene.remove(m); m.geometry.dispose(); }
     this.stringMeshes = [];
     this.noteObjs = [];
+    this.sectionLabels = [];
   }
 
   setChart(chart) {
@@ -362,7 +408,9 @@ export class Highway3D {
       sp.scale.set(3.6, 0.9, 1);
       sp.position.set(a ? a.fret + 1 : 3, STRING_BASE + (n - 1) * STRING_GAP + 1.1, -sec.t);
       sp.userData.ownMaterial = true;
+      sp.userData.t = sec.t;
       this.timeGroup.add(sp);
+      this.sectionLabels.push(sp);
     }
     if (laneQuads.length) {
       this.timeGroup.add(mergedQuads(laneQuads, anchorMat));
@@ -494,6 +542,16 @@ export class Highway3D {
     }
   }
 
+  // 1 right at the start of a section, fading over ~0.7 s (real time).
+  sectionFlash(t, speed) {
+    const secs = this.chart.sections || [];
+    let last = null;
+    for (const s of secs) { if (s.t <= t) last = s; else break; }
+    if (!last || last.t <= 0.01) return 0;
+    const age = (t - last.t) / speed;
+    return age >= 0 && age < 0.7 ? 1 - age / 0.7 : 0;
+  }
+
   // 1 right on a beat, decaying over ~0.15 s (real time); downbeats count fully.
   beatPulse(t, speed) {
     const beats = this.chart.beats;
@@ -574,7 +632,15 @@ export class Highway3D {
 
       // The lit hand lane pulses gently on every beat, stronger on the bar.
       const pulse = this.beatPulse(t, speed);
-      if (this.anchorMat) this.anchorMat.opacity = 0.16 + 0.1 * pulse;
+      // Section names: clear in the distance, fading out as they come close.
+      for (const sp of this.sectionLabels) {
+        const frac = (sp.userData.t - t) / look;      // 1 = far end, 0 = strings
+        sp.visible = frac > 0.12 && frac < 1.05;
+        sp.material.opacity = 0.9 * Math.max(0, Math.min(1, (frac - 0.12) / 0.25));
+      }
+      // ...and flashes briefly when a new section starts.
+      const flash = this.sectionFlash(t, speed);
+      if (this.anchorMat) this.anchorMat.opacity = 0.16 + 0.1 * pulse + 0.22 * flash;
 
       // Camera frames the current passage (see core/camera-follow.js).
       this.follow.update(t, speed, dt);
@@ -636,6 +702,12 @@ export class Highway3D {
     }
     place((lo + hi) / 2);
     this.horizon.position.set(camX, 3, -DEPTH - 6);
+    for (const b of this.beams) {
+      const sway = Math.sin(nowMs / 4200 + b.userData.phase);
+      b.position.set(camX + b.userData.x + sway * 3, 14, -DEPTH - 14);
+      b.material.rotation = sway * 0.22 + (b.userData.x < 0 ? -0.25 : 0.25);
+      b.material.opacity = 0.16 + 0.07 * Math.sin(nowMs / 2600 + b.userData.phase * 2);
+    }
     // Fog is measured from the camera: keep it on the far part of the lane.
     const fog = this.scene.fog;
     fog.near = d0 + DEPTH * C.fogStart;

@@ -42,12 +42,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.runtime.openOptionsPage();
   }
   if (msg && msg.type === 'openPlayer') {
-    chrome.tabs.create({ url: chrome.runtime.getURL('player/player.html') });
+    chrome.tabs.create({ url: chrome.runtime.getURL(`player/player.html${msg.hash || ''}`) });
+  }
+  if (msg && msg.type === 'openLibrary') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('library/library.html') });
   }
   return false;
 });
 
-chrome.action.onClicked.addListener(() => chrome.tabs.create({ url: chrome.runtime.getURL('player/player.html') }));
+chrome.action.onClicked.addListener(() => chrome.tabs.create({ url: chrome.runtime.getURL('library/library.html') }));
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason !== 'update') return;

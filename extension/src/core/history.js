@@ -21,7 +21,7 @@ function backend() {
         else resolve(res.result);
       });
     });
-    return Promise.resolve({ add: call('add'), list: call('list'), clear: call('clear'), songs: call('songs') });
+    return Promise.resolve({ add: call('add'), list: call('list'), clear: call('clear'), songs: call('songs'), all: call('all') });
   }
   return Promise.resolve(memoryHistory());
 }
@@ -34,6 +34,7 @@ export function memoryHistory() {
     async list(key) { return recs.filter((r) => r.songKey === key).sort((a, b) => a.at - b.at); },
     async clear(key) { const n = recs.length; for (let i = recs.length - 1; i >= 0; i--) if (recs[i].songKey === key) recs.splice(i, 1); return n - recs.length; },
     async songs() { return [...new Set(recs.map((r) => r.songKey))].map((songKey) => ({ songKey })); },
+    async all() { return [...recs]; },
   };
 }
 
@@ -48,6 +49,7 @@ export function songKeyOf(chart) {
   if (!chart || !chart.meta) return null;
   const src = chart.meta.source || {};
   if (src.type === 'songsterr' && src.songId) return `songsterr:${src.songId}:${src.partId}`;
+  if (src.type === 'drill' && src.id) return `drill:${src.id}`;
   const title = (chart.meta.title || '').trim();
   if (!title) return null;
   return `local:${(chart.meta.artist || '').trim().toLowerCase()}|${title.toLowerCase()}`;
@@ -71,6 +73,8 @@ export function recordFromSummary(summary, chart) {
     hits: summary.hits,
     bestStreak: summary.bestStreak,
     avgOffsetMs: summary.avgOffsetMs,
+    seconds: summary.seconds || 0,          // practice time of this pass (real seconds)
+    bpm: chart.meta.source && chart.meta.source.bpm ? chart.meta.source.bpm : undefined, // drills
     from: Number.isFinite(summary.from) ? summary.from : null,
     to: Number.isFinite(summary.to) ? summary.to : null,
     perBar: (summary.perBar || []).map((b) => [b.bar, b.hits, b.misses]),

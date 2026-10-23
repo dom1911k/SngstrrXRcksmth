@@ -19,6 +19,7 @@ canvas[hidden] { display: none; }
 .bar button, .pill { background: rgba(30,33,40,.85); color: #c9ced8; border: 1px solid #3a3f49; border-radius: 6px;
   padding: 3px 9px; font: 600 12px system-ui, sans-serif; cursor: pointer; }
 .bar button.on { background: #f2c418; color: #111; border-color: #f2c418; }
+.bar button.star[hidden] { display: none; }
 .bar .sep { width: 8px; }
 .grip { position: absolute; top: -5px; left: 0; right: 0; height: 10px; cursor: ns-resize; z-index: 3; }
 .msg { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); text-align: center; z-index: 2;
@@ -57,6 +58,7 @@ export function createOverlay(adapter, {
   takes = null,          // Takes (optional)
   riff = null,           // RiffRepeater (optional)
   monitor = null,        // InputMonitor: warnings + held-note feedback (optional)
+  library = null,        // LibraryTracker: ★ save button (optional)
 } = {}) {
   const host = h('div', { id: 'bass-trainer-highway' });
   const root = host.attachShadow({ mode: 'open' });
@@ -90,6 +92,20 @@ export function createOverlay(adapter, {
       return styleButtons[style];
     }),
   );
+  // ★ Save the song in the library (favourite).
+  const star = h('button', { class: 'star', title: 'Save this song in your library (favourites)', hidden: true, onclick: async () => {
+    const e = await library.toggleFavorite();
+    if (e) notify(e.favorite ? 'Saved in your library ★' : 'Removed from favourites');
+  } }, '☆ Save');
+  if (library) {
+    bar.append(h('span', { class: 'sep' }), star);
+    library.onChange((e) => {
+      star.hidden = !e;
+      const fav = !!(e && e.favorite);
+      star.textContent = fav ? '★ Saved' : '☆ Save';
+      star.classList.toggle('on', fav);
+    });
+  }
   const grip = h('div', { class: 'grip', title: 'Drag to resize' });
   const msg = h('div', { class: 'msg', hidden: true });
   const wrap = h('div', { class: 'wrap' }, canvas2d, canvas3d, hud, grip, msg, bar, debugEl, notice, warnBox);

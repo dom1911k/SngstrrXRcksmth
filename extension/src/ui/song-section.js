@@ -44,6 +44,12 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
     h('div', { class: 'row' }, exportBtn,
       adapter.name === 'Songsterr player' && typeof chrome !== 'undefined' && chrome.runtime
         ? h('button', { class: 'btn', title: 'Practise with your own audio file and a chart', onclick: () => chrome.runtime.sendMessage({ type: 'openPlayer' }) }, 'Open standalone player')
+        : null,
+      typeof chrome !== 'undefined' && chrome.runtime
+        ? h('button', { class: 'btn', title: 'Your songs, favourites and statistics', onclick: () => chrome.runtime.sendMessage({ type: 'openLibrary' }) }, 'Library')
+        : null,
+      adapter.name === 'Songsterr player' && typeof chrome !== 'undefined' && chrome.runtime
+        ? h('button', { class: 'btn', title: 'Warm-up and technique drills (opens the player)', onclick: () => chrome.runtime.sendMessage({ type: 'openPlayer', hash: '#drills' }) }, 'Drills')
         : null),
   );
 
