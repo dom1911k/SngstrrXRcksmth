@@ -66,7 +66,8 @@ instead.
 | Tied notes | Already merged into one longer note by the converter: one hit. |
 | Chords / double stops | The detector hears one pitch at a time, so only the **lowest** note of simultaneous notes is scored; the others are skipped. |
 | Count-in, pause | Nothing is scored while paused or counting in; notes played then are ignored (tune freely). |
-| Seek | Starts a new pass from the new position. Notes before it aren't counted as misses. |
+| Seek | Starts a new pass from the new position. Notes before it aren't counted as misses. If you played at least 12 notes before jumping, that part is saved to the practice history. |
+| Input off / wait mode / take playback | Nothing is scored. Starting the input starts a new pass at the current position, so notes that went by while it was off are not misses. |
 | Loop | Each loop pass is scored separately. Notes you play right before the loop jumps back still count for the pass they belong to, because the old pass stays open for latency + 0.3 s. A short pop-up shows each pass's result. |
 | End of song | A summary card: accuracy, early/on time/late/missed, **why** notes were missed (not heard / timing / different note), average timing, bars to practise, notes that differed from the tab. |
 

@@ -19,7 +19,7 @@ export class AutoMute {
     window.addEventListener('pagehide', () => { if (this.mutedByUs) adapter.setBassMuted(false); });
     // The trainer's count-in settings are applied whenever the input starts.
     engine.on('state', (st) => {
-      if (!st.running) return;
+      if (!st.running || adapter.countInSuppressed) return;
       const s = getSettings();
       adapter.setCountIn({ before: s.countIn, loops: s.countInLoops });
     });

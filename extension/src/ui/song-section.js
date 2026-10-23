@@ -36,6 +36,7 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
     h('div', { class: 'muted' }, 'How long a note is visible before you play it. Higher = see further ahead, notes move slower.'),
     check('gemFretNumbers', 'Fret numbers on the notes (3D)'),
     check('invertStrings', 'Tab order (G on top) instead of Rocksmith order (E on top)'),
+    check('showSectionBar', 'Section strip with your weak spots at the top of the highway'),
     check('showDebug', 'Show sync diagnostics on the highway'),
     h('div', { class: 'row' }, exportBtn,
       adapter.name === 'Songsterr player' && typeof chrome !== 'undefined' && chrome.runtime

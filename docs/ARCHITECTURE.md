@@ -1,6 +1,7 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **Phase 4 built (0.5.1)**: auto bass muting (`core/auto-mute.js`, Songsterr's
+Status: **V2 built (0.6.0)**: riff repeater, wait mode, practice history with
+weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
 bindings), highway clean-up with a hit indicator. **Correction:** Songsterr's
@@ -82,6 +83,11 @@ extension/
       adapter.js          (isolated world: talks to bridge, emits typed events)
       to-chart.js         (Songsterr part JSON + playback timeline → chart JSON)
   core/
+    history.js, history-db.js  practice history (IndexedDB) and weak-spot statistics
+    riff-repeater.js      loop a section, automatic speed-up
+    wait-mode.js          stop at each note until it is played
+    takes.js              record takes, play them back in sync, WAV export
+    practice-tools.js     wires the four above (Songsterr and player)
     music.js              note/frequency maths, tuning presets, Rocksmith colours
     tuner.js              tuner model (steady reading, tuning-mismatch warnings)
     chart.js              chart schema, validation, helpers (string→MIDI, etc.)
@@ -258,13 +264,14 @@ expected    = note.t (chart seconds) mapped to wall clock through the adapter's 
 
 ---
 
-## 9. Version 2 hooks designed in now
+## 9. Version 2 hooks (designed up front; built in 0.6.0, see §12)
 
 * `scoring/session.js` emits per-note results with `bar` + `section`, which is what
   IndexedDB stats and the weak-spots view need.
-* Loop events plus a per-pass accuracy number drive auto speed-up later.
-* Wait mode uses `adapter.pause()` + the matcher's "next expected note" state.
-* Recording: the input graph already has a tap point for a `MediaRecorder`.
+* Loop events plus a per-pass accuracy number drive auto speed-up.
+* Wait mode uses `adapter.pause()` + the scorer's list of scorable notes.
+* Recording: a second worklet processor taps the input (instead of a
+  `MediaRecorder`, so every sample has an exact AudioContext time).
 
 ---
 
@@ -344,3 +351,59 @@ panel (tuner, calibration, highway settings) is reused unchanged. The toolbar ic
   4×/s instead of 60×/s (other page scripts listening to `message` events
   no longer get woken every frame).
 * Panel: tuner, meter and needle only touch the DOM when a value changed.
+
+---
+
+## 12. V2 practice tools (0.6.0)
+
+All four are wired by `core/practice-tools.js` (same on Songsterr and in the
+player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay).
+
+* **Scoring session changes.** Scores only while active (input on, scoring on, not
+  suspended); when it becomes active a new pass starts at the current position,
+  so notes passed while the input was off are not misses. `suspend(reason, on)`
+  (wait mode, take playback). Emits `'played'` (every detected note, with song
+  time) and `'summary'` kind `'partial'` when you jump away after ≥ 12 judged
+  notes. Summaries carry `speed`, `at` and `perBar`.
+* **History** (`core/history.js`, `core/history-db.js`): one record per pass
+  `{ songKey, kind, speed, accuracy, judged, hits, perBar: [[bar, hits, misses]], barCount, … }`.
+  IndexedDB `bass-trainer` / store `passes` (index `song`) in the **extension's**
+  origin: extension pages use it directly, content scripts go through the
+  background service worker (`{ type: 'history', op, args }`). Max 500 passes per
+  song. `songKey` = `songsterr:{songId}:{partId}` or `local:{artist}|{title}`.
+  `aggregate()` → sections (from chart section markers, `sectionsOf`), per-bar miss
+  rates (recency-weighted: weight halves every 20 passes; only records with the same
+  bar count), weak bars (≥ 3 notes), per-day accuracy. Unit tested.
+* **Section strip** (overlay, 18 px canvas at the top): sections coloured by
+  accuracy, red marks for bars with ≥ 20% misses, loop frame, position line.
+  Click = seek, double-click = loop the section.
+* **Riff repeater** (`core/riff-repeater.js`): on a `'loop'` summary whose pass
+  started at the loop start, `nextRiffSpeed()` (pure, tested) raises the speed by
+  `rrStep` if accuracy ≥ `rrTarget`, up to `rrMaxSpeed`. A new loop range (or
+  turning it on) sets `rrStartSpeed`. Also `loopCurrentSection`, `loopBars`.
+* **Wait mode** (`core/wait-mode.js`): stops = the scorer's scorable notes
+  (ghosts and slide arrivals skipped, lowest chord note). When the song reaches
+  `note.t + visualDelay − 30 ms` it pauses and seeks to `note.t + visualDelay`, so
+  the gem waits on the strings. A `'played'` event matching like the scorer
+  (`pitchMatch`: ±50 cents, octave errors accepted, dead = any attack) resumes;
+  pressing play skips; a user seek/loop restart continues from there (our own
+  repositioning is ignored for 0.8 s). Count-in is suppressed meanwhile via
+  `adapter.suppressCountIn(on)` (Songsterr: its count-in toggles, restored from our
+  settings afterwards; player: a flag). Scoring is suspended.
+* **Takes** (`core/takes.js`, `RecorderProcessor` in `audio/pitch-worklet.js`): while
+  armed, the worklet posts 4096-sample chunks stamped with the AudioContext time of
+  their first sample. A take = one stretch of uninterrupted playback (ends on pause,
+  jump or speed change; ≥ 1.5 s); its samples are cut out of the chunks by context
+  time. Mapping: sample at context time c belongs to song time
+  `sRef + (c − cRef)·speed`, where `(cRef, sRef)` is refreshed every frame from the
+  clock minus the total latency (same correction as scoring). Playback: an
+  `AudioBufferSourceNode` in the engine's context started so that the take's
+  sample for song time s is rendered when the player is at s
+  (`takeOffsetFor`), resynced when off by > 30 ms (checked every 0.5 s), stopped on
+  pause/jump/speed change. WAV export: 16-bit mono. Last 6 takes, in memory only.
+* **Highway additions (0.6.0):** chord frames (white box around simultaneous notes on
+  different strings, child of the first gem), wavy tails for vibrato, a soft
+  additive horizon glow behind the far end of the lane.
+* Tests: `tests/v2.test.mjs` (unit), `tests/e2e-v2.mjs` (player in Chromium with a
+  fake microphone: take recorded and played back in sync, history saved, progress
+  card, wait mode stop/resume, riff repeater speed-up).

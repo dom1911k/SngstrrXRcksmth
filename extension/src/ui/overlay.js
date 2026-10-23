@@ -5,6 +5,7 @@ import { h } from './dom.js';
 import { Highway2D } from './highway2d.js';
 import { getSettings, updateSettings, onSettingsChange } from '../core/settings.js';
 import { createScoreUI, SCORE_CSS } from './score-ui.js';
+import { createProgressUI, PROGRESS_CSS } from './progress-ui.js';
 
 const CSS = (controlsGap) => `
 :host { all: initial; }
@@ -34,6 +35,11 @@ canvas[hidden] { display: none; }
 .notice { position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%); z-index: 4; background: rgba(16,18,24,.92);
   border: 1px solid #3a3f49; border-radius: 8px; padding: 6px 14px; font: 600 14px system-ui; color: #e8e8ea; transition: opacity .25s; pointer-events: none; }
 .notice.hide { opacity: 0; }
+.withbar .hud { top: 24px; }
+.withbar .score { top: 22px; }
+.withbar .hint { top: 24px; }
+.hud .center.wait { left: 50%; right: auto; transform: translateX(-50%); top: 40px; white-space: nowrap; color: #fff; font-size: 18px;
+  background: rgba(10,12,16,.88); border: 1px solid #f2c418; border-radius: 8px; padding: 5px 14px; }
 .debug { position: absolute; right: 10px; bottom: 8px; color: #6f7685; font: 11px system-ui; pointer-events: none; z-index: 2; }
 `;
 
@@ -43,10 +49,14 @@ export function createOverlay(adapter, {
   modes = [['highway', 'Highway'], ['both', 'Both'], ['tab', 'Tab']],
   fixedMode = null,      // e.g. 'highway' on the standalone player page
   session = null,        // ScoringSession (optional)
+  history = null,        // HistoryRecorder: section strip + progress card (optional)
+  wait = null,           // WaitMode (optional)
+  takes = null,          // Takes (optional)
+  riff = null,           // RiffRepeater (optional)
 } = {}) {
   const host = h('div', { id: 'bass-trainer-highway' });
   const root = host.attachShadow({ mode: 'open' });
-  root.append(h('style', {}, CSS(controlsGap) + SCORE_CSS));
+  root.append(h('style', {}, CSS(controlsGap) + SCORE_CSS + PROGRESS_CSS));
 
   const canvas2d = h('canvas');
   const canvas3d = h('canvas');
@@ -81,6 +91,7 @@ export function createOverlay(adapter, {
   const pill = h('button', { class: 'pill', hidden: true, onclick: () => updateSettings({ viewMode: 'both' }) }, '▲ Highway');
   root.append(wrap, pill);
   const scoreUI = session ? createScoreUI(wrap, session, () => active) : null;
+  const progressUI = history ? createProgressUI(wrap, { adapter, history, riff, notify: (t) => notify(t) }) : null;
 
   // Resize by dragging the top edge (Both mode).
   grip.addEventListener('pointerdown', (e) => {
@@ -206,17 +217,29 @@ export function createOverlay(adapter, {
     else if (st.countIn) message = 'Count-in…';
     const playing = st.ready && st.shouldPlay;
     const loop = st.ready ? st.loop : null;
-    active.render({ time, speed, playing, loop, message,
+    if (progressUI) {
+      progressUI.update(time, loop);
+      wrap.classList.toggle('withbar', progressUI.visible);
+    }
+    const waitMsg = wait && wait.enabled ? wait.message : '';
+    active.render({ time, speed, playing, loop, message: active === highway2d ? message || waitMsg : message,
+      topInset: progressUI && progressUI.visible ? 18 : 0,
       debug: `sync err ${(adapter.clock.lastError * 1000).toFixed(1)} ms · snaps ${adapter.clock.snaps} · t ${time.toFixed(2)}s · ${st.playerType || ''}` });
     if (active === highway3d) {
       const bar = barAt(time);
       hudLeft.textContent = bar ? `${bar.section ? bar.section + ' · ' : ''}bar ${bar.measure + 1}` : '';
       const right = [];
+      if (takes && takes.armed) right.push('● REC');
+      if (takes && takes.playback) right.push('▶ TAKE');
+      if (wait && wait.enabled) right.push('WAIT');
+      if (riff && riff.enabled && loop) right.push('RIFF');
       if (Math.abs(speed - 1) > 0.001) right.push(`${Math.round(speed * 100)}%`);
       if (loop) right.push('LOOP');
       if (!playing) right.push('PAUSED');
       hudRight.textContent = right.join('   ');
-      hudCenter.textContent = message || (!lastChart && msg.hidden ? 'Waiting for the song…' : '');
+      const waiting = !message && wait && wait.enabled && wait.message;
+      hudCenter.classList.toggle('wait', !!waiting);
+      hudCenter.textContent = message || (waiting ? wait.message : '') || (!lastChart && msg.hidden ? 'Waiting for the song…' : '');
       debugEl.textContent = s.showDebug ? `sync err ${(adapter.clock.lastError * 1000).toFixed(1)} ms · ${Math.round(active.fps)} fps` : '';
     } else {
       debugEl.textContent = '';
@@ -241,5 +264,5 @@ export function createOverlay(adapter, {
     notify(`View: ${modes.find(([m]) => m === next)[1]}`);
   }
 
-  return { host, scoreUI, notify, toggleView, get highway() { return active; } };
+  return { host, scoreUI, progressUI, notify, toggleView, showProgress: () => progressUI && progressUI.show(), get highway() { return active; } };
 }

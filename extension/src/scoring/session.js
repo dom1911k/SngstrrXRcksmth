@@ -11,7 +11,11 @@
 // latency + 0.3 s so the last notes you played before the jump still count;
 // notes detected after the jump wait in a queue for the new pass.
 //
-// Events: 'result' (per note), 'summary' (end of song / loop pass), 'pass', 'stats'.
+// Events: 'result' (per note), 'summary' (end of song / loop pass; kind 'partial'
+// when you jump away after playing a good part of a pass), 'pass', 'stats',
+// 'played' (every detected note while the input is on, song time; used by wait mode).
+//
+// Scoring can be suspended (wait mode, take playback): suspend(reason, true).
 
 import { NoteEventDetector } from './detector.js';
 import { Scorer } from './scorer.js';
@@ -38,6 +42,8 @@ export class ScoringSession {
     this.queue = [];
     this.seenJump = adapter.clock.lastJumpPerf;
     this.ended = false;
+    this.suspended = new Set();
+    this.wasActive = false;
     this.detector = new NoteEventDetector((ev) => this.onEvent(ev));
     engine.on('onset', (o) => this.detector.onOnset(o));
     engine.on('frame', (f) => this.detector.onFrame(f));
@@ -68,7 +74,12 @@ export class ScoringSession {
   }
 
   get active() {
-    return !!(this.scorer && this.engine.running && getSettings().scoring);
+    return !!(this.scorer && this.engine.running && getSettings().scoring && !this.suspended.size);
+  }
+
+  suspend(reason, on) {
+    if (on) this.suspended.add(reason); else this.suspended.delete(reason);
+    this.emit('stats', this.stats());
   }
 
   setChart(chart) {
@@ -106,8 +117,11 @@ export class ScoringSession {
   }
 
   onEvent(ev) {
-    if (!this.active) return;
     const perf = this.engine.ctxToPerf(ev.t) - this.latencyMs();
+    if (this.engine.running && this.listeners.has('played')) {
+      this.emit('played', { ...ev, perf, songTime: this.adapter.clock.timeAt(perf) });
+    }
+    if (!this.active) return;
     // The jump is noticed on the next frame, a few ms after it happened:
     // anything that maps beyond the old pass belongs to the new one.
     if (this.closing && (perf >= this.closing.jumpPerf || this.adapter.clock.timeAt(perf) >= this.closing.before - 0.0005)) {
@@ -136,6 +150,19 @@ export class ScoringSession {
     if (!this.scorer) return;
     const clock = this.adapter.clock;
     const now = performance.now();
+    // Only score while the input is on: notes passed while it was off (or
+    // suspended) are not misses. Turning it on starts a fresh pass from here.
+    const active = this.active;
+    if (active !== this.wasActive) {
+      this.wasActive = active;
+      if (active) this.restartPass('input');
+    }
+    if (!active) {
+      this.seenJump = clock.lastJumpPerf;
+      this.closing = null;
+      this.queue = [];
+      return;
+    }
 
     // A seek or loop restart happened.
     if (clock.lastJumpPerf !== this.seenJump) {
@@ -147,7 +174,7 @@ export class ScoringSession {
       const loopWrap = !!(st.ready && st.loop && Math.abs(after - st.loop.start) < 0.4 && before >= st.loop.end - 0.6);
       // Song time where the old pass ends: the loop end for a loop restart.
       const limit = loopWrap ? Math.min(before, st.loop.end) : before;
-      this.closing = { jumpPerf: clock.lastJumpPerf, at: now + this.latencyMs() + CLOSE_GRACE_MS + DECISION_MS, before: limit, after, loopWrap };
+      this.closing = { speed: clock.prev ? clock.prev.speed : clock.speed, jumpPerf: clock.lastJumpPerf, at: now + this.latencyMs() + CLOSE_GRACE_MS + DECISION_MS, before: limit, after, loopWrap };
     }
     if (this.closing && now >= this.closing.at) this.closePass();
 
@@ -163,7 +190,7 @@ export class ScoringSession {
     if (!this.ended && this.passKind === 'song' && clock.timeAt(ref) > this.lastNoteTime + 1) {
       this.ended = true;
       const s = this.scorer.passStats();
-      if (s.judged >= 4) this.emit('summary', { kind: 'song', ...this.scorer.summary(this.chart) });
+      if (s.judged >= 4) this.emit('summary', this.summaryOf('song', clock.speed));
     }
   }
 
@@ -173,7 +200,8 @@ export class ScoringSession {
     // Judge everything that was reached before the jump.
     this.scorer.advance(c.before, this.adapter.clock.prev ? this.adapter.clock.prev.speed : this.adapter.clock.speed);
     const s = this.scorer.passStats();
-    if (c.loopWrap && s.judged >= 2) this.emit('summary', { kind: 'loop', ...this.scorer.summary(this.chart) });
+    if (c.loopWrap && s.judged >= 2) this.emit('summary', this.summaryOf('loop', c.speed));
+    else if (!c.loopWrap && s.judged >= 12 && !this.ended) this.emit('summary', this.summaryOf('partial', c.speed));
     this.restartPass(c.loopWrap ? 'loop' : 'seek', c.after);
     const q = this.queue;
     this.queue = [];
@@ -201,6 +229,10 @@ export class ScoringSession {
   stats() {
     if (!this.scorer) return null;
     return { ...this.scorer.passStats(), active: this.active, kind: this.passKind };
+  }
+
+  summaryOf(kind, speed) {
+    return { kind, speed, at: Date.now(), ...this.scorer.summary(this.chart) };
   }
 
   currentSummary() {

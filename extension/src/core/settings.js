@@ -49,8 +49,15 @@ export const DEFAULTS = {
   autoMuteBass: true,      // mute the song's bass track while the input is on
   countIn: true,           // standalone player: one bar of clicks before playing
   countInLoops: true,      // ...and before each loop restart
+  // Riff repeater (auto speed-up on loops)
+  riffRepeater: false,
+  rrStartSpeed: 70,        // %
+  rrStep: 5,               // % per successful pass
+  rrTarget: 90,            // accuracy % needed for the next step
+  rrMaxSpeed: 100,         // %
+  showSectionBar: true,    // section strip with your weak spots above the highway
   shortcuts: {},           // action -> [bindings]; empty = defaults
-  panelCollapsed: ['Shortcuts (keyboard or foot pedal)'], // folded panel sections
+  panelCollapsed: ['Shortcuts (keyboard or foot pedal)', 'Record & listen back'], // folded panel sections
   autoTiming: true,        // learn a small timing correction while playing
   autoTimingMs: 0,         // the learned correction (added to the latency)
   schema: SCHEMA,

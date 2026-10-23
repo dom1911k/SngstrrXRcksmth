@@ -4,6 +4,8 @@
 //   cable ─ MediaStreamSource ─┬─ pitch worklet ─ (silent) ─ destination
 //                              └─ monitor gain (default 0) ─ destination
 //
+//                              └─ take recorder (only while recording takes)
+//
 // Emits: 'frame', 'onset', 'level' (from the worklet), 'state', 'devices'.
 
 const WORKLET_URL = new URL('./pitch-worklet.js', import.meta.url).href;
@@ -181,6 +183,7 @@ export class AudioEngine {
     if (this.source) this.source.disconnect();
     if (this.node) { this.node.port.onmessage = null; this.node.disconnect(); }
     if (this.monitor) this.monitor.disconnect();
+    if (this.recorder) { this.recorder.port.onmessage = null; this.recorder.disconnect(); this.recorder = null; }
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
     this.source = this.node = this.monitor = this.stream = null;
     if (this.running) {
@@ -192,6 +195,21 @@ export class AudioEngine {
   setMinFreq(minFreq) {
     this.minFreq = minFreq;
     if (this.node) this.node.port.postMessage({ type: 'config', minFreq });
+  }
+
+  // Raw input for take recording: onChunk({ t (ctx s of the first sample), data }).
+  setRecording(on, onChunk) {
+    if (!this.running) return false;
+    if (on && !this.recorder) {
+      this.recorder = new AudioWorkletNode(this.ctx, 'bass-trainer-recorder', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+      this.source.connect(this.recorder);
+      this.recorder.connect(this.ctx.destination); // silent; keeps it running
+    }
+    if (!this.recorder) return false;
+    this.recorder.port.onmessage = (e) => { if (e.data.type === 'chunk' && this.onChunk) this.onChunk(e.data); };
+    this.onChunk = onChunk || this.onChunk;
+    this.recorder.port.postMessage({ type: 'record', on });
+    return true;
   }
 
   // 0..1. Uses a short ramp to avoid clicks.

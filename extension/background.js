@@ -1,6 +1,7 @@
-// Service worker: update checks, opening the player/updater pages, and reloading
+// Service worker: update checks, practice history storage, opening the player/updater pages, and reloading
 // Songsterr tabs after an update so they pick up the new code.
 import { fetchLatest, compareVersions } from './src/core/updater.js';
+import { handleHistoryMessage } from './src/core/history-db.js';
 
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 
@@ -31,6 +32,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === 'checkUpdate') {
     checkForUpdate(!!msg.force).then(sendResponse);
     return true; // async response
+  }
+  if (msg && msg.type === 'history') {
+    // Practice history for content scripts (stored in the extension's IndexedDB).
+    handleHistoryMessage(msg).then((result) => sendResponse({ result }), (err) => sendResponse({ error: String(err.message || err) }));
+    return true;
   }
   if (msg && msg.type === 'openUpdater') {
     chrome.runtime.openOptionsPage();

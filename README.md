@@ -5,11 +5,13 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.5.1.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.6.0.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
-**practice tools** (automatic bass muting, count-in, keyboard / foot-pedal
-shortcuts), a **standalone player** for your own chart + audio file, a tuner that
-follows the tab's tuning, latency calibration and monitoring.
+**practice tools** (riff repeater with automatic speed-up, wait mode, practice
+history with your weak spots, recording takes and listening back, automatic bass
+muting, count-in, keyboard / foot-pedal shortcuts), a **standalone player** for
+your own chart + audio file, a tuner that follows the tab's tuning, latency
+calibration and monitoring.
 
 It only uses what your Songsterr account already shows you in the browser.
 It does not unlock anything.
@@ -122,9 +124,17 @@ Good Riddance, can be played too.
   - Play each note when it reaches the strings. A soft spot of light on the string,
     at the note's fret, grows brighter as the note comes in and flashes briefly
     at the exact moment to play. The string glows while the note sounds.
-  - Coloured ribbons are held notes. A ribbon that bends sideways is a slide.
+  - Coloured ribbons are held notes. A ribbon that bends sideways is a slide; a
+    wavy ribbon is vibrato.
   - Wide bars are open strings. **X** = dead note; faded small notes = ghost notes;
-    **H**/**P** = hammer-on/pull-off; **PM** = palm mute.
+    **H**/**P** = hammer-on/pull-off; **PM** = palm mute. Notes played together
+    (chords, double stops) have a white frame around them.
+- **Section strip** (top edge of the highway, like Rocksmith's phrase bar): one
+  block per section of the song (Intro, Verse 1, …) with a white line where you
+  are. Once you have practised, each block is coloured by how well you play it
+  (green = good, yellow = so-so, red = needs work), and small red marks show the
+  bars you miss most. **Click** a section to jump there, **double-click** to loop
+  it. The yellow frame is the loop. It can be turned off under *Song & highway*.
 - **Highway / Both / Tab** (bottom left of the highway) switches between highway
   only, highway under the tab, and tab only. In *Both* you can drag the top edge
   of the highway to resize it. Bigger is easier to read.
@@ -163,6 +173,10 @@ Settings in the panel, under **Song & highway**:
   | Clear loop | C |
   | Slower / faster (5 % steps) | Num − / Num + (also - and =) |
   | Switch Highway / Both / Tab | V |
+  | Loop the current section | L |
+  | Wait mode on / off | W |
+  | Riff repeater on / off | (none; set one if you like) |
+  | Record takes on / off | (none) |
 
   To use a **foot pedal**: most pedals type a key (often Page Down / Page Up or an
   arrow). Click **Set** next to an action and step on the pedal; done. **+** adds a
@@ -171,6 +185,42 @@ Settings in the panel, under **Song & highway**:
   (or player) has focus, so click on the page once if the panel's slider has focus.
 
 Panel sections can be folded by clicking their heading; the panel remembers it.
+
+### Riff repeater, wait mode, weak spots, takes (panel → **Riff repeater & wait mode**)
+These need the input to be running (*Start input*).
+
+- **Loop this section** loops the section you are in (also: key **L**, or
+  double-click it in the section strip).
+- **Riff repeater:** tick *speed up automatically on a loop*. When you set a loop,
+  the song drops to the start speed (default 70%). Each time you play a whole
+  loop pass with at least the target accuracy (default 90%), the speed goes up by
+  the step (default 5%), up to the maximum (default 100%). A pass you started in
+  the middle of the loop doesn't count. The highway shows e.g. "93% · speeding up
+  to 80%", or what you still need. All four numbers can be changed in the panel.
+- **Wait mode** (button, or key **W**): the song stops at each note, with the note
+  waiting on the strings and a box saying what to play ("Play C2 · fret 3 on the A
+  string"). Play it and the song continues to the next note. A wrong note is shown
+  ("you played E2") and it keeps waiting. Press play to skip a note. Nothing is
+  scored in wait mode and the count-in is off meanwhile. Turning it off tells you
+  how many notes you got right the first time.
+- **Weak spots** (button): your progress for this song: number of passes, best
+  score at full speed, accuracy per day, every section with its accuracy and a
+  **Loop** button, and the bars you miss most with **Loop ±1 bar** and **Riff
+  repeater** buttons (loops that bar and starts the riff repeater). Recent passes
+  count more, so bars you have fixed drop off the list.
+  Every scored pass is saved automatically: the whole song, each loop pass, and
+  the part you played before you jumped somewhere else (at least 12 notes). The
+  history is kept in Chrome (in the extension, so clearing Songsterr's site data
+  doesn't delete it) and is shared between Songsterr and the standalone player.
+  *Delete history of this song* clears it.
+- **Record & listen back** (section folded by default): tick *Record takes*.
+  Every run from play to pause, seek or loop restart becomes a **take** (the last
+  6 are kept). **▶ Play** starts the song just before the take, at the speed you
+  played it, with your recorded bass in time with the song (the latency
+  correction is applied, so it sounds the way you played it to what you heard).
+  The Songsterr bass stays muted if auto-muting is on, so you hear yourself instead
+  of the tab. **Save** downloads the take as a WAV file. Takes disappear when the
+  page is reloaded. *Take volume* sets how loud the take plays.
 
 ### Scoring
 1. Open the BASS TRAINER panel and click **Start input** (the cable must be
@@ -329,8 +379,9 @@ for detection.
 - **Phase 4 (done, 0.5.0):** automatic bass-track muting, count-in, configurable
   keyboard / foot-pedal shortcuts, cleaner highway with a subtle hit indicator.
   0.5.1: Rocksmith-like camera: strings low on screen, longer view ahead.
-- **V2 (after scoring):** riff repeater with auto speed-up, wait mode, practice
-  stats and weak spots, take recording.
+- **V2 (done, 0.6.0):** riff repeater with automatic speed-up, wait mode, practice
+  history with weak spots and a section strip on the highway, recording takes and
+  playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
 
 Design details are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -346,6 +397,7 @@ node tests/e2e-phase2.mjs [tab-url] [shot-prefix] # real Songsterr: highway sync
 node tests/e2e-player.mjs /tmp/a.wav [shot.png]   # standalone player: chart + audio, speed, loop
 node tests/e2e-scoring.mjs [shot.png]             # scoring in the browser with a synthesized performance
 node tests/e2e-phase4.mjs /tmp/a.wav [shot.png]   # real Songsterr: count-in, shortcuts, mute status
+node tests/e2e-v2.mjs [shot-prefix]               # takes, history + progress card, wait mode, riff repeater
 npx http-server -p 8123                           # then open /tests/highway-preview.html?t=78&style=3d
 ```
 

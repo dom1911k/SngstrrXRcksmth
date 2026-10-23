@@ -228,13 +228,13 @@ export class Highway2D {
     const bar = this.barAt(t);
     if (bar) {
       const label = `${bar.section ? bar.section + ' · ' : ''}bar ${bar.measure + 1}`;
-      this.text(label, 14 * s, 26 * s, 18 * s, '#c9ced8', 'left');
+      this.text(label, 14 * s, 26 * s + (state.topInset || 0), 18 * s, '#c9ced8', 'left');
     }
     const hud = [];
     if (Math.abs(speed - 1) > 0.001) hud.push(`${Math.round(speed * 100)}%`);
     if (state.loop) hud.push('LOOP');
     if (!state.playing) hud.push('PAUSED');
-    if (hud.length) this.text(hud.join('  '), W - 56 * s, 26 * s, 18 * s, '#f2c418', 'right');
+    if (hud.length) this.text(hud.join('  '), W - 56 * s, 26 * s + (state.topInset || 0), 18 * s, '#f2c418', 'right');
     if (state.message) this.text(state.message, W / 2, H * 0.22, 16 * s, '#ffb347', 'center');
     if (this.options.showDebug && state.debug) this.text(`${state.debug} · ${Math.round(this.fps)} fps`, W - 10 * s, H - 10 * s, 12 * s, '#6f7685', 'right');
   }

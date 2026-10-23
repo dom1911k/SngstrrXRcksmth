@@ -10,6 +10,8 @@ import { ScoringSession } from './scoring/session.js';
 import { AutoMute } from './core/auto-mute.js';
 import { createPracticeSection } from './ui/practice-section.js';
 import { createShortcutActions, installShortcuts } from './core/shortcuts.js';
+import { createPracticeTools } from './core/practice-tools.js';
+import { createTrainingSections } from './ui/training-section.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (t) => {
@@ -25,12 +27,15 @@ let panel, overlay;
 const songSection = createSongSection(adapter, { onTabTuning: (t) => panel && panel.setTabTuning(t), showSummary: () => overlay && overlay.scoreUI && overlay.scoreUI.showLast() });
 const autoMute = new AutoMute(engine, adapter);
 const practiceSection = createPracticeSection(adapter, autoMute);
-panel = createPanel(engine, { sections: [...practiceSection, ...songSection] });
-overlay = createOverlay(adapter, { controlsGap: 0, headerGap: 78, fixedMode: 'highway', session });
+const notify = (t) => overlay && overlay.notify(t);
+const tools = createPracticeTools(engine, adapter, session, notify);
+const training = createTrainingSections({ adapter, ...tools, notify, showProgress: () => overlay.showProgress() });
+panel = createPanel(engine, { sections: [practiceSection[0], ...training, practiceSection[1], ...songSection] });
+overlay = createOverlay(adapter, { controlsGap: 0, headerGap: 78, fixedMode: 'highway', session, ...tools });
 document.body.append(overlay.host, panel.host);
-installShortcuts(createShortcutActions(adapter, { notify: (t) => overlay.notify(t) }));
+installShortcuts(createShortcutActions(adapter, { notify, extra: tools.actions }));
 adapter.start();
-globalThis.bassTrainer = { engine, adapter, panel, overlay, session, autoMute };
+globalThis.bassTrainer = { engine, adapter, panel, overlay, session, autoMute, tools };
 
 let statusTimer;
 function status(text, ok = false) {

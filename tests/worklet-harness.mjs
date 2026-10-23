@@ -17,7 +17,7 @@ export function createProcessor({ sampleRate = 48000, minFreq = 36 } = {}) {
         this.port = { postMessage: (m) => messages.push(m), onmessage: null };
       }
     },
-    registerProcessor: (_name, cls) => { Processor = cls; },
+    registerProcessor: (name, cls) => { if (name === 'bass-trainer-pitch') Processor = cls; },
   };
   ctx.globalThis = ctx;
   vm.createContext(ctx);

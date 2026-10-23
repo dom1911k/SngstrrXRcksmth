@@ -14,6 +14,10 @@ export const ACTIONS = [
   ['speedDown', 'Slower (−5%)'],
   ['speedUp', 'Faster (+5%)'],
   ['toggleView', 'Highway / Both / Tab'],
+  ['loopSection', 'Loop the current section'],
+  ['riffRepeater', 'Riff repeater on / off'],
+  ['waitMode', 'Wait mode on / off'],
+  ['recordTakes', 'Record takes on / off'],
 ];
 
 export const DEFAULT_SHORTCUTS = {
@@ -25,6 +29,10 @@ export const DEFAULT_SHORTCUTS = {
   speedDown: ['NumpadSubtract', 'Minus'],
   speedUp: ['NumpadAdd', 'Equal'],
   toggleView: ['KeyV'],
+  loopSection: ['KeyL'],
+  riffRepeater: [],
+  waitMode: ['KeyW'],
+  recordTakes: [],
 };
 
 export function bindingFromEvent(e) {
@@ -84,7 +92,7 @@ export function nextSpeed(current, dir) {
 }
 
 // Runs the actions on a player adapter. notify(text) shows a short message.
-export function createShortcutActions(adapter, { notify = () => {}, onToggleView = () => {} } = {}) {
+export function createShortcutActions(adapter, { notify = () => {}, onToggleView = () => {}, extra = {} } = {}) {
   let pendingStart = null;
   const chart = () => adapter.getChart();
   const label = (bar) => bar.measure + 1;
@@ -132,6 +140,7 @@ export function createShortcutActions(adapter, { notify = () => {}, onToggleView
     speedDown() { const v = nextSpeed(adapter.getState().speed || 1, -1); adapter.setSpeed(v); notify(`Speed ${v}%`); },
     speedUp() { const v = nextSpeed(adapter.getState().speed || 1, 1); adapter.setSpeed(v); notify(`Speed ${v}%`); },
     toggleView() { onToggleView(); },
+    ...extra,
   };
 }
 

@@ -3,11 +3,13 @@
 // that the rest of the trainer uses (times in chart seconds):
 //
 //   getChart(), getTime(), getState(), on(event, fn)
-//   play(), pause(), seek(t), setLoop(a, b), clearLoop(), setSpeed(pct), switchTrack(partId)
+//   play(), pause(), seek(t), setLoop(a, b), clearLoop(), setSpeed(pct), switchTrack(partId),
+//   setBassMuted(on), setCountIn({ before, loops }), suppressCountIn(on)
 //   events: 'status', 'chart', 'play', 'pause', 'seek', 'loop', 'speed'
 
 import { SongClock } from '../../core/clock.js';
 import { songsterrToChart, bassLikeTracks } from './to-chart.js';
+import { getSettings } from '../../core/settings.js';
 
 const FROM_BRIDGE = 'bass-trainer-bridge';
 const TO_BRIDGE = 'bass-trainer-ext';
@@ -170,6 +172,18 @@ export class SongsterrAdapter {
 
   setCountIn({ before, loops }) {
     this.send({ type: 'command', cmd: 'setCountIn', args: { before, loops } });
+  }
+
+  // Wait mode starts and stops playback at every note: no count-in meanwhile.
+  // Several tools can ask at once (reason = 'wait' | 'take').
+  suppressCountIn(on, reason = 'default') {
+    this.countInBy = this.countInBy || new Set();
+    const was = this.countInBy.size > 0;
+    if (on) this.countInBy.add(reason); else this.countInBy.delete(reason);
+    this.countInSuppressed = this.countInBy.size > 0;
+    if (this.countInSuppressed === was) return;
+    if (this.countInSuppressed) this.setCountIn({ before: false, loops: false });
+    else this.setCountIn({ before: getSettings().countIn, loops: getSettings().countInLoops });
   }
 
   play() { this.send({ type: 'command', cmd: 'play' }); }

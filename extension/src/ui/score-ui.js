@@ -57,6 +57,7 @@ export function createScoreUI(wrap, session, getHighway) {
   session.on('pass', () => { renderStats(session.stats()); });
 
   session.on('summary', (s) => {
+    if (s.kind === 'partial') return; // saved to the history only
     lastSummary = s;
     if (s.kind === 'loop') showToast(s);
     else showCard(s);

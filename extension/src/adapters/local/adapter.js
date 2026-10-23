@@ -35,7 +35,7 @@ export class LocalAdapter {
       const time = this.rawTime();
       if (this.loop && this.isPlaying() && time >= this.loop.end) {
         this.seek(this.loop.start);
-        if (this.settingOr('countInLoops', true)) { this.stopPlayback(); this.startWithCountIn(); }
+        if (this.settingOr('countInLoops', true) && !this.countInSuppressed) { this.stopPlayback(); this.startWithCountIn(); }
       }
       this.clock.update({ perf: performance.now(), time: this.rawTime(), playing: this.isPlaying(), speed: this.speed });
     };
@@ -141,7 +141,7 @@ export class LocalAdapter {
 
   play() {
     if (this.counting || this.isPlaying()) return;
-    if (this.settingOr('countIn', true)) this.startWithCountIn();
+    if (this.settingOr('countIn', true) && !this.countInSuppressed) this.startWithCountIn();
     else this.startPlayback();
   }
 
@@ -224,6 +224,13 @@ export class LocalAdapter {
 
   // A local audio file can't be split into instruments.
   setBassMuted() { return Promise.resolve('local'); }
+
+  // Several tools can ask at once (reason = 'wait' | 'take').
+  suppressCountIn(on, reason = 'default') {
+    this.countInBy = this.countInBy || new Set();
+    if (on) this.countInBy.add(reason); else this.countInBy.delete(reason);
+    this.countInSuppressed = this.countInBy.size > 0;
+  }
 
   setCountIn({ before, loops }) { updateSettings({ countIn: before, countInLoops: loops }); }
 }

@@ -109,6 +109,12 @@ export class Highway3D {
     this.scene.fog = new THREE.Fog(BG, DEPTH * 0.75, DEPTH * 1.08);
     this.camera = new THREE.PerspectiveCamera(CAM.fov, 2, 0.1, DEPTH + 30);
 
+    // Soft glow on the horizon behind the far end of the highway (not fogged).
+    this.horizon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0x233366, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, fog: false }));
+    this.horizon.scale.set(70, 16, 1);
+    this.horizon.renderOrder = -10;
+    this.scene.add(this.horizon);
+
     this.scene.add(new THREE.AmbientLight(0xffffff, 1.4));
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(2, 8, 6);
@@ -370,14 +376,57 @@ export class Highway3D {
         const toFret = note.flags.slide && note.flags.slide.toFret !== null && note.flags.slide.toFret !== undefined ? note.flags.slide.toFret : null;
         const x1 = open ? x : toFret !== null ? Math.max(0.5, toFret - 0.5) : x;
         const hw = open ? 0.35 : 0.16;
-        tailQuads[s].push([x - hw, x + hw, note.t, note.t + note.dur, y, x1 - hw, x1 + hw]);
+        if (note.flags.vibrato && toFret === null) {
+          // Vibrato: a wavy tail, as in Rocksmith.
+          const step = 0.07, amp = 0.09;
+          for (let t0 = note.t, k = 0; t0 < note.t + note.dur - 1e-3; t0 += step, k++) {
+            const t1 = Math.min(note.t + note.dur, t0 + step);
+            const a = k === 0 ? 0 : (k % 2 ? amp : -amp), b = k % 2 ? -amp : amp;
+            tailQuads[s].push([x - hw + a, x + hw + a, t0, t1, y, x - hw + b, x + hw + b]);
+          }
+        } else {
+          tailQuads[s].push([x - hw, x + hw, note.t, note.t + note.dur, y, x1 - hw, x1 + hw]);
+        }
       }
       this.noteObjs.push({ note, obj, gem });
       prevOnString[s] = note;
     }
     tailQuads.forEach((q, s) => { if (q.length) this.timeGroup.add(mergedQuads(q, this.tailMats[s])); });
+    this.addChordFrames();
     this.visibleFrom = 0;
     this.visibleTo = 0;
+  }
+
+  // Chords (two or more notes at once): a frame around them, as Rocksmith
+  // draws chord boxes. Attached to the chord's first gem so it moves with it.
+  addChordFrames() {
+    const objs = this.noteObjs;
+    const mat = this.chordMat || (this.chordMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, depthWrite: false }));
+    const bar = this.chordBarGeo || (this.chordBarGeo = new THREE.BoxGeometry(1, 1, 0.03));
+    bar.userData.shared = true;
+    for (let i = 0; i < objs.length;) {
+      let j = i + 1;
+      while (j < objs.length && Math.abs(objs[j].note.t - objs[i].note.t) < 0.002) j++;
+      const group = objs.slice(i, j).filter((o) => !o.note.flags.ghost);
+      if (group.length >= 2 && new Set(group.map((o) => o.note.string)).size >= 2) {
+        const ys = group.map((o) => o.obj.position.y);
+        const halfW = (o) => (o.note.fret === 0 ? 2 : GEM_W / 2);
+        const x0 = Math.min(...group.map((o) => o.obj.position.x - halfW(o))) - 0.1;
+        const x1 = Math.max(...group.map((o) => o.obj.position.x + halfW(o))) + 0.1;
+        const y0 = 0.03, y1 = Math.max(...ys) + GEM_H / 2 + 0.1;
+        const host = group[0].obj;
+        const frame = new THREE.Group();
+        const t = 0.035;
+        for (const [cx, cy, w, hgt] of [[(x0 + x1) / 2, y1, x1 - x0, t], [(x0 + x1) / 2, y0, x1 - x0, t], [x0, (y0 + y1) / 2, t, y1 - y0], [x1, (y0 + y1) / 2, t, y1 - y0]]) {
+          const m = new THREE.Mesh(bar, mat);
+          m.scale.set(w, hgt, 1);
+          m.position.set(cx - host.position.x, cy - host.position.y, -GEM_D / 2);
+          frame.add(m);
+        }
+        host.add(frame);
+      }
+      i = j;
+    }
   }
 
   resize() {
@@ -494,6 +543,7 @@ export class Highway3D {
       if (far.y > C.farNdc) hi = mid; else lo = mid;
     }
     place((lo + hi) / 2);
+    this.horizon.position.set(camX, 3, -DEPTH - 6);
     // Fog is measured from the camera: keep it on the far part of the lane.
     const fog = this.scene.fog;
     fog.near = d0 + DEPTH * C.fogStart;

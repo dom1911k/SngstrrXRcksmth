@@ -241,6 +241,7 @@ export class Scorer {
       swaps.set(key, e);
     }
     s.wrongNotes = [...swaps.values()].sort((a, b) => b.count - a.count).slice(0, 5).map((e) => ({ ...e, bars: [...e.bars].slice(0, 6) }));
+    s.perBar = [...perBar.values()].filter((e) => e.bar >= 0);
     s.from = this.pass.from;
     s.to = this.pass.to;
     return s;

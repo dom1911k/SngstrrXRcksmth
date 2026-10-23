@@ -325,3 +325,39 @@ class PitchProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('bass-trainer-pitch', PitchProcessor);
+
+// Take recorder: passes the raw input on in chunks, each stamped with the
+// AudioContext time of its first sample (so a take can be lined up with the
+// song exactly). Only sends while recording.
+class RecorderProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.on = false;
+    this.buf = new Float32Array(4096);
+    this.n = 0;
+    this.t0 = 0;
+    this.port.onmessage = (e) => {
+      if (e.data.type !== 'record') return;
+      if (!e.data.on && this.n) this.flush();
+      this.on = e.data.on;
+    };
+  }
+
+  flush() {
+    const out = this.buf.slice(0, this.n);
+    this.port.postMessage({ type: 'chunk', t: this.t0, data: out }, [out.buffer]);
+    this.n = 0;
+  }
+
+  process(inputs) {
+    const ch = inputs[0] && inputs[0][0];
+    if (!this.on || !ch) return true;
+    if (this.n === 0) this.t0 = currentTime;
+    this.buf.set(ch, this.n);
+    this.n += ch.length;
+    if (this.n + 128 > this.buf.length) this.flush();
+    return true;
+  }
+}
+
+registerProcessor('bass-trainer-recorder', RecorderProcessor);
