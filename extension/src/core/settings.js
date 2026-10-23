@@ -48,6 +48,8 @@ export const DEFAULTS = {
   hitSparks: true,         // sparks on the strings when you hit a note (3D)
   timingMarks: false,      // small early/late dot after each hit (3D)
   glowEffects: true,       // soft glow (bloom) on strings and notes (3D)
+  theme: 'classic',        // 3D look: 'classic' | 'stage' | 'minimal' | 'contrast'
+  largeNotes: false,       // 30% bigger notes (3D)
   // Scoring
   scoring: true,
   hitWindowMs: 140,        // how early/late a note may be and still count

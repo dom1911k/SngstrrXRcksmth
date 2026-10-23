@@ -6,6 +6,9 @@ import { Highway2D } from './highway2d.js';
 import { getSettings, updateSettings, onSettingsChange } from '../core/settings.js';
 import { createScoreUI, SCORE_CSS } from './score-ui.js';
 import { createProgressUI, PROGRESS_CSS } from './progress-ui.js';
+import { createEndScreen, END_CSS } from './end-screen.js';
+import { loopBars as loopBarsOf, loopCurrentSection, sectionAt } from '../core/riff-repeater.js';
+import { tuningName } from '../core/music.js';
 
 const CSS = (controlsGap) => `
 :host { all: initial; }
@@ -44,6 +47,22 @@ canvas[hidden] { display: none; }
 .warnbox { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); z-index: 4; max-width: min(640px, 90%);
   background: rgba(43,36,16,.95); border: 1px solid #6a5418; color: #f2c418; border-radius: 8px; padding: 7px 14px; font: 600 13px/1.4 system-ui; text-align: center; }
 .warnbox[hidden] { display: none; }
+.titlecard { position: absolute; left: 0; right: 0; top: 26%; z-index: 4; text-align: center; pointer-events: none; font-family: system-ui, "Segoe UI", sans-serif; }
+.titlecard[hidden] { display: none; }
+.titlecard .t { font-size: 46px; font-weight: 900; color: #fff; text-shadow: 0 0 24px rgba(120,160,255,.5), 0 2px 6px #000; }
+.titlecard .a { font-size: 22px; font-weight: 600; color: #c9d2ea; margin-top: 4px; text-shadow: 0 2px 6px #000; }
+.titlecard .m { font-size: 13px; letter-spacing: .25em; color: #8fa0c8; margin-top: 10px; text-transform: uppercase; }
+.titlecard.go { animation: tc 4s ease-in-out forwards; }
+@keyframes tc { 0% { opacity: 0; transform: translateY(14px); } 15% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; } }
+.pausescreen { position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(6,7,12,.35), rgba(6,7,12,.75)); }
+.pausescreen[hidden] { display: none; }
+.pausescreen .box { pointer-events: auto; text-align: center; font-family: system-ui, "Segoe UI", sans-serif; }
+.pausescreen .p { font-size: 34px; font-weight: 900; letter-spacing: .3em; color: #fff; text-shadow: 0 2px 8px #000; }
+.pausescreen .where { color: #aeb6c8; margin: 4px 0 14px; font-size: 14px; }
+.pausescreen button { background: rgba(30,33,40,.92); color: #fff; border: 1px solid #3a3f49; border-radius: 8px; padding: 8px 14px; font: 600 14px system-ui; cursor: pointer; margin: 3px; }
+.pausescreen button.primary { background: #e8202a; border-color: #e8202a; }
+.pausescreen button.on { background: #f2c418; color: #111; border-color: #f2c418; }
 .debug { position: absolute; right: 10px; bottom: 8px; color: #6f7685; font: 11px system-ui; pointer-events: none; z-index: 2; }
 `;
 
@@ -59,10 +78,11 @@ export function createOverlay(adapter, {
   riff = null,           // RiffRepeater (optional)
   monitor = null,        // InputMonitor: warnings + held-note feedback (optional)
   library = null,        // LibraryTracker: ★ save button (optional)
+  report = null,         // SessionReport: shown when the input stops (optional)
 } = {}) {
   const host = h('div', { id: 'bass-trainer-highway' });
   const root = host.attachShadow({ mode: 'open' });
-  root.append(h('style', {}, CSS(controlsGap) + SCORE_CSS + PROGRESS_CSS));
+  root.append(h('style', {}, CSS(controlsGap) + SCORE_CSS + PROGRESS_CSS + END_CSS));
 
   const canvas2d = h('canvas');
   const canvas3d = h('canvas');
@@ -73,6 +93,16 @@ export function createOverlay(adapter, {
   const debugEl = h('div', { class: 'debug' });
   const notice = h('div', { class: 'notice hide' });
   const warnBox = h('div', { class: 'warnbox', hidden: true });
+  const titleCard = h('div', { class: 'titlecard', hidden: true });
+  const pauseWhere = h('div', { class: 'where' });
+  const riffBtn = h('button', { onclick: () => updateSettings({ riffRepeater: !getSettings().riffRepeater }) }, 'Riff repeater');
+  const pauseScreen = h('div', { class: 'pausescreen', hidden: true },
+    h('div', { class: 'box' }, h('div', { class: 'p' }, 'PAUSED'), pauseWhere,
+      h('div', {},
+        h('button', { class: 'primary', onclick: () => adapter.play() }, '▶ Resume'),
+        h('button', { onclick: () => { const sec = sectionNow(); adapter.seek(sec ? sec.t : 0); adapter.play(); } }, '⏮ Section start'),
+        h('button', { onclick: () => loopCurrentSection(adapter, (t) => notify(t)) }, '⟲ Loop this section'),
+        riffBtn)));
   const highway2d = new Highway2D(canvas2d);
   let highway3d = null;
   let highway3dFailed = false;
@@ -108,10 +138,19 @@ export function createOverlay(adapter, {
   }
   const grip = h('div', { class: 'grip', title: 'Drag to resize' });
   const msg = h('div', { class: 'msg', hidden: true });
-  const wrap = h('div', { class: 'wrap' }, canvas2d, canvas3d, hud, grip, msg, bar, debugEl, notice, warnBox);
+  const wrap = h('div', { class: 'wrap' }, canvas2d, canvas3d, hud, grip, msg, bar, debugEl, notice, warnBox, titleCard, pauseScreen);
   const pill = h('button', { class: 'pill', hidden: true, onclick: () => updateSettings({ viewMode: 'both' }) }, '▲ Highway');
   root.append(wrap, pill);
-  const scoreUI = session ? createScoreUI(wrap, session, () => active) : null;
+  // Rocksmith-style end-of-song screen and session report.
+  const endScreen = createEndScreen(wrap, {
+    adapter, history,
+    onDetails: (s) => scoreUI && scoreUI.showCard(s),
+    loopBars: (a, b) => loopBarsOf(adapter, a, b, (t) => notify(t)),
+  });
+  const scoreUI = session ? createScoreUI(wrap, session, () => active, { onSongEnd: (s) => endScreen.showSong(s) }) : null;
+  const openLibrary = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage
+    ? () => chrome.runtime.sendMessage({ type: 'openLibrary' }) : null;
+  if (report) report.onReport((r) => { if (!fixedMode && getSettings().viewMode === 'tab') updateSettings({ viewMode: 'both' }); endScreen.showSession(r, { onLibrary: openLibrary }); });
   const progressUI = history ? createProgressUI(wrap, { adapter, history, riff, notify: (t) => notify(t) }) : null;
 
   // Resize by dragging the top edge (Both mode).
@@ -167,7 +206,7 @@ export function createOverlay(adapter, {
     }
     const opts = { lookahead: s.lookahead, invertStrings: s.invertStrings, showDebug: s.showDebug };
     highway2d.setOptions(opts);
-    if (highway3d) highway3d.setOptions({ ...opts, showFretNumbers: s.gemFretNumbers, sparks: s.hitSparks, timingMarks: s.timingMarks, glow: s.glowEffects });
+    if (highway3d) highway3d.setOptions({ ...opts, showFretNumbers: s.gemFretNumbers, sparks: s.hitSparks, timingMarks: s.timingMarks, glow: s.glowEffects, theme: s.theme, largeNotes: s.largeNotes });
   }
   onSettingsChange(layout);
   window.addEventListener('resize', () => layout());
@@ -243,6 +282,7 @@ export function createOverlay(adapter, {
       wrap.classList.toggle('withbar', progressUI.visible);
     }
     const waitMsg = wait && wait.enabled ? wait.message : '';
+    updatePause(st);
     if (monitor) {
       const w = st.ready && st.shouldPlay && !(wait && wait.enabled) ? monitor.warning : '';
       if (warnBox.textContent !== w) warnBox.textContent = w;
@@ -273,6 +313,38 @@ export function createOverlay(adapter, {
     }
   }
   requestAnimationFrame(frame);
+
+  // Title card when a song starts from the beginning (as in Rocksmith).
+  function sectionNow() { return lastChart ? sectionAt(lastChart, adapter.getTime()) : null; }
+  let titleTimer = null;
+  adapter.on('play', () => {
+    if (!lastChart || wrap.hidden || !lastChart.notes.length) return;
+    if (adapter.getTime() > lastChart.notes[0].t - 0.5) return;
+    const m = lastChart.meta || {};
+    titleCard.replaceChildren(h('div', { class: 't' }, m.title || ''), m.artist ? h('div', { class: 'a' }, m.artist) : null,
+      h('div', { class: 'm' }, [m.track && !/drill/i.test(m.track) ? 'Bass' : m.track, tuningName(lastChart.instrument.tuning)].filter(Boolean).join(' · ')));
+    titleCard.hidden = false;
+    titleCard.classList.remove('go');
+    void titleCard.offsetWidth;
+    titleCard.classList.add('go');
+    clearTimeout(titleTimer);
+    titleTimer = setTimeout(() => { titleCard.hidden = true; }, 4000);
+  });
+  for (const ev of ['pause', 'seek', 'chart']) adapter.on(ev, () => { titleCard.hidden = true; clearTimeout(titleTimer); });
+  // Pause screen in the full highway view.
+  function updatePause(st) {
+    const full = fixedMode || getSettings().viewMode === 'highway';
+    const busy = endScreen.visible || [...root.querySelectorAll('.card')].some((c) => !c.hidden) || (wait && wait.enabled) || (takes && takes.playback);
+    const show = !!(full && lastChart && st.ready && !st.shouldPlay && !st.countIn && adapter.getTime() > 0.3 && !busy && msg.hidden);
+    if (show) {
+      const sec = sectionNow();
+      const b = barAt(adapter.getTime());
+      const text = `${sec ? sec.name : ''}${b ? ` · bar ${b.measure + 1}` : ''}`;
+      if (pauseWhere.textContent !== text) pauseWhere.textContent = text;
+      riffBtn.classList.toggle('on', !!getSettings().riffRepeater);
+    }
+    if (pauseScreen.hidden === show) pauseScreen.hidden = !show;
+  }
 
   // Sparks / timing dots for scored notes (3D only).
   if (session) {
@@ -308,7 +380,9 @@ export function createOverlay(adapter, {
     const t = e.composedPath ? e.composedPath()[0] : e.target;
     if (t && t.tagName && /^(input|textarea|select)$/i.test(t.tagName)) return;
     const open = [...root.querySelectorAll('.card')].filter((c) => !c.hidden);
-    if (open.length) {
+    if (endScreen.visible) {
+      endScreen.hide();
+    } else if (open.length) {
       open.forEach((c) => { c.hidden = true; });
     } else if (!fixedMode && getSettings().viewMode === 'highway') {
       updateSettings({ viewMode: 'both' });
@@ -318,5 +392,5 @@ export function createOverlay(adapter, {
     e.stopImmediatePropagation();
   }, true);
 
-  return { host, scoreUI, progressUI, notify, toggleView, showProgress: () => progressUI && progressUI.show(), get highway() { return active; } };
+  return { host, scoreUI, progressUI, endScreen, notify, toggleView, showProgress: () => progressUI && progressUI.show(), get highway() { return active; } };
 }

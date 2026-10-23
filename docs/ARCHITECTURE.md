@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
+Status: **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -86,6 +86,8 @@ extension/
     history.js, history-db.js  practice history + song library (IndexedDB) and weak-spot statistics
     library.js            song library: tracker, statistics, "practise these bars" hand-off
     drills.js             warm-up / technique drills generated as charts
+    session-report.js     session report (input start -> stop), saved in IndexedDB
+    note-trainer.js       fretboard note trainer (questions checked by pitch)
     riff-repeater.js      loop a section, automatic speed-up
     wait-mode.js          stop at each note until it is played
     takes.js              record takes, play them back in sync, WAV export
@@ -504,4 +506,38 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
   microphone: metronome clicks, 100%, saved with BPM, auto-stop, ☆ Save; Library page
   rows, cards, detail sections/weak spots/chart; "Practise" hand-off); `e2e-phase4`
   checks ☆ Save + Library on the real Songsterr page.
+
+---
+
+## 15. Reports, goals, spaced repetition, trainer, themes (0.9.0)
+
+* **Session report** (`core/session-report.js`): a session runs from input start to
+  stop (or page hide, saved silently). It collects the history records saved meanwhile;
+  `buildReport()` (pure, tested) → wall/playing time, passes, notes, accuracy, per song
+  best / best at full speed / drill BPM vs. the records from before the session, and
+  highlights. Stored in IndexedDB store `sessions` (DB version 3); shown by the
+  overlay's end screen; listed in the Library.
+* **End-of-song screen** (`ui/end-screen.js`, replaces the card for `kind: 'song'`
+  summaries; the card is still under *Details*): count-up accuracy, NEW BEST vs. the
+  best earlier full-speed record, stats, section blocks from `summary.perBar` +
+  `sectionsOf(chart)`, loop the weakest section. Esc closes it.
+* **Spaced repetition** (`dueInfo`, `reviewInterval` in `core/library.js`, tested):
+  interval = base(status: learning 1 d, practising 2 d, mastered 7 d, favourite-new 2 d)
+  × performance (last pass ≥ 95% ×2, ≥ 85% ×1.5, ≥ 70% ×1, else ×0.6) × (1 + 0.25 ×
+  distinct days, max 8), clamped to 1–60 days; trend < −5 points → due now.
+* **Goals** (`goalProgress`, `goalLabel`, `LibraryTracker.checkGoal`): `entry.goal =
+  { accuracy, speed, by?, setAt, reachedAt? }`; only passes at ≥ the goal speed after
+  `setAt` count; reaching it sets `reachedAt` and status *mastered* (notified on the
+  highway via `practice-tools`).
+* **Fretboard trainer** (`core/note-trainer.js` + `ui/note-trainer-ui.js`, player
+  only; listed in DRILLS with `trainer: true`): `makeQuestion` / `judgeAnswer` (pure,
+  tested; exact pitch, ±12/24 = "other octave"); answers from the session's `'played'`
+  events; a round is saved as history record `drill:fretboard` (accuracy = right first
+  time). The dialog sits below the panel so the input can be started.
+* **Themes** (`THEMES` in `highway3d.js`, setting `theme`): background/fog, floor,
+  wires, lane colour and base opacity, beam colours/opacity (or none), horizon,
+  glow strength, outline opacity. `largeNotes` scales gem bodies 1.3×.
+* **Rocksmith polish:** title card on play from the start (hidden on pause/seek),
+  pause screen in full highway view (pointer-events only on its buttons), note-streak
+  milestones (10, 25, 50, 75, 100, 150…), a bright core line in every sustain tail.
 

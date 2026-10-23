@@ -28,6 +28,14 @@ const STRING_BASE = 0.42;    // height of the lowest drawn string above the floo
 // RS2014-like view: strings low on screen, lane running up to near the top.
 // 0.6.1: wider lens from closer and lower = flatter view with a visible horizon.
 const CAM = { fov: 36, strikeNdc: 0.75, farNdc: 0.76, widthFactor: 0.62, extraWidth: 1.2, fogStart: 0.82 };
+// Looks (setting "theme"). Strings and notes keep the Rocksmith colours in all.
+export const THEMES = {
+  classic: { bg: 0x06070c, floor: 0x1a2030, wire: 0x6d7790, lane: 0x8fb4ff, laneBase: 0.16, beams: [0x3a4f9a, 0x5a3d8f, 0x3d6d9a, 0x4a3a8a], beamOpacity: 0.16, horizon: 0x233366, glow: 0.38, outline: 0.75 },
+  stage: { bg: 0x0a0612, floor: 0x211a30, wire: 0x7a6f98, lane: 0xc9a0ff, laneBase: 0.17, beams: [0xb03a8a, 0xd08a2a, 0x3aa0d0, 0x8a3ad0], beamOpacity: 0.26, horizon: 0x5a2266, glow: 0.5, outline: 0.75 },
+  minimal: { bg: 0x0b0c10, floor: 0x15171d, wire: 0x4a505e, lane: 0x9aa6c0, laneBase: 0.12, beams: null, beamOpacity: 0, horizon: null, glow: 0, outline: 0.5 },
+  contrast: { bg: 0x000000, floor: 0x10141e, wire: 0xb8c2d8, lane: 0xffffff, laneBase: 0.2, beams: null, beamOpacity: 0, horizon: 0x1a2a55, glow: 0.3, outline: 1 },
+};
+
 const GEM_W = 0.78, GEM_H = 0.34, GEM_D = 0.24;
 const GEM_GROW = 0.35;       // far gems are up to 35% bigger (readability)
 const PAST_KEEP = 0.045;     // seconds a gem stays after its hit time
@@ -165,13 +173,13 @@ export class Highway3D {
     // Floor (the neck), slightly lighter than the background.
     // Pushed back in the depth buffer so lines lying on it never flicker
     // (z-fighting at the flat viewing angle).
-    const floorMat = new THREE.MeshLambertMaterial({ color: 0x1a2030, polygonOffset: true, polygonOffsetFactor: 4, polygonOffsetUnits: 8 });
+    const floorMat = this.floorMat = new THREE.MeshLambertMaterial({ color: 0x1a2030, polygonOffset: true, polygonOffsetFactor: 4, polygonOffsetUnits: 8 });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(MAX_FRET + 4, DEPTH + 30), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(MAX_FRET / 2, 0, -(DEPTH + 30) / 2 + 12);
     S.add(floor);
     // Fret wires running into the distance.
-    const wireMat = new THREE.MeshBasicMaterial({ color: 0x6d7790 });
+    const wireMat = this.wireMat = new THREE.MeshBasicMaterial({ color: 0x6d7790 });
     const nutMat = new THREE.MeshBasicMaterial({ color: 0xc4c8d0 });
     for (let w = 0; w <= MAX_FRET; w++) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w === 0 ? 0.08 : 0.035, 0.01, DEPTH + 14), w === 0 ? nutMat : wireMat);
@@ -291,9 +299,28 @@ export class Highway3D {
 
   setOptions(o) {
     const invertChanged = o.invertStrings !== undefined && o.invertStrings !== this.options.invertStrings;
+    const themeChanged = o.theme !== undefined && o.theme !== this.options.theme;
     Object.assign(this.options, o);
     this.lastRenderKey = '';
+    if (themeChanged || !this.themeApplied) this.applyTheme();
     if (invertChanged && this.chart) this.setChart(this.chart);
+  }
+
+  theme() { return THEMES[this.options.theme] || THEMES.classic; }
+
+  applyTheme() {
+    const th = this.theme();
+    this.themeApplied = true;
+    this.renderer.setClearColor(th.bg);
+    this.scene.fog.color.set(th.bg);
+    if (this.floorMat) this.floorMat.color.set(th.floor);
+    if (this.wireMat) this.wireMat.color.set(th.wire);
+    if (this.anchorMat) this.anchorMat.color.set(th.lane);
+    if (this.edgeMat) this.edgeMat.opacity = th.outline;
+    this.beams.forEach((b, i) => { b.visible = !!th.beams; if (th.beams) b.material.color.set(th.beams[i]); });
+    this.horizon.visible = th.horizon !== null;
+    if (th.horizon !== null) this.horizon.material.color.set(th.horizon);
+    this.lastRenderKey = '';
   }
 
   stringY(string) {
@@ -352,11 +379,12 @@ export class Highway3D {
     this.deadMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).multiplyScalar(0.35), emissive: c, emissiveIntensity: 0.12, roughness: 0.6 }));
     this.stemMats = colors.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.28, fog: true }));
     this.tailMats = colors.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.55, side: THREE.DoubleSide, clippingPlanes: this.clipStrike, depthWrite: false }));
+    this.tailCoreMats = colors.map((c) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).lerp(new THREE.Color(0xffffff), 0.55), transparent: true, opacity: 0.9, side: THREE.DoubleSide, clippingPlanes: this.clipStrike, depthWrite: false }));
     this.glowMats = colors.map((c) => new THREE.SpriteMaterial({ map: this.glowTex, color: c, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
     // Rounded gems with a bright outline and a soft shadow on the floor.
     const { geo: gemGeo, outline: edgeGeo } = roundedGemGeometry(GEM_W, GEM_H, GEM_D);
     gemGeo.userData.shared = true; edgeGeo.userData.shared = true;
-    const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 });
+    const edgeMat = this.edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: this.theme().outline });
     const shadowGeo = new THREE.PlaneGeometry(1, 1); shadowGeo.userData.shared = true;
     shadowGeo.rotateX(-Math.PI / 2);
     const shadowMat = new THREE.MeshBasicMaterial({ map: this.shadowTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
@@ -373,7 +401,7 @@ export class Highway3D {
     if (beatQuads.length) this.timeGroup.add(mergedQuads(beatQuads, beatMat));
     if (barQuads.length) this.timeGroup.add(mergedQuads(barQuads, barMat));
 
-    const anchorMat = this.anchorMat = new THREE.MeshBasicMaterial({ color: 0x8fb4ff, transparent: true, opacity: 0.16, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
+    const anchorMat = this.anchorMat = new THREE.MeshBasicMaterial({ color: this.theme().lane, transparent: true, opacity: 0.16, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
     const anchorEdgeMat = new THREE.MeshBasicMaterial({ color: 0xbcd2ff, transparent: true, opacity: 0.5, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
     const end = chart.duration + 2;
     const laneQuads = [], edgeQuads = [];
@@ -504,7 +532,16 @@ export class Highway3D {
       this.noteObjs.push({ note, obj, gem, body });
       prevOnString[s] = note;
     }
-    tailQuads.forEach((q, s) => { if (q.length) this.timeGroup.add(mergedQuads(q, this.tailMats[s])); });
+    tailQuads.forEach((q, s) => {
+      if (!q.length) return;
+      this.timeGroup.add(mergedQuads(q, this.tailMats[s]));
+      // A bright core line inside each tail, as on Rocksmith's sustains.
+      const core = q.map(([x0, x1, t0, t1, y, x0b = x0, x1b = x1]) => {
+        const c = (x0 + x1) / 2, cb = (x0b + x1b) / 2, w = 0.03;
+        return [c - w, c + w, t0, t1, y + 0.004, cb - w, cb + w];
+      });
+      this.timeGroup.add(mergedQuads(core, this.tailCoreMats[s]));
+    });
     this.addChordFrames();
     this.visibleFrom = 0;
     this.visibleTo = 0;
@@ -611,7 +648,7 @@ export class Highway3D {
         o.obj.visible = true;
         o.obj.position.z = -dz;
         // Far gems a bit bigger so they stay readable with the flatter view.
-        o.body.scale.setScalar(1 + GEM_GROW * Math.max(0, Math.min(1, dz / DEPTH)));
+        o.body.scale.setScalar((this.options.largeNotes ? 1.3 : 1) * (1 + GEM_GROW * Math.max(0, Math.min(1, dz / DEPTH))));
       }
       this.visibleFrom = from;
       this.visibleTo = to;
@@ -640,7 +677,7 @@ export class Highway3D {
       }
       // ...and flashes briefly when a new section starts.
       const flash = this.sectionFlash(t, speed);
-      if (this.anchorMat) this.anchorMat.opacity = 0.16 + 0.1 * pulse + 0.22 * flash;
+      if (this.anchorMat) this.anchorMat.opacity = this.theme().laneBase + 0.1 * pulse + 0.22 * flash;
 
       // Camera frames the current passage (see core/camera-follow.js).
       this.follow.update(t, speed, dt);
@@ -706,7 +743,7 @@ export class Highway3D {
       const sway = Math.sin(nowMs / 4200 + b.userData.phase);
       b.position.set(camX + b.userData.x + sway * 3, 14, -DEPTH - 14);
       b.material.rotation = sway * 0.22 + (b.userData.x < 0 ? -0.25 : 0.25);
-      b.material.opacity = 0.16 + 0.07 * Math.sin(nowMs / 2600 + b.userData.phase * 2);
+      b.material.opacity = this.theme().beamOpacity * (1 + 0.45 * Math.sin(nowMs / 2600 + b.userData.phase * 2));
     }
     // Fog is measured from the camera: keep it on the far part of the lane.
     const fog = this.scene.fog;
@@ -717,12 +754,13 @@ export class Highway3D {
 
   // Render, with the glow pass when it is on (and the PC can afford it).
   draw() {
-    if (this.options.glow && !this.quality.noGlow) {
+    if (this.options.glow && !this.quality.noGlow && this.theme().glow > 0) {
       try {
         if (!this.bloom) {
           this.bloom = new Bloom(this.renderer);
           this.bloom.setSize(Math.round(this.w * this.dpr), Math.round(this.h * this.dpr));
         }
+        this.bloom.add.uniforms.strength.value = this.theme().glow;
         this.bloom.render(this.scene, this.camera);
         return;
       } catch (err) {

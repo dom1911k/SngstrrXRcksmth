@@ -174,6 +174,16 @@ export class LibraryTracker {
   }
 
   toggleFavorite() { return this.setFavorite(!(this.entry && this.entry.favorite)); }
+
+  // After each saved pass: goal reached? Then the song becomes Mastered.
+  async checkGoal(rec) {
+    const e = this.entry;
+    if (!e || !e.goal || e.goal.reachedAt || !rec || rec.songKey !== e.songKey) return null;
+    if ((rec.speed || 1) < e.goal.speed - 0.001 || (rec.accuracy || 0) < e.goal.accuracy - 1e-9) return null;
+    this.entry = await (await this.store).patch(e.songKey, { goal: { ...e.goal, reachedAt: rec.at }, status: 'mastered' });
+    this.changed();
+    return this.entry;
+  }
 }
 
 // "Practise bar 12 of this song" from the Library page: stored until the song
@@ -189,4 +199,51 @@ export async function takePending(songKey) {
   if (!p || p.songKey !== songKey || Date.now() - p.at > 10 * 60 * 1000) return null;
   await chrome.storage.local.remove(PENDING);
   return p;
+}
+
+// ---- Spaced repetition: which songs to revisit ("Due today") ----
+// Songs you are working on (a status other than New, or a favourite) come back
+// after an interval that depends on the status, how well you played them last,
+// and on how many different days you have practised them (it grows as the song
+// settles in). A score that is dropping makes the song due right away.
+const BASE_DAYS = { new: 2, learning: 1, practising: 2, mastered: 7 };
+
+export function reviewInterval(entry, stats) {
+  const base = BASE_DAYS[entry.status] || 2;
+  const last = stats.last === null || stats.last === undefined ? 0.5 : stats.last;
+  const perf = last >= 0.95 ? 2 : last >= 0.85 ? 1.5 : last >= 0.7 ? 1 : 0.6;
+  const settle = 1 + 0.25 * Math.min(8, stats.days || 0);
+  return Math.max(1, Math.min(60, base * perf * settle));
+}
+
+// { due, dueAt, days (interval), overdueDays, reason } or null when not tracked.
+export function dueInfo(entry, stats, now = Date.now()) {
+  if (entry.kind === 'drill') return null;
+  if (!(entry.favorite || (entry.status && entry.status !== 'new'))) return null;
+  if (!stats.lastAt) return { due: true, dueAt: now, days: 0, overdueDays: 0, reason: 'not practised yet' };
+  const days = reviewInterval(entry, stats);
+  const dueAt = stats.lastAt + days * DAY;
+  if (stats.trend !== null && stats.trend < -0.05) return { due: true, dueAt: now, days, overdueDays: 0, reason: 'score is dropping' };
+  const overdueDays = Math.floor((now - dueAt) / DAY);
+  const since = Math.floor((now - stats.lastAt) / DAY);
+  return { due: now >= dueAt, dueAt, days, overdueDays, reason: now >= dueAt ? `not played for ${since} day${since === 1 ? '' : 's'}` : '' };
+}
+
+// ---- Goals: "90% at 100% speed by 31 October" ----
+// goal = { accuracy (0..1), speed (0..1.5), by (ms, optional), setAt, reachedAt? }
+export function goalProgress(goal, records, now = Date.now()) {
+  if (!goal) return null;
+  const fast = records.filter((r) => (r.speed || 1) >= goal.speed - 0.001 && r.at >= (goal.setAt || 0));
+  const best = fast.length ? Math.max(...fast.map((r) => r.accuracy || 0)) : null;
+  const reached = best !== null && best >= goal.accuracy - 1e-9;
+  const reachedRec = reached ? fast.find((r) => (r.accuracy || 0) >= goal.accuracy - 1e-9) : null;
+  const daysLeft = goal.by ? Math.ceil((goal.by - now) / DAY) : null;
+  return { best, reached, reachedAt: reachedRec ? reachedRec.at : null, daysLeft, overdue: !reached && daysLeft !== null && daysLeft < 0,
+    fraction: best === null ? 0 : Math.min(1, best / goal.accuracy) };
+}
+
+export function goalLabel(goal) {
+  if (!goal) return '';
+  const by = goal.by ? ` by ${new Date(goal.by).toLocaleDateString([], { day: 'numeric', month: 'short' })}` : '';
+  return `${Math.round(goal.accuracy * 100)}% at ${Math.round(goal.speed * 100)}% speed${by}`;
 }

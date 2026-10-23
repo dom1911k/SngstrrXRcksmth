@@ -80,3 +80,23 @@ select { background: var(--panel2); color: var(--text); border: 1px solid #3a3f4
   .row { grid-template-columns: 30px 1fr 90px 120px; }
   .row .c-tuning, .row .c-time, .row .c-spark, .row .c-status { display: none; }
 }
+
+.duelist { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.duecard { background: linear-gradient(180deg, #1d1a10, var(--panel)); border: 1px solid #4a3d12; border-radius: 12px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.duecard:hover { border-color: var(--yellow); }
+.duecard .why { color: var(--yellow); font-size: 12px; margin: 4px 0 8px; }
+.duecard .btn { align-self: flex-start; }
+.duetag { display: inline-block; margin-left: 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: #111; background: var(--yellow); border-radius: 4px; padding: 0 5px; vertical-align: 2px; }
+.goalline { display: block; font-size: 11px; color: #c9b25a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.goalline.done { color: var(--green); }
+.goalbox { background: var(--panel2); border-radius: 10px; padding: 10px 12px; }
+.goalbox select, .goalbox input[type=date] { background: #15171c; color: var(--text); border: 1px solid #3a3f49; border-radius: 6px; padding: 3px 6px; font: inherit; font-size: 13px; color-scheme: dark; }
+.goalhead { margin-bottom: 6px; }
+.meter.big { height: 10px; margin-bottom: 6px; }
+.good { color: var(--green); } .bad { color: #ff5a5f; }
+
+.sessions { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+.sess { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.sess .when { font-weight: 700; }
+.sess .songs { font-size: 13px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sess .hl { color: var(--yellow); font-size: 12px; margin-top: 4px; }

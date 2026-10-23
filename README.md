@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.8.0.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.9.0.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -162,6 +162,9 @@ Settings in the panel, under **Song & highway**:
 - **Note speed:** how many seconds ahead you see (default 4.5 s). Higher = you
   see further ahead and notes move more slowly.
 - **Fret numbers on the notes (3D):** turn off for a cleaner, more Rocksmith-like look.
+- **Look (3D):** *Classic* (Rocksmith blue), *Stage* (warm stage lights), *Minimal*
+  (calm, no effects) or *High contrast*. **Larger notes** makes the notes 30% bigger
+  for playing further from the screen.
 - **Sparks when you hit a note**, **glow effects** (soft glow on strings and notes;
   turns itself off if your PC can't keep up) and **timing dots** (off by default:
   after each hit a small dot shows where the note was when you played it: blue =
@@ -299,9 +302,37 @@ the player) to open it.
   automatically.
 - Filters (All, Favourites, by status, Drills), search (also searches your notes)
   and sorting (last played, most practised, best score, recently added, title).
+- **Due today** (spaced repetition): songs you are working on (a status other than
+  New, or a favourite) come back to the top of the Library when it's time to play
+  them again, so you don't forget them. The gap grows as a song settles in: about a
+  day for Learning songs, a few days for Practising, a week and more for Mastered,
+  longer when you played it well and the more days you've practised it. A score
+  that is dropping makes a song due right away. Each card says why ("not played for
+  9 days").
+- **Goals:** in a song's details set a goal, e.g. "90% at 100% speed by 31 October".
+  The Library shows your progress towards it; when a pass reaches it, the trainer
+  congratulates you on the highway and marks the song **Mastered**.
+- **Recent sessions:** the reports of your last practice sessions (see below).
 - *Remove from library* deletes the song and its history.
 - Songs from the standalone player are saved with their chart; starred player
   songs also keep their audio file, so **Open** loads both again.
+
+### Session report and end-of-song screen
+- At the **end of a song** a Rocksmith-style screen shows your accuracy (counting
+  up), **NEW BEST!** if you beat your personal best at full speed, notes hit,
+  longest streak, how many notes were on time, your average timing and one coloured
+  block per section (green = good … red = needs work). Buttons: *Play again*,
+  *Practise* your weakest section (loops it), *Details* (the full summary), *Close*.
+- When you **stop the input**, a **session report** shows how long you practised,
+  how much of that you were playing, passes, notes, accuracy, highlights ("New
+  personal best on 21 Guns: 93% (was 88%)", "Octaves: clean at 110 BPM") and each
+  song with its best. Reports are kept in the Library (*Recent sessions*).
+- **Note streaks:** at 10, 25, 50, 100… notes in a row a big "50 NOTE STREAK"
+  appears briefly, as in Rocksmith.
+- **Title card:** when a song starts from the beginning its title, artist and tuning
+  appear for a few seconds.
+- **Pause screen** (full Highway view): *Resume*, *Section start*, *Loop this
+  section* and *Riff repeater* at hand.
 
 ### Warm-up & technique drills
 **Drills** (player toolbar, the Library, or the panel on Songsterr) opens a list
@@ -317,6 +348,13 @@ a song:
 | Major scale (one octave) | the major scale shape, a new key every two bars |
 | Metronome lock-in | steady eighths on open strings, tempo rising 4 BPM every two bars |
 | Sixteenth-note endurance | even sixteenths, alternating fingers |
+
+**Fretboard trainer** (also in the Drills list): learn where the notes are.
+*Find the note* asks "Play G on the A string"; *Name the fret* marks a fret on a
+fretboard diagram, you play it and it tells you the note. 10, 20 or 30 questions,
+frets 0–5, 0–7 or 0–12, natural notes only or with sharps. The string decides the
+octave, so play it on the string asked (a right note in another octave is pointed
+out). The share right the first time is saved in the Library.
 
 Choose the tempo (BPM), number of bars and start fret. Your best clean tempo (90%+)
 is saved per drill. Next time the tempo is set **5 BPM higher** automatically.
@@ -457,6 +495,9 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.9.0:** session report, Rocksmith-style end-of-song screen, "Due today"
+  (spaced repetition), goals per song, fretboard trainer, themes and larger notes;
+  title card, pause screen, note-streak banners, bright cores in held-note tails.
 - **0.8.0:** Library (favourites, status, notes, statistics, streaks, "practise
   these bars"), warm-up & technique drills with a metronome; highway: fret lights
   on the fretboard, inlay dots, stage light beams, section flash, softer lighting.

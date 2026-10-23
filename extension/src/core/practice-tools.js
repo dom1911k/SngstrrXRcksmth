@@ -9,6 +9,7 @@ import { LibraryTracker } from './library.js';
 import { WaitMode } from './wait-mode.js';
 import { Takes } from './takes.js';
 import { InputMonitor } from './input-monitor.js';
+import { SessionReport } from './session-report.js';
 
 export function createPracticeTools(engine, adapter, session, notify) {
   const history = new HistoryRecorder(session);
@@ -30,5 +31,10 @@ export function createPracticeTools(engine, adapter, session, notify) {
     waitMode: () => wait.toggle(),
     recordTakes: () => takes.setArmed(!takes.armed),
   };
-  return { history, riff, wait, takes, monitor, library, actions };
+  history.onSaved(async (rec) => {
+    const e = await library.checkGoal(rec);
+    if (e) notify(`🎯 Goal reached: ${Math.round(e.goal.accuracy * 100)}% at ${Math.round(e.goal.speed * 100)}%! Marked as Mastered.`);
+  });
+  const report = new SessionReport(engine, history);
+  return { history, riff, wait, takes, monitor, library, report, actions };
 }

@@ -15,7 +15,7 @@ if (q.get('cam')) globalThis.__btCam = Object.fromEntries(q.get('cam').split(','
 const mod = style === '3d' ? await import('../extension/src/ui/highway3d.js') : await import('../extension/src/ui/highway2d.js');
 const Cls = style === '3d' ? mod.Highway3D : mod.Highway2D;
 const hw = new Cls(document.getElementById('c'));
-hw.setOptions({ lookahead: Number(q.get('look') || 3.5), invertStrings: q.has('invert') });
+hw.setOptions({ lookahead: Number(q.get('look') || 4.5), invertStrings: q.has('invert'), theme: q.get('theme') || 'classic', largeNotes: q.has('large') });
 hw.setChart(chart);
 const t0 = Number(q.get('t') || 0);
 window.__hw = hw;

@@ -43,3 +43,15 @@ code { background: #0e1014; padding: 1px 5px; border-radius: 4px; }
 .drill .best { color: #5fd38d; font-size: 12px; margin-top: 6px; display: block; }
 .drill-opts { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
 .dialog-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+.dialog.trainer { z-index: 2147482999; }  /* below the BASS TRAINER panel (input start) */
+.tabs { display: flex; gap: 6px; margin: 10px 0 4px; }
+.tq-head { display: flex; justify-content: space-between; }
+.tq { font-size: 30px; text-align: center; margin: 18px 0 10px; }
+.tq b { font-size: 40px; color: #f2c418; }
+.fb { width: 100%; height: auto; display: block; margin: 6px 0; }
+.tfb { text-align: center; font-size: 18px; min-height: 28px; color: #9aa0aa; margin-top: 6px; }
+.tfb.ok { color: #5fd38d; font-weight: 700; }
+.tfb.no { color: #ffb347; }
+.warnline { color: #ffb347; }
+.drill-opts[hidden] { display: none; }

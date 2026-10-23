@@ -1,9 +1,9 @@
 // Library page (extension page library/library.html): your songs with
 // favourites, status, notes and statistics from the practice history.
 import { h } from './ui/dom.js';
-import { idbHistory, idbLibrary } from './core/history-db.js';
+import { idbHistory, idbLibrary, idbSessions } from './core/history-db.js';
 import { aggregate } from './core/history.js';
-import { STATUSES, songStats, overallStats, setPending } from './core/library.js';
+import { STATUSES, songStats, overallStats, setPending, dueInfo, goalProgress, goalLabel } from './core/library.js';
 import { drillById } from './core/drills.js';
 import { accuracyColor } from './ui/progress-ui.js';
 
@@ -32,7 +32,8 @@ let filter = 'all';
 let selected = null;
 
 async function load() {
-  const [lib, recs] = await Promise.all([idbLibrary.all(), idbHistory.all()]);
+  const [lib, recs, sessions] = await Promise.all([idbLibrary.all(), idbHistory.all(), idbSessions.recent(6)]);
+  renderSessions(sessions);
   records = recs.sort((a, b) => a.at - b.at);
   const byKey = new Map();
   for (const r of records) {
@@ -53,7 +54,8 @@ async function load() {
   }
   entries = [...map.values()].map((e) => {
     const recs3 = byKey.get(e.songKey) || [];
-    return { ...e, records: recs3, stats: songStats(recs3) };
+    const stats = songStats(recs3);
+    return { ...e, records: recs3, stats, due: dueInfo(e, stats), goalProg: goalProgress(e.goal, recs3) };
   });
   render();
 }
@@ -81,11 +83,12 @@ function renderOverview() {
 }
 
 // ---------- list ----------
-const FILTERS = [['all', 'All songs'], ['fav', '★ Favourites'], ...STATUSES.filter(([k]) => k !== 'new'), ['drill', 'Drills']];
+const FILTERS = [['all', 'All songs'], ['due', 'Due today'], ['fav', '★ Favourites'], ...STATUSES.filter(([k]) => k !== 'new'), ['drill', 'Drills']];
 
 function matches(e, f = filter, q = $('search').value.trim().toLowerCase()) {
   const filter = f;
   if (filter === 'fav' && !e.favorite) return false;
+  if (filter === 'due' && !(e.due && e.due.due)) return false;
   if (filter === 'drill') { if (e.kind !== 'drill') return false; } else if (e.kind === 'drill' && filter !== 'all') return false;
   if (STATUSES.some(([k]) => k === filter) && e.status !== filter) return false;
   return !q || `${e.title} ${e.artist} ${e.track || ''} ${e.notes || ''}`.toLowerCase().includes(q);
@@ -159,12 +162,15 @@ function render() {
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k, entries.filter((e) => matches(e, k, '')).length]));
   $('filters').replaceChildren(...FILTERS.map(([k, label]) => h('button', { class: `chip${k === filter ? ' on' : ''}`, onclick: () => { filter = k; render(); } },
     label, h('span', { class: 'n' }, counts[k]))));
+  renderDue();
   const list = sorted(entries.filter((e) => matches(e)));
   $('list').replaceChildren(...list.map((e) => {
     const st = e.stats;
     const row = h('div', { class: `row${selected === e.songKey ? ' sel' : ''}`, onclick: () => showDetail(e) },
       h('button', { class: `fav${e.favorite ? ' on' : ''}`, title: e.favorite ? 'Remove from favourites' : 'Add to favourites', onclick: (ev) => { ev.stopPropagation(); setFav(e, !e.favorite); } }, e.favorite ? '★' : '☆'),
-      h('div', { class: 'title' }, h('b', {}, e.title), h('span', { class: 'sub' }, [e.artist, e.track, `played ${ago(st.lastAt || e.lastOpenedAt)}`].filter(Boolean).join(' · '))),
+      h('div', { class: 'title' }, h('b', {}, e.title, e.due && e.due.due ? h('span', { class: 'duetag', title: e.due.reason }, 'due') : null),
+        h('span', { class: 'sub' }, [e.artist, e.track, `played ${ago(st.lastAt || e.lastOpenedAt)}`].filter(Boolean).join(' · ')),
+        e.goal ? h('span', { class: `goalline${e.goal.reachedAt ? ' done' : ''}` }, e.goal.reachedAt ? `🎯 Goal reached: ${goalLabel(e.goal)}` : `🎯 ${goalLabel(e.goal)} · best so far ${pct(e.goalProg.best)}`) : null),
       h('div', { class: 'c-status' }, statusBadge(e)),
       h('div', { class: 'small c-tuning' }, e.kind === 'drill' ? (st.bestBpm ? `90%+ at ${st.bestBpm} BPM` : '') : e.tuning || ''),
       h('div', { class: 'num small c-time', title: `${st.passes} passes` }, dur(st.seconds)),
@@ -178,6 +184,47 @@ function render() {
   $('empty').textContent = entries.length
     ? 'No songs match.'
     : 'No songs yet. Open a bass track on Songsterr (or a chart in the player) and it appears here. Press ☆ Save on the highway to make it a favourite.';
+}
+
+// Recent sessions (session reports saved when you stopped the input).
+function renderSessions(list) {
+  $('sessionsBox').hidden = !list.length;
+  $('sessions').replaceChildren(...list.map((r) => h('div', { class: 'sess' },
+    h('div', { class: 'when' }, new Date(r.start).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }),
+      h('span', { class: 'small' }, ` ${new Date(r.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`)),
+    h('div', { class: 'small' }, `${dur(r.wallSeconds)} · ${r.passes} passes · ${pct(r.accuracy)}`),
+    h('div', { class: 'songs' }, r.songs.map((x) => x.title).join(', ')),
+    r.highlights.length ? h('div', { class: 'hl' }, `★ ${r.highlights[0]}`) : null)));
+}
+
+// "Due today": the songs to revisit now, most overdue first.
+function renderDue() {
+  const due = entries.filter((e) => e.due && e.due.due).sort((a, b) => b.due.overdueDays - a.due.overdueDays).slice(0, 6);
+  $('dueBox').hidden = !due.length;
+  $('dueList').replaceChildren(...due.map((e) => h('div', { class: 'duecard', onclick: () => showDetail(e) },
+    h('b', {}, e.title), h('span', { class: 'small' }, e.artist),
+    h('span', { class: 'why' }, e.due.reason),
+    h('button', { class: 'btn small primary', onclick: (ev) => { ev.stopPropagation(); openSong(e); } }, 'Practise'))));
+  $('dueNote').textContent = due.length ? `${entries.filter((e) => e.due && e.due.due).length} song(s) to revisit so you don't lose them` : '';
+}
+
+// Goal editor in the detail panel.
+function goalEditor(e) {
+  const acc = h('select', {}, [0.8, 0.85, 0.9, 0.95, 1].map((v) => h('option', { value: v, selected: (e.goal ? e.goal.accuracy : 0.9) === v }, `${Math.round(v * 100)}%`)));
+  const spd = h('select', {}, [0.7, 0.8, 0.9, 1].map((v) => h('option', { value: v, selected: (e.goal ? e.goal.speed : 1) === v }, `${Math.round(v * 100)}% speed`)));
+  const by = h('input', { type: 'date', value: e.goal && e.goal.by ? new Date(e.goal.by).toISOString().slice(0, 10) : '' });
+  const save = async (goal) => { Object.assign(e, await idbLibrary.patch(e.songKey, { title: e.title, artist: e.artist, kind: e.kind, goal })); await load(); showDetail(entries.find((x) => x.songKey === e.songKey)); };
+  const g = e.goalProg;
+  return h('div', { class: 'goalbox' },
+    e.goal ? h('div', {},
+      h('div', { class: 'goalhead' }, h('b', {}, goalLabel(e.goal)),
+        e.goal.reachedAt ? h('span', { class: 'good' }, ` reached ${new Date(e.goal.reachedAt).toLocaleDateString()} 🎉`)
+          : g.daysLeft !== null ? h('span', { class: g.overdue ? 'bad' : 'small' }, g.overdue ? ' · date passed' : ` · ${g.daysLeft} day${g.daysLeft === 1 ? '' : 's'} left`) : null),
+      h('div', { class: 'meter big' }, h('i', { style: { width: `${Math.round(g.fraction * 100)}%`, background: e.goal.reachedAt ? '#5fd38d' : '#f2c418' } })),
+      h('div', { class: 'small' }, `Best so far at ${Math.round(e.goal.speed * 100)}% speed (since the goal was set): ${pct(g.best)}. When you reach it, the song is marked Mastered.`)) : h('div', { class: 'small' }, 'Set a goal for this song. When you reach it, it is marked Mastered.'),
+    h('div', { class: 'bar-row' }, acc, spd, h('label', { class: 'small' }, 'by ', by),
+      h('button', { class: 'btn small primary', onclick: () => save({ accuracy: Number(acc.value), speed: Number(spd.value), by: by.value ? new Date(`${by.value}T23:59:00`).getTime() : null, setAt: e.goal && !e.goal.reachedAt ? e.goal.setAt : Date.now() }) }, e.goal ? 'Update goal' : 'Set goal'),
+      e.goal ? h('button', { class: 'btn small', onclick: () => save(null) }, 'Remove') : null));
 }
 
 // ---------- detail ----------
@@ -246,6 +293,9 @@ function showDetail(e) {
       h('div', {}, h('b', {}, pct(st.best)), h('span', { class: 'small' }, 'best overall')),
       h('div', {}, h('b', {}, e.kind === 'drill' ? (st.bestBpm ? `${st.bestBpm}` : '–') : st.bestSpeed ? `${Math.round(st.bestSpeed * 100)}%` : '–'),
         h('span', { class: 'small' }, e.kind === 'drill' ? 'best BPM (90%+)' : 'fastest at 90%+'))),
+    e.kind !== 'drill' ? h('h4', {}, 'Goal') : null,
+    e.kind !== 'drill' ? goalEditor(e) : null,
+    e.due ? h('div', { class: 'small', style: { marginTop: '8px' } }, e.due.due ? `Due for practice: ${e.due.reason}.` : `Next review in ${Math.max(1, Math.ceil((e.due.dueAt - Date.now()) / 86400000))} day(s) (every ~${Math.round(e.due.days)} days at this level).`) : null,
     st.passes ? h('h4', {}, `Last ${Math.min(40, st.passes)} passes`) : null,
     st.passes ? historyChart(e.records) : h('p', { class: 'small' }, 'No scored passes yet. Start the input and play the song.'),
     st.passes ? h('div', { class: 'small' }, `First practised ${new Date(st.firstAt).toLocaleDateString()} · last ${ago(st.lastAt)}${st.trend !== null ? ` · trend ${st.trend >= 0 ? '+' : ''}${Math.round(st.trend * 100)} points over the last 5 passes` : ''}. Faded bars were played slowed down.`) : null,

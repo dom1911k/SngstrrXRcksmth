@@ -7,6 +7,7 @@ const DB_NAME = 'bass-trainer';
 const STORE = 'passes';
 const SONGS = 'songs';        // song library (favourites, status, notes, layout)
 const AUDIO = 'audio';        // audio files of saved player songs
+const SESSIONS = 'sessions';  // session reports
 const MAX_PER_SONG = 500;
 
 let dbPromise = null;
@@ -14,7 +15,7 @@ let dbPromise = null;
 function open() {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 2);
+      const req = indexedDB.open(DB_NAME, 3);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(STORE)) {
@@ -23,6 +24,7 @@ function open() {
         }
         if (!db.objectStoreNames.contains(SONGS)) db.createObjectStore(SONGS, { keyPath: 'songKey' });
         if (!db.objectStoreNames.contains(AUDIO)) db.createObjectStore(AUDIO, { keyPath: 'songKey' });
+        if (!db.objectStoreNames.contains(SESSIONS)) db.createObjectStore(SESSIONS, { keyPath: 'id', autoIncrement: true });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => { dbPromise = null; reject(req.error); };
@@ -99,9 +101,22 @@ export const idbLibrary = {
   async getAudio(songKey) { return (await done((await store('readonly', AUDIO)).get(songKey))) || null; },
 };
 
+// Session reports (core/session-report.js).
+export const idbSessions = {
+  async add(report) { return done((await store('readwrite', SESSIONS)).add(report)); },
+  async recent(n = 20) {
+    const all = await done((await store('readonly', SESSIONS)).getAll());
+    return all.sort((a, b) => b.end - a.end).slice(0, n);
+  },
+};
+
 // Message handler for the background service worker.
 export async function handleHistoryMessage(msg) {
   const { op, args = [] } = msg;
+  if (msg.store === 'sessions') {
+    if (!['add', 'recent'].includes(op)) throw new Error(`unknown sessions op ${op}`);
+    return idbSessions[op](...args);
+  }
   if (msg.store === 'library') {
     if (!['get', 'all', 'put', 'patch', 'remove'].includes(op)) throw new Error(`unknown library op ${op}`);
     return idbLibrary[op](...args);

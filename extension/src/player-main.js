@@ -16,6 +16,8 @@ import { songStats } from './core/library.js';
 import { historyStore } from './core/history.js';
 import { getSettings } from './core/settings.js';
 import { TUNINGS } from './core/music.js';
+import { NoteTrainer } from './core/note-trainer.js';
+import { createNoteTrainerUI } from './ui/note-trainer-ui.js';
 import { createTrainingSections } from './ui/training-section.js';
 
 const $ = (id) => document.getElementById(id);
@@ -41,6 +43,7 @@ document.body.append(overlay.host, panel.host);
 installShortcuts(createShortcutActions(adapter, { notify, extra: tools.actions }));
 adapter.start();
 globalThis.bassTrainer = { engine, adapter, panel, overlay, session, autoMute, tools };
+globalThis.bassTrainerNoteTrainer = () => noteTrainer;
 
 let statusTimer;
 function status(text, ok = false) {
@@ -160,16 +163,30 @@ async function openDrills() {
 }
 function selectDrill(d, st) {
   drillSel = d;
+  $('drillOpts').hidden = !!d.trainer;
   for (const el of $('drillList').children) el.classList.toggle('on', el.querySelector('b').textContent === d.name);
   // Suggest the next tempo: 5 BPM above your best clean (90%+) run.
   const bpm = st && st.bestBpm ? st.bestBpm + 5 : d.defaults.bpm;
+  if (d.trainer) { $('drillHint').textContent = st && st.passes ? `Best round: ${Math.round(st.best * 100)}% right the first time.` : ''; return; }
   $('drillBpm').value = bpm;
   $('drillBars').value = d.defaults.bars;
   $('drillPos').value = d.defaults.position;
   $('drillPos').disabled = d.id === 'lock-in';
   $('drillHint').textContent = st && st.bestBpm ? `You played this cleanly at ${st.bestBpm} BPM, so the tempo is set 5 BPM higher.` : '';
 }
+// Fretboard trainer (not a chart: questions checked by the pitch detector).
+const noteTrainer = new NoteTrainer(session);
+const trainerUI = createNoteTrainerUI(noteTrainer, {
+  engine,
+  getTuning: () => (adapter.chart ? adapter.chart.instrument.tuning : TUNINGS[getSettings().tuningName] || TUNINGS['E Standard']),
+  onDone: async (rec) => {
+    if (!rec) return;
+    try { await (await historyStore()).add(rec); } catch (err) { console.warn('[Bass Trainer] could not save the round', err); }
+  },
+});
+
 function startDrill(id, opts) {
+  if (drillById(id).trainer) { $('drills').hidden = true; trainerUI.open(); return; }
   const tuning = TUNINGS[getSettings().tuningName] || TUNINGS['E Standard'];
   adapter.setChart(makeDrill(id, { ...opts, tuning }));
   $('empty').hidden = true;

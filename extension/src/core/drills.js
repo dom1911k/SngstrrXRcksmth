@@ -41,6 +41,11 @@ export const DRILLS = [
     defaults: { bpm: 80, bars: 12, position: 0 },
   },
   {
+    id: 'fretboard', name: 'Fretboard trainer', trainer: true,
+    description: 'Learn the notes on the neck: "Play G on the A string", or play a marked fret and learn its name.',
+    defaults: {},
+  },
+  {
     id: 'sixteenths', name: 'Sixteenth-note endurance',
     description: 'Even sixteenths alternating plucking fingers, one bar per string. Watch that every note is equally loud.',
     defaults: { bpm: 70, bars: 8, position: 5 },
@@ -95,7 +100,7 @@ function patternBars(id, { bars, position: p }) {
 
 export function makeDrill(id, opts = {}) {
   const d = drillById(id);
-  if (!d) throw new Error(`unknown drill ${id}`);
+  if (!d || d.trainer) throw new Error(`unknown drill ${id}`);
   const o = { ...d.defaults, ...opts };
   const tuning = o.tuning || [28, 33, 38, 43];
   const bpm = Math.max(30, Math.min(240, Math.round(o.bpm)));

@@ -12,6 +12,14 @@ export const SCORE_CSS = `
 .score .streak { color: #f2c418; }
 .hint { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3; color: #ffb347; font: 600 14px system-ui; text-shadow: 0 1px 3px #000; }
 .hint[hidden] { display: none; }
+.milestone { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); z-index: 4; pointer-events: none; text-align: center;
+  font-family: system-ui, "Segoe UI", sans-serif; color: #fff; text-shadow: 0 0 18px rgba(242,196,24,.8), 0 2px 4px #000; }
+.milestone[hidden] { display: none; }
+.milestone b { display: block; font-size: 64px; font-weight: 900; color: #f2c418; line-height: 1; }
+.milestone span { font-size: 16px; font-weight: 800; letter-spacing: .3em; }
+.milestone.go { animation: ms 1.7s ease-out forwards; }
+@keyframes ms { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.5); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+  22% { transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60%) scale(1); } }
 .toast { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); z-index: 4; background: rgba(16,18,24,.94);
   border: 1px solid #3a3f49; border-radius: 10px; padding: 8px 14px; font: 600 14px system-ui; color: #e8e8ea; display: flex; gap: 12px; align-items: center; }
 .toast[hidden] { display: none; }
@@ -34,7 +42,7 @@ export const SCORE_CSS = `
 
 const pct = (x) => (x === null || x === undefined ? '–' : `${Math.round(x * 100)}%`);
 
-export function createScoreUI(wrap, session, getHighway) {
+export function createScoreUI(wrap, session, getHighway, { onSongEnd = null } = {}) {
   const acc = h('span', { class: 'acc' }, '–');
   const streak = h('span', { class: 'streak' }, '');
   const score = h('div', { class: 'score', hidden: true }, acc, streak);
@@ -45,12 +53,30 @@ export function createScoreUI(wrap, session, getHighway) {
   let toastTimer = null;
   let lastSummary = null;
 
+  // Rocksmith-style note-streak milestones.
+  const milestone = h('div', { class: 'milestone', hidden: true });
+  wrap.append(milestone);
+  let milestoneTimer = null;
+  let lastStreak = 0;
+  const MILESTONES = [10, 25, 50, 75, 100, 150, 200, 300, 400, 500];
+  function showMilestone(n) {
+    milestone.replaceChildren(h('b', {}, String(n)), h('span', {}, 'NOTE STREAK'));
+    milestone.hidden = false;
+    milestone.classList.remove('go');
+    void milestone.offsetWidth; // restart the animation
+    milestone.classList.add('go');
+    clearTimeout(milestoneTimer);
+    milestoneTimer = setTimeout(() => { milestone.hidden = true; }, 1700);
+  }
+
   let judged = 0;
   function renderStats(st) {
     if (!st) return;
     judged = st.judged;
     acc.textContent = st.judged ? `${pct(st.accuracy)}` : '–';
     streak.textContent = st.streak >= 2 ? `streak ${st.streak}` : '';
+    if (st.streak > lastStreak && MILESTONES.includes(st.streak) && session.active && getSettings().showLiveScore) showMilestone(st.streak);
+    lastStreak = st.streak;
   }
 
   session.on('stats', renderStats);
@@ -60,6 +86,7 @@ export function createScoreUI(wrap, session, getHighway) {
     if (s.kind === 'partial') return; // saved to the history only
     lastSummary = s;
     if (s.kind === 'loop') showToast(s);
+    else if (onSongEnd) onSongEnd(s);
     else showCard(s);
   });
 
@@ -123,5 +150,5 @@ export function createScoreUI(wrap, session, getHighway) {
   // Hide the card when playback resumes.
   session.adapter.on('play', () => { card.hidden = true; });
 
-  return { update, showLast: () => { const s = lastSummary || session.currentSummary(); if (s) showCard(s); } };
+  return { update, showCard, showLast: () => { const s = lastSummary || session.currentSummary(); if (s) showCard(s); } };
 }
