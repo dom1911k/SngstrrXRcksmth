@@ -79,6 +79,7 @@ export function createOverlay(adapter, {
   monitor = null,        // InputMonitor: warnings + held-note feedback (optional)
   library = null,        // LibraryTracker: ★ save button (optional)
   report = null,         // SessionReport: shown when the input stops (optional)
+  setlist = null,        // SetlistRunner: next song of a running setlist (optional)
 } = {}) {
   const host = h('div', { id: 'bass-trainer-highway' });
   const root = host.attachShadow({ mode: 'open' });
@@ -143,7 +144,7 @@ export function createOverlay(adapter, {
   root.append(wrap, pill);
   // Rocksmith-style end-of-song screen and session report.
   const endScreen = createEndScreen(wrap, {
-    adapter, history,
+    adapter, history, setlist,
     onDetails: (s) => scoreUI && scoreUI.showCard(s),
     loopBars: (a, b) => loopBarsOf(adapter, a, b, (t) => notify(t)),
   });
@@ -206,7 +207,7 @@ export function createOverlay(adapter, {
     }
     const opts = { lookahead: s.lookahead, invertStrings: s.invertStrings, showDebug: s.showDebug };
     highway2d.setOptions(opts);
-    if (highway3d) highway3d.setOptions({ ...opts, showFretNumbers: s.gemFretNumbers, sparks: s.hitSparks, timingMarks: s.timingMarks, glow: s.glowEffects, theme: s.theme, largeNotes: s.largeNotes });
+    if (highway3d) highway3d.setOptions({ ...opts, showFretNumbers: s.gemFretNumbers, sparks: s.hitSparks, timingMarks: s.timingMarks, glow: s.glowEffects, theme: s.theme, largeNotes: s.largeNotes, quality: s.graphicsQuality });
   }
   onSettingsChange(layout);
   window.addEventListener('resize', () => layout());

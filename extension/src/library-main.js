@@ -6,6 +6,7 @@ import { aggregate } from './core/history.js';
 import { STATUSES, songStats, overallStats, setPending, dueInfo, goalProgress, goalLabel, practiceByDay, coverOf } from './core/library.js';
 import { drillById } from './core/drills.js';
 import { accuracyColor } from './ui/progress-ui.js';
+import * as hub from './library-hub.js';
 
 const $ = (id) => document.getElementById(id);
 const pct = (x) => (x === null || x === undefined ? '–' : `${Math.round(x * 100)}%`);
@@ -30,9 +31,13 @@ let entries = [];         // library entries merged with stats
 let records = [];
 let filter = 'all';
 let selected = null;
+let settingsNow = null;
+let view = 'list', groupBy = 'none';
+try { view = localStorage.getItem('btLibView') || 'list'; groupBy = localStorage.getItem('btLibGroup') || 'none'; } catch { /* ignore */ }
 
 async function load() {
-  const [lib, recs, sessions] = await Promise.all([idbLibrary.all(), idbHistory.all(), idbSessions.recent(6)]);
+  const [lib, recs, sessions] = await Promise.all([idbLibrary.all(), idbHistory.all(), idbSessions.recent(6), hub.loadAllSetlists()]);
+  hub.renderSetupCheck($('setup')).then((r) => { settingsNow = r.settings; renderHubTiles(); });
   renderSessions(sessions);
   records = recs.sort((a, b) => a.at - b.at);
   const byKey = new Map();
@@ -224,15 +229,50 @@ async function setFav(e, on) {
   render();
 }
 
+// Change library fields of a song and refresh.
+async function patch(e, fields) {
+  await idbLibrary.patch(e.songKey, { title: e.title, artist: e.artist, kind: e.kind, drillId: e.drillId, ...fields });
+  await load();
+}
+
+function renderHubTiles() {
+  hub.renderTiles($('tiles'), { entries, settings: settingsNow, openSong, setFilter: (f) => { filter = f; render(); $('songs').scrollIntoView({ behavior: 'smooth' }); } });
+}
+
 function render() {
   renderOverview();
+  renderHubTiles();
+  hub.renderWantShelf($('wantBox'), $('wantShelf'), { entries, cover, openSong, patch });
+  hub.renderSetlists($('setlists'), { entries, cover, openSong, rerender: render });
+  $('viewToggle').replaceChildren(...hub.VIEWS.map(([k, label]) => h('button', { class: `chip${view === k ? ' on' : ''}`, onclick: () => { view = k; try { localStorage.setItem('btLibView', k); } catch { /* ignore */ } render(); } }, label)));
+  $('group').value = groupBy;
+  $('group').disabled = view === 'board';
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k, entries.filter((e) => matches(e, k, '')).length]));
   $('filters').replaceChildren(...FILTERS.map(([k, label]) => h('button', { class: `chip${k === filter ? ' on' : ''}`, onclick: () => { filter = k; render(); } },
     label, h('span', { class: 'n' }, counts[k]))));
   renderDue();
   renderHero();
   const list = sorted(entries.filter((e) => matches(e)));
-  $('list').replaceChildren(...list.map((e, i) => {
+  const ctx = { cover, showDetail, openSong, statusBadge, patch };
+  if (view === 'board') {
+    hub.renderBoard($('list'), list, ctx);
+  } else {
+    const groups = hub.groupEntries(list, groupBy);
+    $('list').className = view === 'grid' ? 'list grid' : 'list';
+    $('list').replaceChildren(...groups.flatMap(([name, items]) => [
+      name ? h('div', { class: 'ghead' }, name, h('span', { class: 'n' }, `${items.length}`),
+        groupBy === 'tuning' && name !== 'Drills' ? h('span', { class: 'small' }, ' · play these without retuning') : null) : null,
+      ...(view === 'grid' ? [h('div', { class: 'gridwrap' }, ...items.map((e) => hub.gridCard(e, ctx)))] : items.map((e, i) => songRow(e, i))),
+    ].filter(Boolean)));
+  }
+  $('empty').hidden = list.length > 0;
+  $('empty').textContent = entries.length
+    ? 'No songs match.'
+    : 'No songs yet. Open a bass track on Songsterr (or a chart in the player) and it appears here. Press ☆ Save on the highway to make it a favourite.';
+}
+
+function songRow(e, i) {
+  {
     const st = e.stats;
     const row = h('div', { class: `row${selected === e.songKey ? ' sel' : ''}`, style: { '--i': String(Math.min(i, 20)) }, onclick: () => showDetail(e) },
       cover(e, 40),
@@ -248,11 +288,7 @@ function render() {
       sparkline(st.recent),
       h('div', { class: 'actions' }, h('button', { class: 'btn small primary', onclick: (ev) => { ev.stopPropagation(); openSong(e); } }, e.kind === 'drill' ? 'Play' : 'Open')));
     return row;
-  }));
-  $('empty').hidden = list.length > 0;
-  $('empty').textContent = entries.length
-    ? 'No songs match.'
-    : 'No songs yet. Open a bass track on Songsterr (or a chart in the player) and it appears here. Press ☆ Save on the highway to make it a favourite.';
+  }
 }
 
 // Recent sessions (session reports saved when you stopped the input).
@@ -380,6 +416,8 @@ function showDetail(e) {
       h('td', {}, `Bar ${b.number}`, b.section ? h('span', { class: 'small' }, ` · ${b.section}`) : null),
       h('td', { class: 'r' }, `${Math.round(b.missRate * 100)}% missed`),
       h('td', { class: 'r' }, canLoop ? practise(Math.max(0, b.bar - 1), Math.min(layout.bars.length - 1, b.bar + 1)) : null)))) : null,
+    e.kind !== 'drill' ? h('h4', {}, 'Setlists') : null,
+    e.kind !== 'drill' ? hub.setlistChips(e, () => { render(); showDetail(e); }) : null,
     h('h4', {}, 'Notes'),
     notes,
     h('div', { class: 'bar-row' },
@@ -398,7 +436,8 @@ function showDetail(e) {
 
 $('search').addEventListener('input', render);
 $('sort').addEventListener('change', render);
+$('group').addEventListener('change', (ev) => { groupBy = ev.target.value; try { localStorage.setItem('btLibGroup', groupBy); } catch { /* ignore */ } render(); });
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('detail').hidden = true; selected = null; render(); } });
 // Refresh when you come back from practising.
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
-load();
+load().then(() => setTimeout(() => document.body.classList.add('settled'), 1200));

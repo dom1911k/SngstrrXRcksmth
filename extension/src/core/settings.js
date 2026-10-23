@@ -50,6 +50,7 @@ export const DEFAULTS = {
   glowEffects: true,       // soft glow (bloom) on strings and notes (3D)
   theme: 'classic',        // 3D look: 'classic' | 'stage' | 'minimal' | 'contrast'
   largeNotes: false,       // 30% bigger notes (3D)
+  graphicsQuality: 'auto', // 'auto' | 'high' | 'low' (3D)
   // Scoring
   scoring: true,
   hitWindowMs: 140,        // how early/late a note may be and still count

@@ -148,3 +148,70 @@ select { background: var(--panel2); color: var(--text); border: 1px solid #3a3f4
 .duetop b { display: block; }
 .heat .mo { overflow: visible; width: 13px; }
 .badge.want { background: #2b2140; color: #c9a6ff; }
+
+/* ---- 0.11 hub ---- */
+.setup { display: flex; flex-direction: column; gap: 6px; }
+.setup[hidden] { display: none; }
+.setup-item { display: flex; align-items: center; gap: 10px; background: #2b2410; border: 1px solid #4a3d12; color: #f2d77a; border-radius: 10px; padding: 8px 12px; animation: rise .3s ease-out both; }
+.setup-item .ico { font-size: 18px; }
+.setup-item .txt { flex: 1; font-size: 13px; }
+.setup-item .x { background: none; border: none; color: #8b7a3a; font-size: 18px; cursor: pointer; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tile { display: flex; flex-direction: column; gap: 3px; text-align: left; text-decoration: none; color: var(--text); cursor: pointer; font: inherit;
+  background: linear-gradient(160deg, #1b1f29, #12141a); border: 1px solid #2c313d; border-radius: 14px; padding: 14px; min-height: 96px;
+  transition: transform .15s, border-color .15s, box-shadow .15s; animation: rise .35s ease-out both; }
+.tile:hover { transform: translateY(-3px); border-color: #4b5262; box-shadow: 0 10px 24px rgba(0,0,0,.35); }
+.tile .ico { font-size: 22px; line-height: 1; margin-bottom: 4px; }
+.tile b { font-size: 15px; }
+.tile .sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile.hot { background: linear-gradient(160deg, #3a1214, #1a0d0f); border-color: #6b1f24; }
+.tile.hot:hover { border-color: var(--red); }
+.shelf { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+.shelf-card { flex: none; width: 128px; display: flex; flex-direction: column; gap: 3px; cursor: pointer; scroll-snap-align: start; padding: 6px; border-radius: 12px; transition: background .15s, transform .15s; }
+.shelf-card:hover { background: #171a21; transform: translateY(-2px); }
+.shelf-card b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
+.shelf-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.tun { display: inline-block; font-size: 10px; font-weight: 700; border-radius: 5px; padding: 1px 6px; background: #1d2433; color: #9fc0ff; }
+.setlists { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; align-items: start; }
+.setlist-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.setlist-card.open { grid-column: 1 / -1; border-color: #4b5262; }
+.setlist-card.new { border-style: dashed; color: var(--muted); cursor: pointer; font: inherit; min-height: 58px; }
+.setlist-card.new:hover { color: var(--text); border-color: var(--yellow); }
+.sl-head { display: flex; align-items: center; gap: 10px; }
+.sl-covers { display: flex; }
+.sl-covers .cover { margin-right: -10px; border: 2px solid var(--panel); }
+.sl-title { flex: 1; min-width: 0; margin-left: 12px; }
+.sl-title b { display: block; }
+.sl-acts { display: flex; gap: 6px; }
+.sl-edit { margin-top: 10px; }
+.sl-name { background: var(--panel2); color: var(--text); border: 1px solid #3a3f49; border-radius: 6px; padding: 4px 8px; font: inherit; }
+.sl-songs { margin: 8px 0 0 18px; padding: 0; }
+.sl-songs li { display: flex; gap: 6px; align-items: center; padding: 3px 0; border-bottom: 1px solid #23262c; }
+.sl-songs .grow { flex: 1; }
+.ghead { margin: 14px 0 4px; font-weight: 800; font-size: 14px; color: #dfe3ea; display: flex; gap: 8px; align-items: baseline; }
+.ghead .n { color: var(--muted); font-weight: 600; font-size: 12px; }
+.list.grid { display: block; }
+.gridwrap { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.gcard { display: flex; flex-direction: column; gap: 2px; cursor: pointer; animation: rise .3s ease-out both; }
+.gcard b { font-size: 14px; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gcover { position: relative; }
+.gcover .cover { width: 100% !important; height: auto !important; aspect-ratio: 1; font-size: 44px !important; border-radius: 14px; transition: transform .2s, box-shadow .2s; }
+.gcard:hover .cover { transform: scale(1.03); box-shadow: 0 12px 28px rgba(0,0,0,.5); }
+.gfav { position: absolute; top: 8px; left: 10px; color: var(--yellow); font-size: 18px; text-shadow: 0 1px 4px #000; }
+.gplay { position: absolute; right: 10px; bottom: 10px; width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--red); color: #fff; font-size: 15px;
+  cursor: pointer; opacity: 0; transform: translateY(6px); transition: opacity .15s, transform .15s; box-shadow: 0 4px 12px rgba(0,0,0,.5); }
+.gcard:hover .gplay { opacity: 1; transform: none; }
+.gmeta { display: flex; justify-content: space-between; align-items: center; }
+.gbest { font-weight: 800; font-size: 13px; }
+.board { display: grid; grid-template-columns: repeat(5, minmax(180px, 1fr)); gap: 10px; overflow-x: auto; }
+.bcol { background: #101217; border: 1px solid var(--line); border-radius: 12px; padding: 8px; min-height: 160px; transition: border-color .15s, background .15s; }
+.bcol.over { border-color: var(--yellow); background: #17150c; }
+.bhead { font-weight: 800; font-size: 13px; margin: 2px 4px 8px; display: flex; justify-content: space-between; }
+.bhead .n { color: var(--muted); }
+.bcard { display: grid; grid-template-columns: 36px 1fr auto; gap: 8px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; margin-bottom: 6px; cursor: grab; }
+.bcard b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcard .small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcard.dragging { opacity: .4; }
+#group { margin-left: auto; }
+/* Entrance animations only when the page opens, not on every refresh. */
+.settled .row, .settled .gcard, .settled .tile, .settled .setup-item, .settled .hero { animation: none; }

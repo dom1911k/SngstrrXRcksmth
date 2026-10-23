@@ -10,6 +10,7 @@ import { WaitMode } from './wait-mode.js';
 import { Takes } from './takes.js';
 import { InputMonitor } from './input-monitor.js';
 import { SessionReport } from './session-report.js';
+import { SetlistRunner } from './setlist-runner.js';
 
 export function createPracticeTools(engine, adapter, session, notify) {
   const history = new HistoryRecorder(session);
@@ -39,5 +40,6 @@ export function createPracticeTools(engine, adapter, session, notify) {
     if (e) notify(`🎯 Goal reached: ${Math.round(e.goal.accuracy * 100)}% at ${Math.round(e.goal.speed * 100)}%! Marked as Mastered.`);
   });
   const report = new SessionReport(engine, history);
-  return { history, riff, wait, takes, monitor, library, report, actions };
+  const setlist = new SetlistRunner(library);
+  return { history, riff, wait, takes, monitor, library, report, setlist, actions };
 }

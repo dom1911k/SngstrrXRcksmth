@@ -40,22 +40,72 @@ const GEM_W = 0.78, GEM_H = 0.34, GEM_D = 0.24;
 const GEM_GROW = 0.35;       // far gems are up to 35% bigger (readability)
 const PAST_KEEP = 0.045;     // seconds a gem stays after its hit time
 
-function labelTexture(text, { color = '#ffffff', size = 128, font = 'bold 84px system-ui, "Segoe UI", sans-serif', outline = 'rgba(0,0,0,0.85)' } = {}) {
+// Text on a 256 px canvas (crisp on high-DPI screens), mipmapped.
+function labelTexture(text, { color = '#ffffff', size = 256, outline = 'rgba(0,0,0,0.85)' } = {}) {
   const c = document.createElement('canvas');
   c.width = size; c.height = size;
   const g = c.getContext('2d');
-  g.font = font;
+  const k = size / 128;
+  g.font = `800 ${Math.round(84 * k)}px system-ui, "Segoe UI", sans-serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.lineWidth = 12;
+  g.lineJoin = 'round';
+  g.lineWidth = 12 * k;
   g.strokeStyle = outline;
-  g.strokeText(text, size / 2, size / 2 + 4);
+  g.strokeText(text, size / 2, size / 2 + 4 * k);
   g.fillStyle = color;
-  g.fillText(text, size / 2, size / 2 + 4);
+  g.fillText(text, size / 2, size / 2 + 4 * k);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   return tex;
+}
+
+// Subtle fretboard texture: darker grooves and fine grain (grey, multiplied
+// with the theme's floor colour).
+function floorTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, 256, 256);
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let i = 0; i < 2600; i++) {
+    const v = 225 + Math.floor(rnd() * 30);
+    g.fillStyle = `rgb(${v},${v},${v + 4})`;
+    g.fillRect(Math.floor(rnd() * 256), Math.floor(rnd() * 256), 1, 2 + Math.floor(rnd() * 10));
+  }
+  const grad = g.createLinearGradient(0, 0, 256, 0);   // darker towards the fret wires
+  grad.addColorStop(0, 'rgba(0,0,0,0.22)'); grad.addColorStop(0.18, 'rgba(0,0,0,0)');
+  grad.addColorStop(0.82, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,0.22)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+// A soft "studio" environment for reflections on gems, strings and frets.
+function studioEnvironment(renderer) {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x05060a);
+  const panel = (color, intensity, w, hgt, pos, rot) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, hgt), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide }));
+    m.position.set(...pos);
+    m.rotation.set(...rot);
+    scene.add(m);
+  };
+  panel(0xffffff, 3, 8, 2, [0, 6, 2], [Math.PI / 2, 0, 0]);       // soft key light above
+  panel(0x6f8cff, 1.6, 10, 4, [0, 2, -9], [0, 0, 0]);            // blue stage glow ahead
+  panel(0xffb070, 1.2, 4, 6, [-8, 2, 0], [0, Math.PI / 2, 0]);   // warm side light
+  panel(0x9a6fff, 1.0, 4, 6, [8, 2, 0], [0, -Math.PI / 2, 0]);   // purple side light
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const env = pmrem.fromScene(scene, 0.04).texture;
+  pmrem.dispose();
+  return env;
 }
 
 // One mesh for many flat quads lying on (or parallel to) the floor, in the
@@ -111,7 +161,7 @@ export class Highway3D {
     this.litPrev = new Float32Array(6);
     this.labelKey = '';
     this.lastRenderKey = '';
-    this.quality = { maxDpr: 2, slowFor: 0 };
+    this.quality = { maxDpr: 2, slowFor: 0, level: 'auto' };
 
     const r = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     r.setClearColor(BG);
@@ -119,6 +169,7 @@ export class Highway3D {
     r.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
+    try { this.envMap = studioEnvironment(r); this.scene.environment = this.envMap; } catch (err) { console.warn('[Bass Trainer] no environment lighting', err); }
     this.scene.fog = new THREE.Fog(BG, DEPTH * 0.75, DEPTH * 1.08);
     this.camera = new THREE.PerspectiveCamera(CAM.fov, 2, 0.5, DEPTH + 40); // near 0.5: better depth precision
 
@@ -173,16 +224,19 @@ export class Highway3D {
     // Floor (the neck), slightly lighter than the background.
     // Pushed back in the depth buffer so lines lying on it never flicker
     // (z-fighting at the flat viewing angle).
-    const floorMat = this.floorMat = new THREE.MeshLambertMaterial({ color: 0x1a2030, polygonOffset: true, polygonOffsetFactor: 4, polygonOffsetUnits: 8 });
+    const floorTex = floorTexture();
+    floorTex.repeat.set(MAX_FRET + 4, (DEPTH + 30) / 6);
+    const floorMat = this.floorMat = new THREE.MeshLambertMaterial({ color: 0x1a2030, map: floorTex, polygonOffset: true, polygonOffsetFactor: 4, polygonOffsetUnits: 8 });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(MAX_FRET + 4, DEPTH + 30), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(MAX_FRET / 2, 0, -(DEPTH + 30) / 2 + 12);
     S.add(floor);
     // Fret wires running into the distance.
-    const wireMat = this.wireMat = new THREE.MeshBasicMaterial({ color: 0x6d7790 });
+    // Fret wires: metal that catches the light (a bit raised above the floor).
+    const wireMat = this.wireMat = new THREE.MeshStandardMaterial({ color: 0x6d7790, metalness: 0.8, roughness: 0.35, emissive: 0x6d7790, emissiveIntensity: 0.45 });
     const nutMat = new THREE.MeshBasicMaterial({ color: 0xc4c8d0 });
     for (let w = 0; w <= MAX_FRET; w++) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w === 0 ? 0.08 : 0.035, 0.01, DEPTH + 14), w === 0 ? nutMat : wireMat);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w === 0 ? 0.08 : 0.035, 0.016, DEPTH + 14), w === 0 ? nutMat : wireMat);
       m.position.set(w, 0.006, -(DEPTH + 14) / 2 + 6);
       S.add(m);
     }
@@ -300,13 +354,28 @@ export class Highway3D {
   setOptions(o) {
     const invertChanged = o.invertStrings !== undefined && o.invertStrings !== this.options.invertStrings;
     const themeChanged = o.theme !== undefined && o.theme !== this.options.theme;
+    const qualityChanged = o.quality !== undefined && o.quality !== this.quality.level;
     Object.assign(this.options, o);
     this.lastRenderKey = '';
     if (themeChanged || !this.themeApplied) this.applyTheme();
+    if (qualityChanged) this.applyQuality(o.quality);
     if (invertChanged && this.chart) this.setChart(this.chart);
   }
 
   theme() { return THEMES[this.options.theme] || THEMES.classic; }
+
+  // Graphics quality: 'high' (full resolution, all effects, never lowered),
+  // 'auto' (lowers itself if the PC can't keep up) or 'low' (for slow PCs).
+  applyQuality(level) {
+    const q = this.quality;
+    q.level = level || 'auto';
+    q.maxDpr = q.level === 'low' ? 1 : 2;
+    q.noGlow = q.level === 'low';
+    q.slowFor = 0;
+    this.scene.environment = q.level === 'low' ? null : this.envMap || null;
+    if (this.chart) this.setChart(this.chart);   // gem materials depend on the level
+    this.lastRenderKey = '';
+  }
 
   applyTheme() {
     const th = this.theme();
@@ -360,14 +429,15 @@ export class Highway3D {
     this.lastRenderKey = '';
 
     // Strings at the strike line.
-    this.stringMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.35, roughness: 0.4 }));
+    // Metallic strings with a highlight from the environment.
+    this.stringMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.35, roughness: 0.28, metalness: 0.55, envMapIntensity: 1.2 }));
     // Thinner strings, graded like real ones (lowest = thickest).
     const radii = n >= 5 ? [0.025, 0.021, 0.018, 0.015, 0.013] : [0.021, 0.018, 0.015, 0.013];
     for (let s = 0; s < n; s++) {
       const row = this.options.invertStrings ? n - 1 - s : s;
       const radius = radii[s] || 0.013;
       // Many segments along the string so it can bend locally when you hit a note.
-      const geo = new THREE.CylinderGeometry(radius, radius, MAX_FRET + 3, 8, 160);
+      const geo = new THREE.CylinderGeometry(radius, radius, MAX_FRET + 3, 14, 160);
       const m = new THREE.Mesh(geo, this.stringMats[s]);
       m.rotation.z = Math.PI / 2;
       m.position.set(MAX_FRET / 2, this.stringY(s), 0);
@@ -378,7 +448,11 @@ export class Highway3D {
     }
 
     // Materials.
-    this.gemMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.4, roughness: 0.35, metalness: 0.1 }));
+    // Glossy gems (clear coat reflects the stage lights).
+    const hiQ = this.quality.level !== 'low';
+    this.gemMats = colors.map((c) => (hiQ
+      ? new THREE.MeshPhysicalMaterial({ color: c, emissive: c, emissiveIntensity: 0.38, roughness: 0.32, metalness: 0.05, clearcoat: 0.7, clearcoatRoughness: 0.18, envMapIntensity: 0.9 })
+      : new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.4, roughness: 0.35, metalness: 0.1 })));
     this.ghostMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.3, transparent: true, opacity: 0.35 }));
     this.deadMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).multiplyScalar(0.35), emissive: c, emissiveIntensity: 0.12, roughness: 0.6 }));
     this.stemMats = colors.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.28, fog: true }));
@@ -888,6 +962,7 @@ export class Highway3D {
   // lower resolution instead of stuttering. Never raises it again in a session.
   adaptQuality(dt) {
     const q = this.quality;
+    if (q.level === 'high' || q.level === 'low') return;
     if (dt > 1 / 50 && dt < 0.1) q.slowFor += dt; else q.slowFor = Math.max(0, q.slowFor - dt * 0.5);
     if (q.slowFor > 2 && (this.dpr || 1) > 1) {
       q.maxDpr = this.dpr > 1.5 ? 1.5 : 1;

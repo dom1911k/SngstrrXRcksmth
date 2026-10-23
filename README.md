@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.10.0.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.11.0.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -163,6 +163,9 @@ Settings in the panel, under **Song & highway**:
 - **Note speed:** how many seconds ahead you see (default 4.5 s). Higher = you
   see further ahead and notes move more slowly.
 - **Fret numbers on the notes (3D):** turn off for a cleaner, more Rocksmith-like look.
+- **Graphics quality (3D):** *Auto* (lowers resolution / glow itself if the PC can't
+  keep up), *High* (always full quality) or *Low* (for slow PCs: no glow or
+  reflections, normal resolution).
 - **Look (3D):** *Classic* (Rocksmith blue), *Stage* (warm stage lights), *Minimal*
   (calm, no effects) or *High contrast*. **Larger notes** makes the notes 30% bigger
   for playing further from the screen.
@@ -290,6 +293,24 @@ the player) to open it.
 - Every bass track you open is remembered automatically, with its Songsterr link.
   Press **☆ Save** (bottom left of the highway) to make the song a **favourite**.
   Favourites are listed first.
+- **Setup check** (only when needed): a yellow bar if no input is chosen, the input
+  isn't the Real Tone Cable, you never calibrated or the calibration is over a month
+  old, or an update is available, each with a one-click fix (× hides it for now).
+- **Quick-start tiles:** Continue (last song), Due today, Find songs, Drills,
+  Fretboard trainer, Tuner and Calibrate, each with a one-line status (e.g. your
+  latency and when you calibrated). Tuner and Calibrate open the player with the
+  panel at that section.
+- **Want to learn** shelf: the songs you saved from Find songs as covers. Click one
+  to open it; it moves to *Learning*.
+- **Setlists:** your own lists (e.g. "Band rehearsal"). *+ New setlist*, then add
+  songs in a song's details (*Setlists*), reorder with ↑ ↓ in *Edit*. **▶ Play**
+  plays them in order: after each song the end screen shows the running score
+  ("2 of 5 played · average 91%") and a **Next: …** button; the last song says
+  *Setlist complete*.
+- **Song views:** ☰ List, ▦ Grid (big covers, ▶ on hover) or ▥ Board (one column per
+  status: drag a song to another column to change its status). **Grouping:** by
+  tuning (the biggest group first, "play these without retuning"), by artist or by
+  status. View and grouping are remembered.
 - At the top: **Now practising** (the song you played last, with *Continue*,
   *Practise* its weakest section and your goal), then practice time this week,
   songs, accuracy, your **streak** (days in a row) and total time, and a **heat map**
@@ -528,6 +549,10 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.11.0:** Library hub (setup check, quick-start tiles, Want-to-learn shelf,
+  setlists with Play, grid/board views, grouping by tuning/artist/status); graphics:
+  glossy gems with reflections, metallic strings and frets, fretboard texture, crisper
+  text, graphics quality setting.
 - **0.10.0:** Find songs: detailed bass tab search with tuning, strings, difficulty,
   popularity, style, tab-quality and library filters, quick searches, "Want to learn".
 - **0.9.1:** hit animation (note sinks into the string, string ripples); Library

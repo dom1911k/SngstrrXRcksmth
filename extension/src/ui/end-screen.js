@@ -33,6 +33,7 @@ export const END_CSS = `
 .endscreen .row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
 .endscreen button { background: #2a2e36; color: #fff; border: 1px solid #3a3f49; border-radius: 8px; padding: 8px 16px; font: 600 14px system-ui; cursor: pointer; }
 .endscreen button.primary { background: #e8202a; border-color: #e8202a; }
+.endscreen .setlist { background: rgba(242,196,24,.12); border: 1px solid rgba(242,196,24,.4); color: #f2c418; border-radius: 8px; padding: 6px 14px; font-size: 14px; }
 .endscreen .hl { color: #f2c418; font-size: 15px; text-align: center; }
 .endscreen table { border-collapse: collapse; font-size: 14px; min-width: min(560px, 92%); }
 .endscreen td { padding: 5px 10px; border-bottom: 1px solid #23262c; }
@@ -43,7 +44,7 @@ export const END_CSS = `
 const pct = (x) => (x === null || x === undefined ? '–' : `${Math.round(x * 100)}%`);
 const mins = (s) => (s < 60 ? `${Math.round(s)} s` : `${Math.round(s / 60)} min`);
 
-export function createEndScreen(wrap, { adapter, history = null, onDetails = null, loopBars = null } = {}) {
+export function createEndScreen(wrap, { adapter, history = null, setlist = null, onDetails = null, loopBars = null } = {}) {
   const el = h('div', { class: 'endscreen', hidden: true });
   wrap.append(el);
   let anim = null;
@@ -83,6 +84,9 @@ export function createEndScreen(wrap, { adapter, history = null, onDetails = nul
       for (let i = sec.firstBar; i <= sec.lastBar; i++) { const b = perBar.get(i); if (b) { hits += b.hits; n += b.hits + b.misses; } }
       return { ...sec, acc: n ? hits / n : null };
     }).filter((x) => x.acc !== null);
+    // Running setlist: running score and the next song.
+    let sl = null;
+    if (setlist) { try { sl = await setlist.onSongEnd(s); } catch { sl = null; } }
     const weakest = secs.length ? [...secs].sort((a, b) => a.acc - b.acc)[0] : null;
     const timed = s.early + s.ontime + s.late;
     const accEl = h('div', { class: 'acc' }, '0', h('small', {}, '%'));
@@ -101,8 +105,11 @@ export function createEndScreen(wrap, { adapter, history = null, onDetails = nul
         class: 'sec', title: `${x.name}: ${pct(x.acc)}`,
         style: { background: accuracyColor(x.acc, 0.85), flexGrow: String(Math.max(1, x.lastBar - x.firstBar + 1)), animationDelay: `${0.3 + i * 0.07}s` },
       }, h('em', {}, pct(x.acc)), x.name))) : null,
+      sl ? h('div', { class: 'setlist' }, h('span', {}, `Setlist "${sl.name}": ${sl.played} of ${sl.total} played · average ${pct(sl.average)}`),
+        sl.done ? h('b', {}, ' · Setlist complete! 🎉') : null) : null,
       h('div', { class: 'row' },
-        h('button', { class: 'primary', onclick: () => { hide(); adapter.seek(0); adapter.play(); } }, 'Play again'),
+        sl && sl.next ? h('button', { class: 'primary', onclick: () => setlist.open(sl.next) }, `Next: ${sl.next.title} ▶`) : null,
+        h('button', { class: sl && sl.next ? '' : 'primary', onclick: () => { hide(); adapter.seek(0); adapter.play(); } }, 'Play again'),
         weakest && loopBars && weakest.acc < 0.98 ? h('button', { onclick: () => { hide(); loopBars(weakest.firstBar, weakest.lastBar); } }, `Practise "${weakest.name}" (${pct(weakest.acc)})`) : null,
         onDetails ? h('button', { onclick: () => { hide(); onDetails(s); } }, 'Details') : null,
         h('button', { onclick: hide }, 'Close')),

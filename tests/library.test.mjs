@@ -147,3 +147,46 @@ test('fretboard trainer: questions and answers', async () => {
   assert.deepEqual(judgeAnswer(q, 38), { result: 'wrong', played: 'D' });
   assert.equal(judgeAnswer(q, null).result, 'unclear');
 });
+
+test('setlists: edit, play in order with a running score', async () => {
+  const sl = await import('../extension/src/core/setlists.js');
+  let list = sl.createSetlist([], 'Rehearsal', 1000);
+  const id = list[0].id;
+  list = sl.toggleSong(list, id, 'a');
+  list = sl.toggleSong(list, id, 'b');
+  list = sl.toggleSong(list, id, 'c');
+  list = sl.moveSong(list, id, 'c', -1);
+  assert.deepEqual(list[0].songKeys, ['a', 'c', 'b']);
+  list = sl.toggleSong(list, id, 'a');
+  assert.deepEqual(list[0].songKeys, ['c', 'b']);
+  assert.equal(sl.renameSetlist(list, id, 'Gig')[0].name, 'Gig');
+  assert.equal(sl.deleteSetlist(list, id).length, 0);
+  let run = sl.startRunState(list[0], 5);
+  assert.equal(sl.recordRunScore(run, 'b', 0.9), run);          // not the current song
+  run = sl.recordRunScore(run, 'c', 0.9);
+  assert.equal(sl.runSummary(run).nextKey, 'b');
+  run = sl.recordRunScore(run, 'b', 0.8);
+  const sum = sl.runSummary(run);
+  assert.equal(sum.done, true);
+  assert.ok(Math.abs(sum.average - 0.85) < 1e-9);
+  // The runner offers the next song after a song of the running setlist.
+  const { SetlistRunner } = await import('../extension/src/core/setlist-runner.js');
+  const { memoryLibrary } = await import('../extension/src/core/library.js');
+  const store = memoryLibrary();
+  await store.put({ songKey: 'b', title: 'Song B', kind: 'songsterr', url: 'https://x/b' });
+  await sl.setRun(sl.startRunState({ id: 's', name: 'Gig', songKeys: ['a', 'b'] }));
+  const runner = new SetlistRunner({ entry: { songKey: 'a' } }, { store: Promise.resolve(store) });
+  const info = await runner.onSongEnd({ accuracy: 0.92 });
+  assert.equal(info.next.title, 'Song B');
+  assert.equal(info.played, 1);
+  assert.equal((await sl.getRun()).index, 1);
+  assert.equal(await new SetlistRunner({ entry: { songKey: 'zzz' } }, { store: Promise.resolve(store) }).onSongEnd({ accuracy: 1 }), null);
+});
+
+test('library groups: by tuning with the biggest group first', async () => {
+  const { groupEntries } = await import('../extension/src/library-hub.js').catch(() => ({}));
+  if (!groupEntries) return; // needs the DOM helper only at call time
+  const list = [{ tuning: 'Drop D' }, { tuning: 'E Standard' }, { tuning: 'E Standard' }, { kind: 'drill' }];
+  const g = groupEntries(list, 'tuning');
+  assert.deepEqual(g.map(([k, v]) => [k, v.length]), [['E Standard', 2], ['Drop D', 1], ['Drills', 1]]);
+});

@@ -17,7 +17,13 @@
   <a class="small link" href="../updater/updater.html" target="_blank">Updates</a>
 </header>
 <main>
+  <section id="setup" class="setup" hidden></section>
   <section id="hero" class="hero" hidden></section>
+  <section id="tiles" class="tiles"></section>
+  <section id="wantBox" hidden>
+    <div class="head"><h2>Want to learn</h2><span class="small">Click a song to start learning it</span></div>
+    <div id="wantShelf" class="shelf"></div>
+  </section>
   <section id="overview" class="overview"></section>
   <section class="practice">
     <div class="head"><h2>Practice, last 12 months</h2><span id="practiceNote" class="small"></span></div>
@@ -27,13 +33,21 @@
     <div class="head"><h2>Due today</h2><span id="dueNote" class="small"></span></div>
     <div id="dueList" class="duelist"></div>
   </section>
+  <section>
+    <div class="head"><h2>Setlists</h2><span class="small">Your own lists; ▶ Play runs them in order with a running score</span></div>
+    <div id="setlists" class="setlists"></div>
+  </section>
   <section id="sessionsBox" hidden>
     <div class="head"><h2>Recent sessions</h2></div>
     <div id="sessions" class="sessions"></div>
   </section>
-  <section>
+  <section id="songs">
+    <div class="head"><h2>Songs</h2><div id="viewToggle" class="chips"></div></div>
     <div class="head">
       <div id="filters" class="chips"></div>
+      <select id="group" title="Group the songs">
+        <option value="none">No grouping</option><option value="tuning">By tuning</option><option value="artist">By artist</option><option value="status">By status</option>
+      </select>
       <label class="small">Sort
         <select id="sort">
           <option value="recent">Last played</option>

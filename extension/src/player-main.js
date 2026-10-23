@@ -220,6 +220,9 @@ if (params.get('drill') && drillById(params.get('drill'))) {
   })();
 }
 if (location.hash === '#drills') openDrills();
+// Library tiles: open the panel at a section.
+const PANEL_LINKS = { '#tuner': 'Tuner', '#calibrate': 'Latency calibration', '#input': 'Input' };
+if (PANEL_LINKS[location.hash]) setTimeout(() => panel.showSection(PANEL_LINKS[location.hash]), 300);
 
 // Saving a player song in the library (★) keeps its audio file too.
 async function saveAudio(entry) {

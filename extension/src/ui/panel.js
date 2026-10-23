@@ -392,5 +392,15 @@ export function createPanel(engine, { sections = [] } = {}) {
   calBtn.disabled = true;
   requestAnimationFrame(frame);
 
-  return { host, open: () => { panel.hidden = false; }, setTabTuning };
+  // Open the panel at a section (e.g. from the Library's quick-start tiles).
+  function showSection(name) {
+    panel.hidden = false;
+    const sec = [...panel.querySelectorAll('section')].find((x) => { const t = x.querySelector('h2'); return t && t.textContent === name; });
+    if (!sec) return;
+    sec.classList.remove('collapsed');
+    sec.scrollIntoView({ block: 'start' });
+    sec.animate([{ background: 'rgba(242,196,24,.18)' }, { background: 'transparent' }], { duration: 1600 });
+  }
+
+  return { host, open: () => { panel.hidden = false; }, showSection, setTabTuning };
 }

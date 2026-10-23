@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
+Status: **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -580,4 +580,28 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
   `want` ("Want to learn"), not part of spaced repetition.
 * Tests: `tests/search.test.mjs`; `tests/e2e-search.mjs` (real search: popular,
   pattern, Drop D server filter, difficulty filter, + Want, Open, quick search).
+
+---
+
+## 17. Library hub and graphics fidelity (0.11.0)
+
+* **Hub** (`src/library-hub.js`): setup check (settings: input label, calibration
+  age; `checkUpdate` from the background; per-session dismiss), quick-start tiles
+  (player links `#input`, `#tuner`, `#calibrate` open the panel at that section via
+  `panel.showSection`), Want-to-learn shelf (status `want` → `learning` on open),
+  song views (list / grid / board with HTML5 drag & drop to change status) and
+  grouping (`groupEntries`: tuning biggest-first, artist A–Z, status order). Entrance
+  animations only on first load (`body.settled`).
+* **Setlists** (`core/setlists.js`, pure list ops tested; `chrome.storage.local`
+  `setlists`, `setlistRun` with a 6 h expiry). `SetlistRunner` (`core/setlist-runner.js`)
+  records the score when a song of the running setlist ends (matched by songKey and
+  position) and gives the end screen the running score and the next entry; *Next*
+  navigates to its URL (Songsterr link, `player.html?song=` or `?drill=`).
+* **Graphics:** labels drawn on 256 px canvases (anisotropy 8); a PMREM "studio"
+  environment (soft key light, blue stage glow, warm/purple sides) gives reflections
+  to gems (MeshPhysical with clearcoat 0.7), strings (metalness 0.55, 14 radial
+  segments) and fret wires (metal, slightly raised, faint emissive); a procedural
+  fretboard texture (grain + darker towards the frets) multiplied with the theme's
+  floor colour. `graphicsQuality`: high (no auto-lowering), auto, low (pixel ratio 1,
+  no bloom, no environment, standard gem material).
 
