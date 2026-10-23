@@ -147,3 +147,4 @@ select { background: var(--panel2); color: var(--text); border: 1px solid #3a3f4
 @media (prefers-reduced-motion: reduce) { .row, .hero, .detail:not([hidden]) { animation: none; } .row:hover, .duecard:hover, .sess:hover { transform: none; } }
 .duetop b { display: block; }
 .heat .mo { overflow: visible; width: 13px; }
+.badge.want { background: #2b2140; color: #c9a6ff; }

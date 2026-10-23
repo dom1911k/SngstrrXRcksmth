@@ -10,7 +10,7 @@ import { songKeyOf } from './history.js';
 import { tuningName } from './music.js';
 
 export const STATUSES = [
-  ['new', 'New'], ['learning', 'Learning'], ['practising', 'Practising'], ['mastered', 'Mastered'],
+  ['new', 'New'], ['want', 'Want to learn'], ['learning', 'Learning'], ['practising', 'Practising'], ['mastered', 'Mastered'],
 ];
 
 function backend() {
@@ -178,6 +178,11 @@ export class LibraryTracker {
       this.changed();
       const pending = await takePending(key);
       if (pending) this.onPending(pending);
+      else {
+        // Opened from the song search on another track of the same song: switch.
+        const other = await peekPendingSong(key);
+        if (other && other.switchPart !== undefined) this.onPending({ switchTrack: other.switchPart });
+      }
     } catch (err) {
       console.warn('[Bass Trainer] library unavailable', err);
     }
@@ -210,6 +215,15 @@ export async function setPending(action) {
   if (typeof chrome === 'undefined' || !chrome.storage) return;
   await chrome.storage.local.set({ [PENDING]: { ...action, at: Date.now() } });
 }
+// A request for another track of the same Songsterr song (song search).
+export async function peekPendingSong(songKey) {
+  if (typeof chrome === 'undefined' || !chrome.storage) return null;
+  const p = (await chrome.storage.local.get(PENDING))[PENDING];
+  if (!p || Date.now() - p.at > 10 * 60 * 1000) return null;
+  const a = p.songKey.split(':'), b = songKey.split(':');
+  return a[0] === 'songsterr' && a[0] === b[0] && a[1] === b[1] && a[2] !== b[2] ? p : null;
+}
+
 export async function takePending(songKey) {
   if (typeof chrome === 'undefined' || !chrome.storage) return null;
   const p = (await chrome.storage.local.get(PENDING))[PENDING];
@@ -236,7 +250,7 @@ export function reviewInterval(entry, stats) {
 // { due, dueAt, days (interval), overdueDays, reason } or null when not tracked.
 export function dueInfo(entry, stats, now = Date.now()) {
   if (entry.kind === 'drill') return null;
-  if (!(entry.favorite || (entry.status && entry.status !== 'new'))) return null;
+  if (!(entry.favorite || (entry.status && entry.status !== 'new' && entry.status !== 'want'))) return null;
   if (!stats.lastAt) return { due: true, dueAt: now, days: 0, overdueDays: 0, reason: 'not practised yet' };
   const days = reviewInterval(entry, stats);
   const dueAt = stats.lastAt + days * DAY;

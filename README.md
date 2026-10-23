@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.9.1.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.10.0.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -338,6 +338,35 @@ the player) to open it.
 - **Pause screen** (full Highway view): *Resume*, *Section start*, *Loop this
   section* and *Riff repeater* at hand.
 
+### Find songs (detailed bass tab search)
+**Find songs** (top of the Library, or in the panel on Songsterr) searches Songsterr
+with filters made for bass. It uses the same search as Songsterr's website (titles,
+artists, tracks with tuning, difficulty and views), nothing more.
+
+- **Search** for songs or artists; several at once separated by **;**
+  (e.g. `Green Day; Muse; Royal Blood`). Empty = Songsterr's most popular bass tabs.
+- **Filters** (left):
+  - **Tuning:** E Standard, Drop D, Eb Standard, Drop C#, D Standard, Drop C,
+    C Standard, 5-string (BEADG), Other. One tuning is searched by Songsterr
+    directly (best results); several are combined.
+  - **Strings** (4/5/6), **difficulty** range (Songsterr's 1–7, unrated tabs
+    optional), **popularity** (views of the bass tab), **playing style** (finger,
+    pick, fretless, slap, synth, acoustic, contrabass).
+  - **Tab quality:** main bass track only (the song's most-used bass tab), hide
+    low-quality tabs, only tabs with the player.
+  - **My library:** not in my library yet / not mastered / in my library / favourites.
+  - **Leave out artists.**
+- **Sort:** best match, most viewed bass tab, easiest or hardest first, artist, title.
+- **Quick searches:** most popular bass tabs, *more by artists I play* (from your
+  Library), *around my level* (difficulty of the songs you play at 90%+, ±1, songs
+  you haven't added yet), easy & popular, Drop D songs, 5-string songs.
+- Each result shows the bass track (player and instrument), tuning, difficulty,
+  views and, if the song is in your Library, its status and your best score.
+  **☆** favourite, **+ Want** adds it as *Want to learn* (a new status), **Open**
+  opens exactly that bass track on Songsterr.
+- Few results after filtering? It searches further pages automatically, or press
+  *Search further*. Your last search and filters are remembered.
+
 ### Warm-up & technique drills
 **Drills** (player toolbar, the Library, or the panel on Songsterr) opens a list
 of exercises. They are played in the player with a metronome click and scored like
@@ -499,6 +528,8 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.10.0:** Find songs: detailed bass tab search with tuning, strings, difficulty,
+  popularity, style, tab-quality and library filters, quick searches, "Want to learn".
 - **0.9.1:** hit animation (note sinks into the string, string ripples); Library
   covers, "Now practising", 12-month heat map, smoother animations.
 - **0.9.0:** session report, Rocksmith-style end-of-song screen, "Due today"
@@ -527,6 +558,7 @@ node tests/e2e-player.mjs /tmp/a.wav [shot.png]   # standalone player: chart + a
 node tests/e2e-scoring.mjs [shot.png]             # scoring in the browser with a synthesized performance
 node tests/e2e-phase4.mjs /tmp/a.wav [shot.png]   # real Songsterr: count-in, shortcuts, mute status
 node tests/e2e-v2.mjs [shot-prefix]               # takes, history + progress card, wait mode, riff repeater
+node tests/e2e-search.mjs [shot-prefix]           # Find songs against Songsterr's real search (needs network)
 node tests/e2e-library.mjs [shot-prefix]          # drill scored + saved, ☆ Save, Library page, "practise these bars"
 npx http-server -p 8123                           # then open /tests/highway-preview.html?t=78&style=3d
 ```

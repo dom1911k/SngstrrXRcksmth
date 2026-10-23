@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
+Status: **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -88,6 +88,7 @@ extension/
     drills.js             warm-up / technique drills generated as charts
     session-report.js     session report (input start -> stop), saved in IndexedDB
     note-trainer.js       fretboard note trainer (questions checked by pitch)
+    song-search.js        Songsterr search + bass filters (Find songs page)
     riff-repeater.js      loop a section, automatic speed-up
     wait-mode.js          stop at each note until it is played
     takes.js              record takes, play them back in sync, WAV export
@@ -548,4 +549,35 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
   short-circuit with the particles check). Library: `coverOf()` (FNV hash → two hues
   + initials), "Now practising" hero, 52-week heat map (`practiceByDay`), staggered
   row animation, drawer slide-in, `prefers-reduced-motion` respected.
+
+---
+
+## 16. Find songs (0.10.0)
+
+* **Source:** `GET https://www.songsterr.com/api/songs?pattern=&inst=bass&size=100&from=N[&tuning=high,…,low]`,
+  the endpoint Songsterr's own search uses (public song metadata only: songId,
+  artist, title, `isJunk`, `hasPlayer`, `popularTrackBass`, tracks with
+  `instrumentId`, `instrument`, `name`, `tuning` (high first), `difficulty`, `views`).
+  Empty pattern = most popular; `inst=bass` ranks by bass; `tuning` filters exactly.
+  The extension page needs `host_permissions: https://www.songsterr.com/*` (the API
+  sends no CORS headers); Chrome already had access to that site for the content
+  scripts, so no new permission warning.
+* `core/song-search.js` (tested with a recorded result): bass tracks = GM programs
+  32–39 with a lowest string ≤ C2 (some "bass" tracks carry a guitar tuning), or
+  contrabass (43) in bass range; `tuningInfo` names tunings; `filterResults`
+  (tunings, strings, difficulty range ± unrated, min views, playing style from the
+  instrument name, main bass track, junk, player, library state, excluded artists);
+  `sortResults`; `trackUrl` (`<artist>-<title>-bass-tab-s<id>t<track>`; Songsterr
+  redirects to its own spelling); `levelFrom` (median difficulty of songs ≥ 90%).
+* **Page** (`search/search.html`, `src/search-main.js`): up to 8 `;`-separated
+  patterns, paged 100 at a time per pattern, up to 3 pages automatically (and again
+  after a filter change) until ≥ 30 tabs pass; results joined by songId. One selected
+  tuning goes to the server, several are filtered locally. "Around my level" looks up
+  the difficulty of up to 6 well-played library songs (one search each) and stores it
+  on the entry. **Open** stores `libraryPending { songKey, switchPart }`; Songsterr's
+  redirect drops the track number, so the tracker (`peekPendingSong`) switches to the
+  chosen track when another track of the same song loads. New library status
+  `want` ("Want to learn"), not part of spaced repetition.
+* Tests: `tests/search.test.mjs`; `tests/e2e-search.mjs` (real search: popular,
+  pattern, Drop D server filter, difficulty filter, + Want, Open, quick search).
 

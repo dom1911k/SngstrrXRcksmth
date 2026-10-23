@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bass Trainer: find songs</title>
+<link rel="stylesheet" href="../library/library.css">
+<link rel="stylesheet" href="search.css">
+</head>
+<body>
+<header>
+  <div class="brand">Bass Trainer <span>find songs</span></div>
+  <div class="spacer"></div>
+  <a class="btn" href="../library/library.html">Library</a>
+  <a class="btn" href="../player/player.html#drills">Drills</a>
+  <a class="btn" href="https://www.songsterr.com" target="_blank" rel="noopener">Songsterr</a>
+</header>
+<div class="layout">
+  <aside id="filters" class="filters"></aside>
+  <main class="results">
+    <form id="searchForm" class="searchbar">
+      <input id="q" type="search" placeholder="Song or artist… (several: separate with ;  e.g. Green Day; Muse)" autocomplete="off">
+      <button class="btn primary" type="submit">Search</button>
+    </form>
+    <div class="quick">
+      <button class="chip" data-quick="popular">🔥 Most popular bass tabs</button>
+      <button class="chip" data-quick="artists">🎸 More by artists I play</button>
+      <button class="chip" data-quick="level">🎯 Around my level</button>
+      <button class="chip" data-quick="easy">🌱 Easy &amp; popular</button>
+      <button class="chip" data-quick="drop">⬇ Drop D songs</button>
+      <button class="chip" data-quick="five">5️⃣ 5-string songs</button>
+    </div>
+    <div class="reshead">
+      <div id="count" class="small"></div>
+      <label class="small">Sort
+        <select id="sort">
+          <option value="relevance">Best match</option>
+          <option value="views">Most viewed bass tab</option>
+          <option value="easy">Easiest first</option>
+          <option value="hard">Hardest first</option>
+          <option value="artist">Artist</option>
+          <option value="title">Title</option>
+        </select>
+      </label>
+    </div>
+    <div id="list" class="list"></div>
+    <p id="msg" class="emptymsg" hidden></p>
+    <div class="more"><button id="more" class="btn" hidden>Search further</button></div>
+  </main>
+</div>
+<script type="module" src="../src/search-main.js"></script>
+</body>
+</html>

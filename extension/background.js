@@ -47,6 +47,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === 'openLibrary') {
     chrome.tabs.create({ url: chrome.runtime.getURL('library/library.html') });
   }
+  if (msg && msg.type === 'openSearch') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('search/search.html') });
+  }
   return false;
 });
 

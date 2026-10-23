@@ -19,7 +19,10 @@ export function createPracticeTools(engine, adapter, session, notify) {
   const monitor = new InputMonitor(engine, session);
   // "Practise bars 12–14" chosen on the Library page: loop them once the song is open.
   const library = new LibraryTracker(adapter, {
-    onPending: (p) => { if (p.loopBars) setTimeout(() => loopBars(adapter, p.loopBars[0], p.loopBars[1], notify), 800); },
+    onPending: (p) => {
+      if (p.switchTrack !== undefined && adapter.switchTrack) { adapter.switchTrack(p.switchTrack); return; }
+      if (p.loopBars) setTimeout(() => loopBars(adapter, p.loopBars[0], p.loopBars[1], notify), 800);
+    },
   });
   const actions = {
     loopSection: () => loopCurrentSection(adapter, notify),

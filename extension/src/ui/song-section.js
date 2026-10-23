@@ -51,6 +51,9 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
       typeof chrome !== 'undefined' && chrome.runtime
         ? h('button', { class: 'btn', title: 'Your songs, favourites and statistics', onclick: () => chrome.runtime.sendMessage({ type: 'openLibrary' }) }, 'Library')
         : null,
+      typeof chrome !== 'undefined' && chrome.runtime
+        ? h('button', { class: 'btn', title: 'Search Songsterr for bass tabs with detailed filters', onclick: () => chrome.runtime.sendMessage({ type: 'openSearch' }) }, 'Find songs')
+        : null,
       adapter.name === 'Songsterr player' && typeof chrome !== 'undefined' && chrome.runtime
         ? h('button', { class: 'btn', title: 'Warm-up and technique drills (opens the player)', onclick: () => chrome.runtime.sendMessage({ type: 'openPlayer', hash: '#drills' }) }, 'Drills')
         : null),
