@@ -192,7 +192,7 @@ function renderSessions(list) {
   $('sessions').replaceChildren(...list.map((r) => h('div', { class: 'sess' },
     h('div', { class: 'when' }, new Date(r.start).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }),
       h('span', { class: 'small' }, ` ${new Date(r.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`)),
-    h('div', { class: 'small' }, `${dur(r.wallSeconds)} · ${r.passes} passes · ${pct(r.accuracy)}`),
+    h('div', { class: 'small' }, `${dur(r.wallSeconds)} · ${r.passes} pass${r.passes === 1 ? '' : 'es'} · ${pct(r.accuracy)}`),
     h('div', { class: 'songs' }, r.songs.map((x) => x.title).join(', ')),
     r.highlights.length ? h('div', { class: 'hl' }, `★ ${r.highlights[0]}`) : null)));
 }
@@ -205,7 +205,8 @@ function renderDue() {
     h('b', {}, e.title), h('span', { class: 'small' }, e.artist),
     h('span', { class: 'why' }, e.due.reason),
     h('button', { class: 'btn small primary', onclick: (ev) => { ev.stopPropagation(); openSong(e); } }, 'Practise'))));
-  $('dueNote').textContent = due.length ? `${entries.filter((e) => e.due && e.due.due).length} song(s) to revisit so you don't lose them` : '';
+  const nDue = entries.filter((e) => e.due && e.due.due).length;
+  $('dueNote').textContent = nDue ? `${nDue} song${nDue === 1 ? '' : 's'} to revisit so you don't lose ${nDue === 1 ? 'it' : 'them'}` : '';
 }
 
 // Goal editor in the detail panel.
