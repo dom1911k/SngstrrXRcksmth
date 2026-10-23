@@ -24,7 +24,8 @@ const STRING_BASE = 0.42;    // height of the lowest drawn string above the floo
 // camera backs off until about camSpan frets fit across the strings.
 // The tilt is solved per frame so that the far end of the highway sits at
 // `farNdc` (just below the top edge) for any window shape.
-const CAM = { fov: 26, strikeNdc: 0.6, farNdc: 0.86, widthFactor: 0.5, extraWidth: 0.5 };
+// RS2014-like view: strings low on screen, lane running up to near the top.
+const CAM = { fov: 22, strikeNdc: 0.82, farNdc: 0.86, widthFactor: 0.62, extraWidth: 1.2, fogStart: 0.82 };
 const GEM_W = 0.78, GEM_H = 0.34, GEM_D = 0.24;
 const PAST_KEEP = 0.045;     // seconds a gem stays after its hit time
 
@@ -88,7 +89,7 @@ export class Highway3D {
 
   constructor(canvas) {
     this.canvas = canvas;
-    this.options = { lookahead: 3.5, invertStrings: false, showDebug: false, showFretNumbers: true };
+    this.options = { lookahead: 4.5, invertStrings: false, showDebug: false, showFretNumbers: true };
     this.chart = null;
     this.fps = 60;
     this.lastFrame = 0;
@@ -471,12 +472,14 @@ export class Highway3D {
 
     // Camera: behind and above the strings, looking down the highway.
     const cam = this.camera;
-    const tanV = Math.tan(THREE.MathUtils.degToRad(CAM.fov) / 2);
-    const halfW = camSpan * CAM.widthFactor + CAM.extraWidth;         // half width at the strings
+    const C = globalThis.__btCam ? { ...CAM, ...globalThis.__btCam } : CAM; // dev preview override
+    if (cam.fov !== C.fov) { cam.fov = C.fov; cam.updateProjectionMatrix(); }
+    const tanV = Math.tan(THREE.MathUtils.degToRad(C.fov) / 2);
+    const halfW = camSpan * C.widthFactor + C.extraWidth;         // half width at the strings
     // Wide, short windows show more frets instead of zooming in.
     const d0 = halfW / (tanV * Math.min(1.9, Math.max(0.6, cam.aspect))); // distance to the strike line
     const place = (pitch) => {
-      const down = pitch + Math.atan(CAM.strikeNdc * tanV);            // angle down to the strike line
+      const down = pitch + Math.atan(C.strikeNdc * tanV);            // angle down to the strike line
       const camH = d0 * Math.sin(down), camZ = d0 * Math.cos(down);
       cam.position.set(camX, camH, camZ);
       cam.lookAt(camX, 0, camZ - camH / Math.tan(pitch));
@@ -488,9 +491,13 @@ export class Highway3D {
       const mid = (lo + hi) / 2;
       place(mid);
       far.set(camX, 0, -DEPTH).project(cam);
-      if (far.y > CAM.farNdc) hi = mid; else lo = mid;
+      if (far.y > C.farNdc) hi = mid; else lo = mid;
     }
     place((lo + hi) / 2);
+    // Fog is measured from the camera: keep it on the far part of the lane.
+    const fog = this.scene.fog;
+    fog.near = d0 + DEPTH * C.fogStart;
+    fog.far = d0 + DEPTH * 1.08;
     this.renderer.render(this.scene, cam);
   }
 

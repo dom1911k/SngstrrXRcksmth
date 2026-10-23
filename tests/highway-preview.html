@@ -11,6 +11,7 @@ const fixture = q.get('song') || '21-guns-bass';
 const song = await (await fetch(`./fixtures/${fixture}.json`)).json();
 const { chart } = songsterrToChart(song);
 const style = q.get('style') || '3d';
+if (q.get('cam')) globalThis.__btCam = Object.fromEntries(q.get('cam').split(',').map((kv) => { const [k, v] = kv.split(':'); return [k, Number(v)]; }));
 const mod = style === '3d' ? await import('../extension/src/ui/highway3d.js') : await import('../extension/src/ui/highway2d.js');
 const Cls = style === '3d' ? mod.Highway3D : mod.Highway2D;
 const hw = new Cls(document.getElementById('c'));

@@ -2,7 +2,7 @@
 // survives clearing Songsterr's site data) and localStorage elsewhere (tests).
 
 const KEY = 'bassTrainerSettings';
-const SCHEMA = 2;
+const SCHEMA = 3;
 
 // Adjust settings saved by older versions.
 function migrate(stored) {
@@ -10,6 +10,10 @@ function migrate(stored) {
   if (v < 2) {
     // 0.3.0: longer default look-ahead for the 3D highway.
     if (stored.lookahead === undefined || stored.lookahead <= 2.4) stored.lookahead = 3.5;
+  }
+  if (v < 3) {
+    // 0.5.1: lower, wider camera shows further ahead; give it more time.
+    if (stored.lookahead === undefined || stored.lookahead <= 3.5) stored.lookahead = 4.5;
   }
   stored.schema = SCHEMA;
   return stored;
@@ -30,7 +34,7 @@ export const DEFAULTS = {
   viewMode: 'both',        // 'both' | 'highway' | 'tab'
   highwayHeight: 0.42,     // fraction of the window height in 'both' mode
   visualDelayMs: 60,       // shift the highway so notes cross the line when you HEAR them
-  lookahead: 3.5,          // seconds a note is visible before it must be played
+  lookahead: 4.5,          // seconds a note is visible before it must be played
   highwayStyle: '3d',      // '3d' (Rocksmith-style, WebGL) | '2d'
   gemFretNumbers: true,    // fret numbers on the 3D note gems
   invertStrings: false,    // false = Rocksmith (low E on top); true = tab order
@@ -40,13 +44,13 @@ export const DEFAULTS = {
   hitWindowMs: 110,        // how early/late a note may be and still count
   onTimeMs: 40,            // within this it is "on time"
   deadNotes: 'attack',     // 'attack' = any muted attack counts | 'ignore'
-  showLiveScore: true,
+  showLiveScore: true,     // accuracy % and streak above the highway
   // Practice
   autoMuteBass: true,      // mute the song's bass track while the input is on
   countIn: true,           // standalone player: one bar of clicks before playing
   countInLoops: true,      // ...and before each loop restart
   shortcuts: {},           // action -> [bindings]; empty = defaults
-  panelCollapsed: ['Shortcuts (keyboard or foot pedal)'], // folded panel sections     // accuracy % and streak above the highway
+  panelCollapsed: ['Shortcuts (keyboard or foot pedal)'], // folded panel sections
   autoTiming: true,        // learn a small timing correction while playing
   autoTimingMs: 0,         // the learned correction (added to the latency)
   schema: SCHEMA,

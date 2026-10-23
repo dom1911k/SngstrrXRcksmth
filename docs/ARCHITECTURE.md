@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **Phase 4 built (0.5.0)**: auto bass muting (`core/auto-mute.js`, Songsterr's
+Status: **Phase 4 built (0.5.1)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
 bindings), highway clean-up with a hit indicator. **Correction:** Songsterr's
@@ -298,7 +298,7 @@ on disk:
 **3D highway** (`ui/highway3d.js`, three.js r170 vendored in `extension/vendor/three/`):
 * World: x = frets (1 unit each, nut at 0), y = up (floor at 0, strings stacked
   above it, low E on top), z = time (strike line at z = 0, the future at −z).
-  40 world units ≙ the look-ahead (default 3.5 s of real time, × speed in song time).
+  40 world units ≙ the look-ahead (default 4.5 s of real time, × speed in song time).
 * Static scene: floor, fret wires, fret numbers, strings (glow while a note sounds).
 * `timeGroup` holds everything that is a length in time (beat/bar lines, anchor
   lanes with their "next fret" labels, sustain/slide ribbons). It is built once in
@@ -316,7 +316,13 @@ on disk:
   outside the frame are shaded and their numbers dimmed. Seeks snap. Open strings
   and ghost notes never move the camera. All three test songs fit a single frame,
   so the camera never moves in them. The same framing is used by the 2D view.
-* Narrow FOV (26°) + fog in the last ~30% keep far notes large and readable.
+* Camera placement (0.5.1, `CAM` in `highway3d.js`): FOV 22°; the strike line sits
+  at 82% down the view (`strikeNdc`) and the pitch is solved by bisection so the far
+  end of the lane is near the top (`farNdc` 0.86), as in Rocksmith 2014. The camera
+  distance comes from the frame width (`widthFactor`, `extraWidth`; aspect capped at
+  1.9). Fog is set relative to the camera distance and covers only the last ~18% of
+  the lane. `tests/highway-preview.html?cam=fov:20,strikeNdc:0.8` overrides `CAM`
+  for tuning (`globalThis.__btCam`).
 * Performance (0.3.1): beat/bar lines, anchor lanes and sustain ribbons are merged
   into ~8 meshes (was >1,000 objects for 21 Guns); stems share one geometry; fret
   labels re-colour only when the hand moves; nothing is redrawn while paused and

@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.5.0.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.5.1.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (automatic bass muting, count-in, keyboard / foot-pedal
 shortcuts), a **standalone player** for your own chart + audio file, a tuner that
@@ -106,8 +106,9 @@ Good Riddance, can be played too.
   **SYNTH**). To practise without the recorded bass, use Songsterr's mixer to
   mute the bass track in SYNTH mode. (Phase 4 does this automatically.)
 - Layout, as in Rocksmith 2014 (3D view):
-  - The fretboard lies in front of you and the highway runs into the distance.
-    You see about 3.5 seconds ahead (adjustable).
+  - The fretboard lies in front of you, low on the screen, and the highway runs
+    up to near the top of the screen. You see about 4.5 seconds ahead
+    (adjustable). In full screen this shows the next few bars, as in Rocksmith.
   - **Colour and height = string:** E red (top), A yellow, D blue, G orange.
     Notes far away appear higher up and drop onto their string as they arrive.
   - **Left–right = fret,** numbered on the floor in front of the strings. The
@@ -134,7 +135,7 @@ Settings in the panel, under **Song & highway**:
 - **Highway timing:** with a wireless headset the sound reaches you a bit after
   the picture. Play a song and move this slider until notes cross the strings
   exactly when you **hear** them. 40–120 ms is typical.
-- **Note speed:** how many seconds ahead you see (default 3.5 s). Higher = you
+- **Note speed:** how many seconds ahead you see (default 4.5 s). Higher = you
   see further ahead and notes move more slowly.
 - **Fret numbers on the notes (3D):** turn off for a cleaner, more Rocksmith-like look.
 - **Tab order:** puts G on top, like a tab, instead of Rocksmith's E-on-top.
@@ -327,6 +328,7 @@ for detection.
   summary, edge cases (dead notes, ghost notes, slides, ringing notes, octave errors).
 - **Phase 4 (done, 0.5.0):** automatic bass-track muting, count-in, configurable
   keyboard / foot-pedal shortcuts, cleaner highway with a subtle hit indicator.
+  0.5.1: Rocksmith-like camera: strings low on screen, longer view ahead.
 - **V2 (after scoring):** riff repeater with auto speed-up, wait mode, practice
   stats and weak spots, take recording.
 
