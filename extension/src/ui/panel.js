@@ -90,7 +90,7 @@ export function createPanel(engine, { sections = [] } = {}) {
   const calDots = h('div', { class: 'dots' });
   const calStatus = h('div', {}, '');
   const calResult = h('div', { class: 'big' });
-  const fineSlider = h('input', { type: 'range', min: -80, max: 80, step: 1, value: settings.fineTuneMs, oninput: () => {
+  const fineSlider = h('input', { type: 'range', min: -150, max: 150, step: 1, value: settings.fineTuneMs, oninput: () => {
     updateSettings({ fineTuneMs: Number(fineSlider.value) });
   } });
   const fineValue = h('span', { class: 'muted' });
@@ -106,7 +106,7 @@ export function createPanel(engine, { sections = [] } = {}) {
     h('div', { class: 'row' }, calBtn),
     calDots, calStatus, calResult,
     h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Fine-tune'), h('div', { class: 'grow' }, fineSlider), fineValue),
-    h('div', { class: 'muted' }, 'Fine-tune only changes how scoring judges your timing (from Phase 3 on). It does not change what you hear. Leave it at 0 until scoring exists; then, if correct notes are judged "late", move right; if "early", move left.'),
+    h('div', { class: 'muted' }, 'Fine-tune only changes how scoring judges your timing. It does not change what you hear. If notes you play in time are judged "late", move right; if "early", move left. The summary after a song suggests a value.'),
     chromeInfo,
   );
 

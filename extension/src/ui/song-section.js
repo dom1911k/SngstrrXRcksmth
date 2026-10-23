@@ -4,7 +4,7 @@ import { h } from './dom.js';
 import { getSettings, updateSettings } from '../core/settings.js';
 import { tuningName } from '../core/music.js';
 
-export function createSongSection(adapter, { onTabTuning }) {
+export function createSongSection(adapter, { onTabTuning, showSummary = null }) {
   const s = getSettings();
   const statusEl = h('div', {}, 'Connecting to Songsterr…');
   const trackEl = h('div', { class: 'muted' });
@@ -20,6 +20,8 @@ export function createSongSection(adapter, { onTabTuning }) {
     } });
     return [h('div', { class: 'grow' }, input), val];
   };
+  const select = (key, options, cast = String) => h('select', { onchange: (e) => updateSettings({ [key]: cast(e.target.value) }) },
+    options.map(([v, label]) => h('option', { value: v, selected: s[key] === v }, label)));
   const check = (key, label) => h('label', { class: 'row muted' },
     h('input', { type: 'checkbox', checked: s[key], onchange: (e) => updateSettings({ [key]: e.target.checked }) }), label);
 
@@ -34,6 +36,15 @@ export function createSongSection(adapter, { onTabTuning }) {
     h('div', { class: 'muted' }, 'How long a note is visible before you play it. Higher = see further ahead, notes move slower.'),
     check('gemFretNumbers', 'Fret numbers on the notes (3D)'),
     check('invertStrings', 'Tab order (G on top) instead of Rocksmith order (E on top)'),
+    h('h2', { style: { marginTop: '12px' } }, 'Scoring'),
+    check('scoring', 'Score my playing (needs the input started below)'),
+    h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Timing window'),
+      select('hitWindowMs', [[70, 'Strict (±70 ms)'], [110, 'Normal (±110 ms)'], [160, 'Relaxed (±160 ms)']], Number)),
+    h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Dead notes (x)'),
+      select('deadNotes', [['attack', 'any muted attack counts'], ['ignore', 'not scored']])),
+    check('showFeedback', 'Show hit / miss / early / late at the strings'),
+    showSummary ? h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => showSummary() }, 'Show summary of the current pass')) : null,
+    h('h2', { style: { marginTop: '12px' } }, 'More'),
     check('showDebug', 'Show sync diagnostics on the highway'),
     h('div', { class: 'row' }, exportBtn,
       adapter.name === 'Songsterr player' && typeof chrome !== 'undefined' && chrome.runtime

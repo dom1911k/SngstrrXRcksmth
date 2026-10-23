@@ -35,6 +35,12 @@ export const DEFAULTS = {
   gemFretNumbers: true,    // fret numbers on the 3D note gems
   invertStrings: false,    // false = Rocksmith (low E on top); true = tab order
   showDebug: false,
+  // Scoring
+  scoring: true,
+  hitWindowMs: 110,        // how early/late a note may be and still count
+  onTimeMs: 40,            // within this it is "on time"
+  deadNotes: 'attack',     // 'attack' = any muted attack counts | 'ignore'
+  showFeedback: true,      // hit/miss labels at the strings
   schema: SCHEMA,
 };
 

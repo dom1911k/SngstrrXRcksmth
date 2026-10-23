@@ -1,6 +1,7 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **V3 built (0.3.0)**: 3D Rocksmith-style highway and standalone player, on
+Status: **Phase 3 built (0.4.0)**: scoring (see `docs/SCORING.md`). Also built:
+**V3 (0.3.x)**: 3D Rocksmith-style highway and standalone player, on
 top of Phase 2 (Songsterr adapter, chart format, highway in sync).
 Phase 1 (input, tuner, monitoring, calibration) and self-update are done too. This file
 is the design reference for all phases and is kept up to date.
@@ -202,7 +203,7 @@ expected    = note.t (chart seconds) mapped to wall clock through the adapter's 
 
 ---
 
-## 7. Scoring edge cases (policy; full table in `docs/SCORING.md`)
+## 7. Scoring edge cases (initial policy; the implemented rules are in `docs/SCORING.md`)
 
 | Case | Handling |
 |---|---|

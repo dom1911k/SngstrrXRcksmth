@@ -4,6 +4,7 @@
 import { h } from './dom.js';
 import { Highway2D } from './highway2d.js';
 import { getSettings, updateSettings, onSettingsChange } from '../core/settings.js';
+import { createScoreUI, SCORE_CSS } from './score-ui.js';
 
 const CSS = (controlsGap) => `
 :host { all: initial; }
@@ -29,7 +30,7 @@ canvas[hidden] { display: none; }
   font: 600 17px system-ui, "Segoe UI", sans-serif; text-shadow: 0 1px 3px #000; }
 .hud .left { color: #d4d9e3; }
 .hud .right { color: #f2c418; }
-.hud .center { position: absolute; left: 0; right: 0; top: 30px; text-align: center; color: #ffb347; }
+.hud .center { position: absolute; left: 0; right: 0; top: 64px; text-align: center; color: #ffb347; }
 .debug { position: absolute; right: 10px; bottom: 8px; color: #6f7685; font: 11px system-ui; pointer-events: none; z-index: 2; }
 `;
 
@@ -38,10 +39,11 @@ export function createOverlay(adapter, {
   headerGap = 56,
   modes = [['highway', 'Highway'], ['both', 'Both'], ['tab', 'Tab']],
   fixedMode = null,      // e.g. 'highway' on the standalone player page
+  session = null,        // ScoringSession (optional)
 } = {}) {
   const host = h('div', { id: 'bass-trainer-highway' });
   const root = host.attachShadow({ mode: 'open' });
-  root.append(h('style', {}, CSS(controlsGap)));
+  root.append(h('style', {}, CSS(controlsGap) + SCORE_CSS));
 
   const canvas2d = h('canvas');
   const canvas3d = h('canvas');
@@ -74,6 +76,7 @@ export function createOverlay(adapter, {
   const wrap = h('div', { class: 'wrap' }, canvas2d, canvas3d, hud, grip, msg, bar, debugEl);
   const pill = h('button', { class: 'pill', hidden: true, onclick: () => updateSettings({ viewMode: 'both' }) }, '▲ Highway');
   root.append(wrap, pill);
+  const scoreUI = session ? createScoreUI(wrap, session, () => active) : null;
 
   // Resize by dragging the top edge (Both mode).
   grip.addEventListener('pointerdown', (e) => {
@@ -191,6 +194,7 @@ export function createOverlay(adapter, {
     const s = getSettings();
     const st = adapter.getState();
     const speed = st.ready ? st.speed : 1;
+    if (scoreUI) scoreUI.update(!!lastChart);
     // What you hear lags the player position by the output delay.
     const time = adapter.getTime() - (s.visualDelayMs / 1000) * speed;
     let message = '';
@@ -216,5 +220,5 @@ export function createOverlay(adapter, {
   }
   requestAnimationFrame(frame);
 
-  return { host, get highway() { return active; } };
+  return { host, scoreUI, get highway() { return active; } };
 }

@@ -12,6 +12,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { stringColors } from '../core/music.js';
 import { computeAnchors, anchorAt, firstNoteAtOrAfter } from '../core/chart.js';
 import { CameraFollow, planCameraSegments } from '../core/camera-follow.js';
+import { feedbackLabel } from './feedback-label.js';
 
 const DEPTH = 40;            // world units from the strike line to the far end
 const MAX_FRET = 24;
@@ -123,7 +124,16 @@ export class Highway3D {
     this.timeGroup = new THREE.Group();   // children in seconds along -z; scaled per frame
     this.noteGroup = new THREE.Group();   // gems, positioned per frame
     this.scene.add(this.timeGroup, this.noteGroup);
-    this.flashes = [];
+    // Hit/miss labels at the strike line (pool of sprites with own materials
+    // so each can fade on its own).
+    this.feedbackPool = Array.from({ length: 10 }, () => {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, depthTest: false }));
+      sp.visible = false;
+      sp.renderOrder = 10;
+      this.scene.add(sp);
+      return { sp, until: 0, born: 0, y0: 0 };
+    });
+    this.texCache = new Map();
   }
 
   label(text, color = '#ffffff') {
@@ -171,6 +181,38 @@ export class Highway3D {
       this.fretLabels.push(sp);
     }
     this.scene.add(S);
+  }
+
+  // Show a scoring result at the strings: r from scoring/scorer.js.
+  feedback(r) {
+    const o = this.noteObjs && this.noteObjs[r.index];
+    if (!o) return;
+    const { text, color } = feedbackLabel(r);
+    const key = `${text}|${color}`;
+    if (!this.texCache.has(key)) this.texCache.set(key, labelTexture(text, { color, size: 256, font: 'bold 120px system-ui, "Segoe UI", sans-serif' }));
+    const slot = this.feedbackPool.reduce((a, b) => (a.until < b.until ? a : b));
+    slot.sp.material.map = this.texCache.get(key);
+    slot.sp.material.needsUpdate = true;
+    slot.sp.position.set(o.obj.position.x, o.obj.position.y + 0.55, 0.35);
+    slot.sp.scale.set(1.15, 1.15, 1);
+    slot.y0 = slot.sp.position.y;
+    slot.born = performance.now();
+    slot.until = slot.born + 900;
+    slot.sp.visible = true;
+    this.lastRenderKey = '';
+  }
+
+  updateFeedback(now) {
+    let active = false;
+    for (const slot of this.feedbackPool) {
+      if (!slot.sp.visible) continue;
+      const age = (now - slot.born) / (slot.until - slot.born);
+      if (age >= 1) { slot.sp.visible = false; continue; }
+      active = true;
+      slot.sp.material.opacity = age < 0.6 ? 1 : 1 - (age - 0.6) / 0.4;
+      slot.sp.position.y = slot.y0 + age * 0.5;
+    }
+    return active;
   }
 
   setOptions(o) {
@@ -427,10 +469,12 @@ export class Highway3D {
       }
     }
 
+    const feedbackActive = this.updateFeedback(nowMs);
+
     // Nothing moves while paused: skip drawing the same picture again.
     const camX = this.follow.x, camSpan = this.follow.span;
     const key = `${t.toFixed(4)}|${camX.toFixed(3)}|${camSpan.toFixed(3)}|${this.w}x${this.h}|${this.dpr}|${k.toFixed(4)}|${this.chart ? this.chart.notes.length : 0}`;
-    if (!state.playing && key === this.lastRenderKey) return;
+    if (!state.playing && !feedbackActive && key === this.lastRenderKey) return;
     this.lastRenderKey = key;
 
     // Camera: behind and above the strings, looking down the highway.

@@ -102,7 +102,11 @@ export class AudioEngine {
       outputChannelCount: [1],
       processorOptions: { minFreq: this.minFreq },
     });
-    this.node.port.onmessage = (e) => this.emit(e.data.type, e.data);
+    this.perfOffset = null;
+    this.node.port.onmessage = (e) => {
+      if (e.data.type === 'level') this.updateClockMap();
+      this.emit(e.data.type, e.data);
+    };
     this.source.connect(this.node);
     this.node.connect(this.ctx.destination); // outputs silence; keeps it processing
 
@@ -148,6 +152,29 @@ export class AudioEngine {
       const blobUrl = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
       await this.ctx.audioWorklet.addModule(blobUrl);
     }
+  }
+
+  // Mapping AudioContext time -> performance.now(), as "when the audio thread
+  // renders that moment". Uses the browser's output timestamp (smooth) minus
+  // the reported output latency; falls back to currentTime. Calibration and
+  // scoring both go through this mapping, so any constant bias cancels out.
+  updateClockMap() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    let off;
+    const ts = ctx.getOutputTimestamp ? ctx.getOutputTimestamp() : null;
+    if (ts && ts.performanceTime > 0 && ts.contextTime > 0) {
+      off = ts.performanceTime - ts.contextTime * 1000 - (ctx.outputLatency || 0) * 1000;
+    } else {
+      off = performance.now() - ctx.currentTime * 1000;
+    }
+    if (this.perfOffset === null || Math.abs(off - this.perfOffset) > 50) this.perfOffset = off;
+    else this.perfOffset += (off - this.perfOffset) * 0.05;
+  }
+
+  ctxToPerf(t) {
+    if (this.perfOffset === null) this.updateClockMap();
+    return t * 1000 + (this.perfOffset || 0);
   }
 
   async stop() {

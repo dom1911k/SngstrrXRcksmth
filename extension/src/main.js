@@ -5,19 +5,21 @@ import { SongsterrAdapter } from './adapters/songsterr/adapter.js';
 import { createPanel } from './ui/panel.js';
 import { createOverlay } from './ui/overlay.js';
 import { createSongSection } from './ui/song-section.js';
+import { ScoringSession } from './scoring/session.js';
 
 export async function start() {
   if (document.getElementById('bass-trainer-root')) return; // already running
   await loadSettings();
   const engine = new AudioEngine();
   const adapter = new SongsterrAdapter();
-  let panel;
-  const songSection = createSongSection(adapter, { onTabTuning: (t) => panel && panel.setTabTuning(t) });
+  const session = new ScoringSession(engine, adapter);
+  let panel, overlay;
+  const songSection = createSongSection(adapter, { onTabTuning: (t) => panel && panel.setTabTuning(t), showSummary: () => overlay && overlay.scoreUI && overlay.scoreUI.showLast() });
   panel = createPanel(engine, { sections: [songSection] });
-  const overlay = createOverlay(adapter);
+  overlay = createOverlay(adapter, { session });
   document.documentElement.append(overlay.host, panel.host);
   adapter.start();
   // Exposed for troubleshooting from the DevTools console (extension context).
-  globalThis.bassTrainer = { engine, adapter, panel, overlay, onSettingsChange };
-  return { engine, adapter, panel, overlay };
+  globalThis.bassTrainer = { engine, adapter, panel, overlay, session, onSettingsChange };
+  return { engine, adapter, panel, overlay, session };
 }

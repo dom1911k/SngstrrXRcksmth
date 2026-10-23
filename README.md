@@ -5,10 +5,10 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.3.0.** Rocksmith 2014-style **3D note highway** in sync with
-Songsterr's player, a **standalone player** for your own chart + audio file,
+**Current version: 0.4.0.** Rocksmith 2014-style **3D note highway** in sync with
+Songsterr's player, **scoring** of what you play (hit/miss, early/on time/late,
+accuracy, streak, summary), a **standalone player** for your own chart + audio file,
 tuner that follows the tab's tuning, latency calibration and monitoring.
-Scoring comes in Phase 3 (see [Roadmap](#roadmap)).
 
 It only uses what your Songsterr account already shows you in the browser.
 It does not unlock anything.
@@ -138,6 +138,30 @@ Settings in the panel, under **Song & highway**:
 - **Download chart (JSON):** saves the song in the trainer's chart format
   ([`docs/CHART_FORMAT.md`](docs/CHART_FORMAT.md)) for use in other tools.
 
+### Scoring
+1. Open the BASS TRAINER panel and click **Start input** (the cable must be
+   running). Calibrate once if you haven't.
+2. Press play and play along. Every note is judged when it reaches the strings:
+   - **✓** on time, **Early** / **Late** (outside ±40 ms), **✗** missed. If you
+     played a different note, the note you played is shown, e.g. **D?**.
+   - At the top: accuracy %, current streak and the last judgement.
+3. **End of the song:** a summary with accuracy, early/on time/late/missed counts,
+   your average timing, the bars to practise, and notes you played differently
+   from the tab ("played D2 instead of C2 ×3 in bar 15"). If it's the same every
+   time and you're sure, the tab may be wrong there.
+4. **Loops:** each pass through a loop is scored separately, with a short pop-up
+   after each pass (**Details** opens the full summary).
+5. **Timing check:** if the summary says your hits were on average e.g. "32 ms late"
+   while you felt in time, click **Apply**. This adjusts the timing correction.
+
+Settings (panel, **Song & highway → Scoring**): turn scoring on/off, timing window
+(Strict ±70 / Normal ±110 / Relaxed ±160 ms), dead notes (any muted attack counts,
+or not scored), labels at the strings on/off, and "Show summary of the current pass".
+
+Not scored by design: ghost notes; slide destinations that aren't picked again;
+upper notes of chords. A note that keeps ringing never counts twice; you have to
+play it again. Details: [`docs/SCORING.md`](docs/SCORING.md).
+
 ### Standalone player (your own audio)
 Click the extension's icon in Chrome's toolbar, or **Open standalone player** in the
 panel. A page opens where you can practise without Songsterr:
@@ -263,8 +287,8 @@ for detection.
   note highway synced to Songsterr playback (play, pause, seek, loop, speed).
 - **V3 (done, 0.3.0):** 3D Rocksmith-style highway with a camera following the hand
   position, and a standalone player for chart files + local audio.
-- **Phase 3:** scoring: hit/miss, early/on time/late, accuracy, streak, summary,
-  edge cases (dead notes, ghost notes, slides, ringing notes, octave errors).
+- **Phase 3 (done, 0.4.0):** scoring: hit/miss, early/on time/late, accuracy, streak,
+  summary, edge cases (dead notes, ghost notes, slides, ringing notes, octave errors).
 - **Phase 4:** automatic bass-track muting, count-in, configurable keyboard /
   foot-pedal shortcuts, polish.
 - **V2 (after scoring):** riff repeater with auto speed-up, wait mode, practice
@@ -282,6 +306,7 @@ node tests/make-wav.mjs /tmp/a.wav                # synthetic bass recording
 node tests/e2e-phase1.mjs /tmp/a.wav shot.png     # Chromium + fake mic (needs Playwright)
 node tests/e2e-phase2.mjs [tab-url] [shot-prefix] # real Songsterr: highway sync (needs network)
 node tests/e2e-player.mjs /tmp/a.wav [shot.png]   # standalone player: chart + audio, speed, loop
+node tests/e2e-scoring.mjs [shot.png]             # scoring in the browser with a synthesized performance
 npx http-server -p 8123                           # then open /tests/highway-preview.html?t=78&style=3d
 ```
 

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Bass Trainer for Songsterr",
-  "version": "0.3.2",
-  "description": "Rocksmith-style bass practice on top of Songsterr: tuner, latency calibration, note highway and scoring.",
+  "version": "0.4.0",
+  "description": "Rocksmith-style bass practice on top of Songsterr: note highway, scoring, tuner and latency calibration.",
   "minimum_chrome_version": "116",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAn4LTvIiIn9Z4V20WEC/va2//EkVM6g3u/kWGTlATt+y/J70RzcLl8446NUJX7mM6Hhnwuagohd+rviar5JKd394ATbYO7al1ezAu4Z4mHGXLrVxJDA/ddkKDEHosJyAIoY7vIo2L8R0CuwCZkd2me4IGjAKry+Yhu/fBPSFM/E29jFPcfa9HiL+ovjDFnJvq7/Rp8wtO23PTGWHJKMGVNhyNuj0E3hZNWeWkWuUJYbHt5KbDefF4cmrEboQqrvwlTQks036R9rmxgiEhJpR1IoMrNdpynRdDjbfajwWbvC1bdUmAAVtSJWoIl8xhbxODuJG/o6A43oLdF2LvxnRCdQIDAQAB",
   "permissions": [
