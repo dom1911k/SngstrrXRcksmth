@@ -25,8 +25,10 @@ const STRING_BASE = 0.42;    // height of the lowest drawn string above the floo
 // The tilt is solved per frame so that the far end of the highway sits at
 // `farNdc` (just below the top edge) for any window shape.
 // RS2014-like view: strings low on screen, lane running up to near the top.
-const CAM = { fov: 22, strikeNdc: 0.82, farNdc: 0.86, widthFactor: 0.62, extraWidth: 1.2, fogStart: 0.82 };
+// 0.6.1: wider lens from closer and lower = flatter view with a visible horizon.
+const CAM = { fov: 36, strikeNdc: 0.75, farNdc: 0.76, widthFactor: 0.62, extraWidth: 1.2, fogStart: 0.82 };
 const GEM_W = 0.78, GEM_H = 0.34, GEM_D = 0.24;
+const GEM_GROW = 0.35;       // far gems are up to 35% bigger (readability)
 const PAST_KEEP = 0.045;     // seconds a gem stays after its hit time
 
 function labelTexture(text, { color = '#ffffff', size = 128, font = 'bold 84px system-ui, "Segoe UI", sans-serif', outline = 'rgba(0,0,0,0.85)' } = {}) {
@@ -107,7 +109,7 @@ export class Highway3D {
 
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(BG, DEPTH * 0.75, DEPTH * 1.08);
-    this.camera = new THREE.PerspectiveCamera(CAM.fov, 2, 0.1, DEPTH + 30);
+    this.camera = new THREE.PerspectiveCamera(CAM.fov, 2, 0.5, DEPTH + 40); // near 0.5: better depth precision
 
     // Soft glow on the horizon behind the far end of the highway (not fogged).
     this.horizon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0x233366, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, fog: false }));
@@ -143,7 +145,9 @@ export class Highway3D {
   buildStatic() {
     const S = this.static = new THREE.Group();
     // Floor (the neck), slightly lighter than the background.
-    const floorMat = new THREE.MeshLambertMaterial({ color: 0x1a2030 });
+    // Pushed back in the depth buffer so lines lying on it never flicker
+    // (z-fighting at the flat viewing angle).
+    const floorMat = new THREE.MeshLambertMaterial({ color: 0x1a2030, polygonOffset: true, polygonOffsetFactor: 4, polygonOffsetUnits: 8 });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(MAX_FRET + 4, DEPTH + 30), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(MAX_FRET / 2, 0, -(DEPTH + 30) / 2 + 12);
@@ -291,7 +295,7 @@ export class Highway3D {
     if (beatQuads.length) this.timeGroup.add(mergedQuads(beatQuads, beatMat));
     if (barQuads.length) this.timeGroup.add(mergedQuads(barQuads, barMat));
 
-    const anchorMat = new THREE.MeshBasicMaterial({ color: 0x8fb4ff, transparent: true, opacity: 0.16, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
+    const anchorMat = this.anchorMat = new THREE.MeshBasicMaterial({ color: 0x8fb4ff, transparent: true, opacity: 0.16, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
     const anchorEdgeMat = new THREE.MeshBasicMaterial({ color: 0xbcd2ff, transparent: true, opacity: 0.5, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
     const end = chart.duration + 2;
     const laneQuads = [], edgeQuads = [];
@@ -429,6 +433,17 @@ export class Highway3D {
     }
   }
 
+  // 1 right on a beat, decaying over ~0.15 s (real time); downbeats count fully.
+  beatPulse(t, speed) {
+    const beats = this.chart.beats;
+    if (!beats || !beats.length) return 0;
+    let lo = 0, hi = beats.length - 1, b = -1;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (beats[mid].t <= t) { b = mid; lo = mid + 1; } else hi = mid - 1; }
+    if (b < 0) return 0;
+    const age = (t - beats[b].t) / speed;
+    return Math.exp(-age / 0.15) * (beats[b].downbeat ? 1 : 0.55);
+  }
+
   resize() {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     const dpr = Math.min(window.devicePixelRatio || 1, this.quality.maxDpr);
@@ -475,6 +490,8 @@ export class Highway3D {
         const dz = (o.note.t - t) * k;
         o.obj.visible = true;
         o.obj.position.z = -dz;
+        // Far gems a bit bigger so they stay readable with the flatter view.
+        o.obj.scale.setScalar(1 + GEM_GROW * Math.max(0, Math.min(1, dz / DEPTH)));
       }
       this.visibleFrom = from;
       this.visibleTo = to;
@@ -488,6 +505,14 @@ export class Highway3D {
         if (n.t <= t && t <= n.t + Math.max(0.12, n.dur)) lit[n.string] = Math.max(lit[n.string], 1 - (t - n.t) / Math.max(0.3, n.dur + 0.2));
       }
       this.stringMats.forEach((m, s) => { m.emissiveIntensity = 0.35 + lit[s] * 1.0; });
+      // ...and vibrate a little (only visible while it rings).
+      this.stringMeshes.forEach((m, s) => {
+        m.position.y = this.stringY(s) + (state.playing ? lit[s] * 0.014 * Math.sin(nowMs * (0.11 - s * 0.012) + s) : 0);
+      });
+
+      // The lit hand lane pulses gently on every beat, stronger on the bar.
+      const pulse = this.beatPulse(t, speed);
+      if (this.anchorMat) this.anchorMat.opacity = 0.16 + 0.1 * pulse;
 
       // Camera frames the current passage (see core/camera-follow.js).
       this.follow.update(t, speed, dt);

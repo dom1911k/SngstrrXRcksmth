@@ -50,7 +50,7 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
     check('showLiveScore', 'Show accuracy and streak above the highway while playing'),
     check('autoTiming', 'Automatic timing correction (learns small, constant early/late offsets while you play)'),
     h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Timing window'),
-      select('hitWindowMs', [[70, 'Strict (±70 ms)'], [110, 'Normal (±110 ms)'], [160, 'Relaxed (±160 ms)']], Number)),
+      select('hitWindowMs', [[80, 'Strict (±80 ms)'], [140, 'Normal (±140 ms)'], [190, 'Relaxed (±190 ms)']], Number)),
     h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Dead notes (x)'),
       select('deadNotes', [['attack', 'any muted attack counts'], ['ignore', 'not scored']])),
     showSummary ? h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => showSummary() }, 'Show summary of the current pass')) : null,

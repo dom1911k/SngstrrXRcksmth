@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.6.0.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.6.1.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -109,7 +109,8 @@ Good Riddance, can be played too.
   mute the bass track in SYNTH mode. (Phase 4 does this automatically.)
 - Layout, as in Rocksmith 2014 (3D view):
   - The fretboard lies in front of you, low on the screen, and the highway runs
-    up to near the top of the screen. You see about 4.5 seconds ahead
+    towards a horizon near the top of the screen, seen from a low, fairly flat
+    angle as in Rocksmith. Far notes are drawn a little bigger so they stay readable. You see about 4.5 seconds ahead
     (adjustable). In full screen this shows the next few bars, as in Rocksmith.
   - **Colour and height = string:** E red (top), A yellow, D blue, G orange.
     Notes far away appear higher up and drop onto their string as they arrive.
@@ -123,7 +124,9 @@ Good Riddance, can be played too.
     (frets 1–8) never moves the camera at all.
   - Play each note when it reaches the strings. A soft spot of light on the string,
     at the note's fret, grows brighter as the note comes in and flashes briefly
-    at the exact moment to play. The string glows while the note sounds.
+    at the exact moment to play. The string glows and vibrates while the note
+    sounds, and the lit hand lane pulses gently on every beat (stronger on the
+    first beat of a bar).
   - Coloured ribbons are held notes. A ribbon that bends sideways is a slide; a
     wavy ribbon is vibrato.
   - Wide bars are open strings. **X** = dead note; faded small notes = ghost notes;
@@ -136,7 +139,8 @@ Good Riddance, can be played too.
   bars you miss most. **Click** a section to jump there, **double-click** to loop
   it. The yellow frame is the loop. It can be turned off under *Song & highway*.
 - **Highway / Both / Tab** (bottom left of the highway) switches between highway
-  only, highway under the tab, and tab only. In *Both* you can drag the top edge
+  only, highway under the tab, and tab only. **Esc** leaves the full *Highway*
+  view (back to *Both*); if a summary or progress card is open, Esc closes that first. In *Both* you can drag the top edge
   of the highway to resize it. Bigger is easier to read.
 - **3D / 2D** switches between the Rocksmith-style 3D highway and the simpler,
   flat 2D one. 2D is used automatically if your PC can't do WebGL.
@@ -240,8 +244,8 @@ These need the input to be running (*Start input*).
    with a Reset button. It resets when you calibrate again.
 
 Settings (panel, **Song & highway → Scoring**): scoring on/off, live accuracy on/off,
-automatic timing correction on/off, timing window (Strict ±70 / Normal ±110 /
-Relaxed ±160 ms), dead notes (any muted attack counts, or not scored), and
+automatic timing correction on/off, timing window (Strict ±80 / Normal ±140 /
+Relaxed ±190 ms), dead notes (any muted attack counts, or not scored), and
 "Show summary of the current pass".
 
 Not scored by design: ghost notes; slide destinations that aren't picked again;
@@ -382,6 +386,8 @@ for detection.
 - **V2 (done, 0.6.0):** riff repeater with automatic speed-up, wait mode, practice
   history with weak spots and a section strip on the highway, recording takes and
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
+  0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
+  windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
 
 Design details are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 

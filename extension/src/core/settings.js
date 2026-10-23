@@ -2,7 +2,7 @@
 // survives clearing Songsterr's site data) and localStorage elsewhere (tests).
 
 const KEY = 'bassTrainerSettings';
-const SCHEMA = 3;
+const SCHEMA = 4;
 
 // Adjust settings saved by older versions.
 function migrate(stored) {
@@ -14,6 +14,12 @@ function migrate(stored) {
   if (v < 3) {
     // 0.5.1: lower, wider camera shows further ahead; give it more time.
     if (stored.lookahead === undefined || stored.lookahead <= 3.5) stored.lookahead = 4.5;
+  }
+  if (v < 4) {
+    // 0.6.1: more forgiving timing windows.
+    const map = { 70: 80, 110: 140, 160: 190 };
+    if (stored.hitWindowMs === undefined || map[stored.hitWindowMs]) stored.hitWindowMs = map[stored.hitWindowMs] || 140;
+    if (stored.onTimeMs === undefined || stored.onTimeMs === 40) stored.onTimeMs = 50;
   }
   stored.schema = SCHEMA;
   return stored;
@@ -41,8 +47,8 @@ export const DEFAULTS = {
   showDebug: false,
   // Scoring
   scoring: true,
-  hitWindowMs: 110,        // how early/late a note may be and still count
-  onTimeMs: 40,            // within this it is "on time"
+  hitWindowMs: 140,        // how early/late a note may be and still count
+  onTimeMs: 50,            // within this it is "on time"
   deadNotes: 'attack',     // 'attack' = any muted attack counts | 'ignore'
   showLiveScore: true,     // accuracy % and streak above the highway
   // Practice

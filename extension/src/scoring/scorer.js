@@ -15,11 +15,11 @@ import { noteName } from '../core/music.js';
 const NEAR_MS = 300; // right pitch this close to a note counts as a near miss (timing)
 
 export const SCORING_DEFAULTS = {
-  hitWindowMs: 110,     // a note can be hit this early/late (real time)
-  onTimeMs: 40,         // within this it counts as "on time"
+  hitWindowMs: 140,     // a note can be hit this early/late (real time)
+  onTimeMs: 50,         // within this it counts as "on time"
   pitchTolerance: 0.5,  // semitones (50 cents)
   deadNotes: 'attack',  // 'attack' = any muted attack counts | 'ignore'
-  minWindowMs: 35,      // fast passages: windows shrink, but not below this
+  minWindowMs: 50,      // fast passages: windows shrink, but not below this
 };
 
 // Why a note is not scored (null = scored).
@@ -68,12 +68,13 @@ export class Scorer {
     if (set) for (const fn of set) fn(data);
   }
 
-  // Hit window (song seconds) for a note: the normal window, shrunk to half the
-  // distance to its neighbours when notes are close together.
+  // Hit window (song seconds) for a note: the normal window, shrunk to 60% of
+  // the distance to its neighbours when notes are close together (windows may
+  // overlap a little; a played note always goes to the nearest matching note).
   window(it, speed) {
     const base = (this.opts.hitWindowMs / 1000) * speed;
     const min = (this.opts.minWindowMs / 1000) * speed;
-    return Math.max(min, Math.min(base, it.gapPrev / 2, it.gapNext / 2));
+    return Math.max(min, Math.min(base, it.gapPrev * 0.6, it.gapNext * 0.6));
   }
 
   // Start counting from `from` (inclusive) to `to` (exclusive). Notes outside

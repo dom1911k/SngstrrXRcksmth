@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **V2 built (0.6.0)**: riff repeater, wait mode, practice history with
+Status: **V2 built (0.6.1)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -323,9 +323,14 @@ on disk:
   outside the frame are shaded and their numbers dimmed. Seeks snap. Open strings
   and ghost notes never move the camera. All three test songs fit a single frame,
   so the camera never moves in them. The same framing is used by the 2D view.
-* Camera placement (0.5.1, `CAM` in `highway3d.js`): FOV 22°; the strike line sits
-  at 82% down the view (`strikeNdc`) and the pitch is solved by bisection so the far
-  end of the lane is near the top (`farNdc` 0.86), as in Rocksmith 2014. The camera
+* Camera placement (`CAM` in `highway3d.js`; 0.6.1): FOV 36° from closer and lower
+  (flatter, stronger perspective, horizon visible); the strike line sits at 75% down
+  the view (`strikeNdc`) and the pitch is solved by bisection so the far end of the
+  lane is at `farNdc` 0.76. (0.5.1 used FOV 22°, 0.82, 0.86: felt too top-down.)
+  The floor uses polygonOffset and the camera near plane is 0.5, so lines lying on
+  the floor don't z-fight at the flat angle. Far gems grow up to 35% (`GEM_GROW`).
+  Animation: strings vibrate while a note on them sounds; the hand lane's opacity
+  pulses on each beat (`beatPulse`, ~0.15 s decay, downbeats stronger). The camera
   distance comes from the frame width (`widthFactor`, `extraWidth`; aspect capped at
   1.9). Fog is set relative to the camera distance and covers only the last ~18% of
   the lane. `tests/highway-preview.html?cam=fov:20,strikeNdc:0.8` overrides `CAM`

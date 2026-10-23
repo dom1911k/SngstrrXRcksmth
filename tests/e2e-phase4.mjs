@@ -66,6 +66,16 @@ await page.keyboard.press('c');
 await page.waitForTimeout(300);
 results.loopCleared = (await st()).loop;
 
+// 2b. Escape leaves the full highway view (Highway -> Both).
+const viewOn = () => page.evaluate(() => [...document.getElementById('bass-trainer-highway').shadowRoot.querySelectorAll('.bar button.on')].map((b) => b.textContent));
+await page.locator('#bass-trainer-highway >> css=.bar button:has-text("Highway")').click();
+await page.waitForTimeout(200);
+const before = await viewOn();
+await page.mouse.click(600, 600);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+results.escape = { before, after: await viewOn() };
+
 // 3. Auto-mute status after starting the input (logged out = no Plus).
 await page.locator('#bass-trainer-root >> css=.launcher').click();
 await page.locator('#bass-trainer-root >> css=button.btn:has-text("Start input")').click();

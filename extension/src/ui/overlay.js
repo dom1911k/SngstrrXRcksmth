@@ -264,5 +264,22 @@ export function createOverlay(adapter, {
     notify(`View: ${modes.find(([m]) => m === next)[1]}`);
   }
 
+  // Escape: close an open card first; otherwise leave the full highway view
+  // (Highway -> Both).
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.repeat || wrap.hidden) return;
+    const t = e.composedPath ? e.composedPath()[0] : e.target;
+    if (t && t.tagName && /^(input|textarea|select)$/i.test(t.tagName)) return;
+    const open = [...root.querySelectorAll('.card')].filter((c) => !c.hidden);
+    if (open.length) {
+      open.forEach((c) => { c.hidden = true; });
+    } else if (!fixedMode && getSettings().viewMode === 'highway') {
+      updateSettings({ viewMode: 'both' });
+      notify('View: Both');
+    } else return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
+
   return { host, scoreUI, progressUI, notify, toggleView, showProgress: () => progressUI && progressUI.show(), get highway() { return active; } };
 }

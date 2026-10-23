@@ -29,12 +29,12 @@ in the song. Windows are in **real time**, so 50% speed is not easier or harder 
 
 | Setting | Default | Meaning |
 |---|---|---|
-| Timing window | ±110 ms (Strict 70, Relaxed 160) | how early/late a note may be |
-| On time | ±40 ms | inside this = "on time", otherwise "early"/"late" |
+| Timing window | ±140 ms (Strict 80, Relaxed 190; 0.6.1, was 110) | how early/late a note may be |
+| On time | ±50 ms | inside this = "on time", otherwise "early"/"late" |
 | Pitch tolerance | ±50 cents | |
 
-**Fast passages:** a note's window shrinks to half the distance to its
-neighbours (never below 35 ms), so windows never overlap. Each played note is used
+**Fast passages:** a note's window shrinks to 60% of the distance to its
+neighbours (never below 50 ms), so neighbouring windows overlap only a little. Each played note is used
 for **at most one** expected note: the closest one with the right pitch.
 
 **Automatic timing correction** (on by default): after every 12 timing
