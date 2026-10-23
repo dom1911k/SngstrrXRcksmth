@@ -150,6 +150,7 @@ async function openDrills() {
     b.innerHTML = `<b></b><span class="small"></span><span class="best"></span>`;
     b.querySelector('b').textContent = d.name;
     b.querySelector('.small').textContent = d.description;
+    if (!st.passes) b.querySelector('.best').style.color = '#8b919c';
     b.querySelector('.best').textContent = st.passes ? `${st.passes} runs · best ${Math.round(st.best * 100)}%${st.bestBpm ? ` · 90%+ at ${st.bestBpm} BPM` : ''}` : 'Not played yet';
     b.addEventListener('click', () => selectDrill(d, st));
     list.append(b);
