@@ -33,11 +33,14 @@ export function expandRepeats(measures) {
   return order;
 }
 
-const layoutCount = (measures, order) => order.reduce((a, mi) => a + measures[mi].layouts.length, 0);
+// Beat positions that Songsterr gives a time. Empty layouts (no beats, e.g. the
+// unused rest of a pickup bar) have no timestamp.
+const timedLayouts = (m) => m.layouts.filter((l) => l.beats && l.beats.length > 0);
+const layoutCount = (measures, order) => order.reduce((a, mi) => a + timedLayouts(measures[mi]).length, 0);
 
 function bpmAt(metronome, ms) {
   let bpm = 120;
-  for (const b of metronome) { if (b.t <= ms) bpm = b.bpm; else break; }
+  for (const b of metronome) { if (b.t <= ms + 0.5) bpm = b.bpm; else break; } // +0.5: Songsterr rounds beat times
   return bpm;
 }
 
@@ -51,35 +54,50 @@ export function songsterrToChart(song) {
   const ts = part.timestamps;
   const metronome = song.metronome || [];
 
+  const msPerTick = (ms) => 60000 / bpmAt(metronome, ms) / (part.tpqn || 960);
   let order = expandRepeats(measures);
+  let estimated = false;
   if (layoutCount(measures, order) !== ts.length) {
     const linear = measures.map((_, i) => i);
     if (layoutCount(measures, linear) === ts.length) {
       warnings.push('Repeat structure did not match Songsterr\'s timeline; using bars in written order.');
       order = linear;
     } else {
-      throw new Error(`Timeline mismatch: ${ts.length} timestamps for ${layoutCount(measures, order)} beat positions.`);
+      // Safety net: compute times from the tempo instead of refusing the tab.
+      estimated = true;
+      warnings.push(`Songsterr's timeline didn't match this tab (${ts.length} times for ${layoutCount(measures, order)} beat positions), so note times were calculated from the tempo. They may drift slightly against the music; please report this song.`);
     }
   }
 
   // --- bars (one per measure play) with their beat-layout times ---
   const plays = [];
   let k = 0;
+  let cursorMs = 0;
+  const firstTick = (l) => {
+    const tick = Math.min(...l.beats.map((b) => b.startTick || 0));
+    return Number.isFinite(tick) ? tick : 0;
+  };
   for (const mi of order) {
     const m = measures[mi];
-    const points = m.layouts.map((l) => {
-      const tick = Math.min(...l.beats.map((b) => b.startTick || 0));
-      return { tick: Number.isFinite(tick) ? tick : 0, ms: ts[k++] };
-    });
+    let points;
+    if (estimated) {
+      const start = cursorMs, rate = msPerTick(start);
+      points = timedLayouts(m).map((l) => ({ tick: firstTick(l), ms: start + firstTick(l) * rate }));
+      cursorMs = start + (m.totalTicks || 0) * rate;
+    } else {
+      points = timedLayouts(m).map((l) => ({ tick: firstTick(l), ms: ts[k++] }));
+    }
     plays.push({ mi, m, points });
   }
-  const msPerTick = (ms) => 60000 / bpmAt(metronome, ms) / (part.tpqn || 960);
   plays.forEach((p, j) => {
     const first = p.points[0];
-    p.startMs = first ? first.ms - first.tick * msPerTick(first.ms) : 0;
+    const prevEnd = j > 0 ? plays[j - 1].endMs : 0;
+    p.startMs = first ? first.ms - first.tick * msPerTick(first.ms) : prevEnd;
     const next = plays[j + 1];
     if (next && next.points[0]) {
       p.endMs = next.points[0].ms - next.points[0].tick * msPerTick(next.points[0].ms);
+    } else if (next) {
+      p.endMs = p.startMs + (p.m.totalTicks || 0) * msPerTick(p.startMs);
     } else {
       const last = p.points[p.points.length - 1] || { tick: 0, ms: p.startMs };
       p.endMs = last.ms + (p.m.totalTicks - last.tick) * msPerTick(last.ms);

@@ -5,7 +5,7 @@ import { songsterrToChart, expandRepeats, bassLikeTracks } from '../extension/sr
 import { validateChart, computeAnchors, anchorAt } from '../extension/src/core/chart.js';
 
 const load = (name) => JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url)));
-const FIXTURES = ['21-guns-bass', 'love-thats-gone-bass', 'good-riddance-contrabass'];
+const FIXTURES = ['21-guns-bass', 'love-thats-gone-bass', 'good-riddance-contrabass', 'enter-sandman-bass'];
 
 for (const name of FIXTURES) {
   test(`${name}: converts to a valid chart that matches Songsterr's timeline`, () => {
@@ -18,6 +18,7 @@ for (const name of FIXTURES) {
     const noteTimes = new Set(chart.notes.map((n) => Math.round(n.t * 1000)));
     let k = 0, checked = 0;
     for (const m of song.part.measures) for (const l of m.layouts) {
+      if (!l.beats.length) continue; // empty positions (pickup bar) have no time
       const ms = song.part.timestamps[k++];
       const playable = l.beats.some((b) => !b.rest && b.notes.some((n) => !n.tie));
       if (playable) { assert.ok(noteTimes.has(Math.round(ms)), `no note at ${ms}`); checked++; }
@@ -45,6 +46,29 @@ test('21 Guns: string numbering flipped (low E = 0), sections present', () => {
     assert.equal(first.fret, n.fret);
     return;
   }
+});
+
+test('Enter Sandman: pickup bar (empty beat position) lines up with Songsterr', () => {
+  const song = load('enter-sandman-bass');
+  const { chart, warnings } = songsterrToChart(song);
+  assert.deepEqual(warnings, []);
+  // The pickup bar is an eighth note long; bar 2 starts at Songsterr's 2nd timestamp.
+  assert.ok(Math.abs(chart.bars[1].t - song.part.timestamps[1] / 1000) < 1e-6);
+  assert.ok(chart.notes.length > 1000);
+});
+
+test('timeline mismatch: falls back to tempo-based times with a warning', () => {
+  const song = load('21-guns-bass');
+  const real = songsterrToChart(song).chart;
+  const broken = structuredClone(song);
+  broken.part.timestamps.pop();
+  const { chart, warnings } = songsterrToChart(broken);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /calculated from the tempo/);
+  assert.equal(chart.notes.length, real.notes.length);
+  // Constant tempo sections: estimated times stay close to the real ones.
+  const worst = chart.notes.slice(0, 200).reduce((m, n, i) => Math.max(m, Math.abs(n.t - real.notes[i].t)), 0);
+  assert.ok(worst < 0.05, `estimated times off by up to ${(worst * 1000).toFixed(0)} ms`);
 });
 
 test('tied notes are merged into one longer note', () => {
