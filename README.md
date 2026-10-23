@@ -111,9 +111,12 @@ Good Riddance, can be played too.
     Notes far away appear higher up and drop onto their string as they arrive.
   - **Left–right = fret,** numbered on the floor in front of the strings. The
     frets under your hand are yellow.
-  - The lit lane on the floor shows where your hand should be (4 frets). The
-    camera glides along with it, like in Rocksmith. A big yellow number in the
-    distance marks where the hand moves next.
+  - The lit lane on the floor shows where your hand should be (4 frets). A big
+    yellow number in the distance marks where the hand moves next.
+  - The camera frames only the frets the current passage uses; the rest of the
+    neck is darkened. It stays still while you play a passage and only glides
+    when the music moves to another part of the neck. For example, 21 Guns
+    (frets 1–8) never moves the camera at all.
   - Play each note when it reaches the strings; the string glows while it sounds.
   - Coloured ribbons are held notes. A ribbon that bends sideways is a slide.
   - Wide bars are open strings. **X** = dead note; faded small notes = ghost notes;

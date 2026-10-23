@@ -7,6 +7,7 @@
 
 import { stringColors } from '../core/music.js';
 import { computeAnchors, anchorAt, firstNoteAtOrAfter } from '../core/chart.js';
+import { CameraFollow, planCameraSegments } from '../core/camera-follow.js';
 
 const FAR_SCALE = 5;          // far plane is drawn at 1 / (1 + FAR_SCALE) size
 const MIN_FRETS_VISIBLE = 7;
@@ -59,6 +60,7 @@ export class Highway2D {
       const a = this.anchors[0];
       const lo = a ? Math.max(0, a.fret - 2) : 0;
       this.cam = { lo, hi: lo + MIN_FRETS_VISIBLE + 1 };
+      this.follow = new CameraFollow(planCameraSegments(chart.notes));
       this.colors = stringColors(chart.instrument.strings);
     }
   }
@@ -117,24 +119,10 @@ export class Highway2D {
     const depth = (time) => (time - t) / look;
     const proj = (x, y, z) => { const k = scaleAt(z); return { x: vp.x + (x - vp.x) * k, y: vp.y + (y - vp.y) * k, k }; };
 
-    // ---- camera (visible fret range follows the upcoming hand positions) ----
-    let lo = Infinity, hi = -Infinity;
-    for (const a of this.anchors) {
-      if (a.until < t || a.t > t + look * 0.8) continue;
-      lo = Math.min(lo, a.fret - 1);
-      hi = Math.max(hi, a.fret + 4);
-    }
-    if (!Number.isFinite(lo)) {
-      const a = anchorAt(this.anchors, t);
-      lo = a ? a.fret - 1 : 0;
-      hi = lo + MIN_FRETS_VISIBLE;
-    }
-    if (hi - lo < MIN_FRETS_VISIBLE) { const c = (lo + hi) / 2; lo = c - MIN_FRETS_VISIBLE / 2; hi = c + MIN_FRETS_VISIBLE / 2; }
-    if (lo < 0) { hi -= lo; lo = 0; }
-    hi = Math.min(hi, (chart.instrument.frets || 24) + 0.5);
-    const follow = Math.min(1, dt * 3.5);
-    this.cam.lo += (lo - this.cam.lo) * follow;
-    this.cam.hi += (hi - this.cam.hi) * follow;
+    // ---- camera: frames the current passage, still while you play it ----
+    this.follow.update(t, speed, dt);
+    this.cam.lo = Math.max(0, this.follow.lo - 0.5);
+    this.cam.hi = Math.min((chart.instrument.frets || 24) + 0.5, this.follow.hi + 0.5);
     const wireX = (wire) => left + ((wire - this.cam.lo) / (this.cam.hi - this.cam.lo)) * (right - left);
     const fretX = (fret) => (fret <= 0 ? wireX(this.cam.lo + 0.5) : (wireX(fret - 1) + wireX(fret)) / 2);
     const fretW = wireX(1) - wireX(0);

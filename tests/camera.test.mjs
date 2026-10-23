@@ -1,84 +1,87 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { CameraFollow, smoothDamp } from '../extension/src/core/camera-follow.js';
-import { computeAnchors, anchorAt } from '../extension/src/core/chart.js';
+import { CameraFollow, planCameraSegments, smoothDamp } from '../extension/src/core/camera-follow.js';
 import { songsterrToChart } from '../extension/src/adapters/songsterr/to-chart.js';
 
 const chartOf = (name) => songsterrToChart(JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url)))).chart;
+const note = (t, fret) => ({ t, dur: 0.2, fret, string: 0, flags: {} });
 
-// The 0.3.0 behaviour, for comparison.
-function oldCamera(anchors, t, speed, dt, st) {
-  let lo = Infinity, hi = -Infinity;
-  for (const a of anchors) { if (a.until < t || a.t > t + 1.5 * speed) continue; lo = Math.min(lo, a.fret - 1); hi = Math.max(hi, a.fret + 3); }
-  if (!Number.isFinite(lo)) { const a = anchorAt(anchors, t); lo = a ? a.fret - 1 : 0; hi = lo + 4; }
-  const f = Math.min(1, dt * 2.5);
-  st.x += ((lo + hi) / 2 - st.x) * f;
-  st.span += (Math.max(6, hi - lo + 2) - st.span) * f;
-  return st;
-}
-
-function stats(series, dt) {
-  let maxRate = 0, reversals = 0, lastDir = 0, travel = 0;
-  for (let i = 1; i < series.length; i++) {
-    const d = series[i] - series[i - 1];
-    maxRate = Math.max(maxRate, Math.abs(d) / dt);
-    travel += Math.abs(d);
-    const dir = Math.abs(d) < 1e-4 ? 0 : Math.sign(d);
-    if (dir && lastDir && dir !== lastDir) reversals++;
-    if (dir) lastDir = dir;
-  }
-  return { maxRate, reversals, travel };
-}
-
-for (const name of ['21-guns-bass', 'love-thats-gone-bass']) {
-  test(`${name}: camera zooms calmly (fewer, slower zoom changes than 0.3.0)`, () => {
-    const chart = chartOf(name);
-    const anchors = computeAnchors(chart.notes);
-    const dt = 1 / 60;
-    const cam = new CameraFollow();
-    const old = { x: 4, span: 8 };
-    const spans = [], oldSpans = [], xs = [];
-    for (let t = 0; t < chart.duration; t += dt) {
-      cam.update(anchors, t, 1, dt);
-      oldCamera(anchors, t, 1, dt, old);
-      spans.push(cam.span); oldSpans.push(old.span); xs.push(cam.x);
+// Run the camera over notes at 60 fps; returns movement stats and the worst
+// case of a note being outside the framed frets when it is played.
+function simulate(notes, duration) {
+  const cam = new CameraFollow(planCameraSegments(notes));
+  const dt = 1 / 60;
+  let travel = 0, moves = 0, moving = false, worstOutside = 0, prevX = null, prevSpan = null;
+  let ni = 0;
+  for (let t = 0; t < duration; t += dt) {
+    cam.update(t, 1, dt);
+    if (prevX !== null) {
+      const d = Math.abs(cam.x - prevX) + Math.abs(cam.span - prevSpan);
+      travel += d;
+      const now = d > 1e-3;
+      if (now && !moving) moves++;
+      moving = now;
     }
-    const n = stats(spans, dt), o = stats(oldSpans, dt), p = stats(xs, dt);
-    const minutes = chart.duration / 60;
-    console.log(name, { new: n, old: o, pan: p, minutes: +minutes.toFixed(1) });
-    assert.ok(n.reversals <= o.reversals / 2, `zoom reversals ${n.reversals} vs old ${o.reversals}`);
-    assert.ok(n.maxRate < o.maxRate, `max zoom rate ${n.maxRate} vs old ${o.maxRate}`);
-    assert.ok(n.maxRate < 6, `zoom faster than 6 frets/s: ${n.maxRate}`);
-    assert.ok(n.reversals / minutes < 6, `${(n.reversals / minutes).toFixed(1)} zoom direction changes per minute`);
+    prevX = cam.x; prevSpan = cam.span;
+    while (ni < notes.length && notes[ni].t <= t) {
+      const n = notes[ni++];
+      if (n.fret > 0) worstOutside = Math.max(worstOutside, cam.lo - (n.fret - 1), n.fret - cam.hi);
+    }
+  }
+  return { travel, moves, worstOutside, segments: cam.segments };
+}
+
+for (const name of ['21-guns-bass', 'love-thats-gone-bass', 'good-riddance-contrabass']) {
+  test(`${name}: camera holds still for the whole song and every note is in frame`, () => {
+    const chart = chartOf(name);
+    const r = simulate(chart.notes, chart.duration);
+    assert.equal(r.segments.length, 1);
+    assert.equal(r.moves, 0, `camera moved ${r.moves} times`);
+    assert.ok(r.worstOutside <= 0, `a note was ${r.worstOutside.toFixed(2)} frets outside the frame`);
+    assert.ok(r.segments[0].span <= 9.5);
   });
 }
 
-test('every upcoming hand position is in view when its notes arrive', () => {
-  const chart = chartOf('21-guns-bass');
-  const anchors = computeAnchors(chart.notes);
-  const cam = new CameraFollow();
-  const dt = 1 / 60;
-  let worst = 0;
-  let ai = 0;
-  for (let t = 0; t < chart.duration; t += dt) {
-    cam.update(anchors, t, 1, dt);
-    while (ai < anchors.length && anchors[ai].t < t) ai++;
-    const a = anchors[ai - 1];
-    if (!a || t - a.t > 0.05) continue;
-    // Visible fret range ~ x ± span/2; how far is the hand lane outside it?
-    const lo = cam.x - cam.span / 2, hi = cam.x + cam.span / 2;
-    worst = Math.max(worst, lo - (a.fret - 1), (a.fret + 3) - hi);
-  }
-  assert.ok(worst < 1.0, `hand lane up to ${worst.toFixed(2)} frets outside the view`);
+test('21 Guns frame covers frets 1–8 and hides the rest of the neck', () => {
+  const [seg] = planCameraSegments(chartOf('21-guns-bass').notes);
+  assert.equal(seg.lo, 1);
+  assert.equal(seg.hi, 8);
+  assert.ok(seg.x + seg.span / 2 < 9.6);
+});
+
+test('moving up the neck: one smooth move, finished before the new passage starts', () => {
+  const notes = [];
+  for (let t = 0; t < 20; t += 0.5) notes.push(note(t, [1, 3, 5, 2][Math.floor(t * 2) % 4]));
+  for (let t = 20; t < 40; t += 0.5) notes.push(note(t, [12, 14, 15, 12][Math.floor(t * 2) % 4]));
+  const r = simulate(notes, 40);
+  assert.equal(r.segments.length, 2);
+  assert.equal(r.moves, 1);
+  assert.ok(r.worstOutside <= 0, `note ${r.worstOutside} frets outside`);
+});
+
+test('a short excursion does not make the camera go back and forth', () => {
+  const notes = [];
+  for (let t = 0; t < 10; t += 0.5) notes.push(note(t, 1 + (Math.floor(t * 2) % 4)));
+  notes.push(note(10, 9), note(10.5, 10));
+  for (let t = 11; t < 20; t += 0.5) notes.push(note(t, 1 + (Math.floor(t * 2) % 4)));
+  const r = simulate(notes, 20);
+  assert.equal(r.segments.length, 1, JSON.stringify(r.segments.map((s) => [s.lo, s.hi])));
+  assert.equal(r.moves, 0);
+  assert.ok(r.worstOutside <= 0);
+});
+
+test('open strings and ghost notes never move the camera', () => {
+  const notes = [note(0, 5), note(1, 0), note(2, 7), { ...note(3, 17), flags: { ghost: true } }, note(4, 6)];
+  assert.equal(planCameraSegments(notes).length, 1);
 });
 
 test('seek snaps the camera instead of gliding across the neck', () => {
-  const anchors = [{ t: 0, until: 10, fret: 1 }, { t: 10, until: Infinity, fret: 12 }];
-  const cam = new CameraFollow();
-  cam.update(anchors, 1, 1, 1 / 60);
-  cam.update(anchors, 20, 1, 1 / 60);
-  assert.ok(Math.abs(cam.x - 13) < 0.01);
+  const notes = [note(0, 2), note(5, 3), note(20, 14), note(25, 15)];
+  const cam = new CameraFollow(planCameraSegments(notes));
+  cam.update(1, 1, 1 / 60);
+  cam.update(22, 1, 1 / 60);
+  assert.ok(cam.lo <= 13 && cam.hi >= 15, `${cam.lo}..${cam.hi}`);
 });
 
 test('smoothDamp settles without overshoot', () => {

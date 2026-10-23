@@ -3,14 +3,15 @@
 // World units: x = frets (1 unit per fret, nut at x = 0), y = up (floor at 0,
 // strings stacked above it, low E on top by default), z = time (z = 0 is the
 // strike line at the strings; upcoming notes are at negative z, far away).
-// A camera behind the strings follows the hand position (anchor) smoothly.
+// A camera behind the strings frames the frets of the current passage and
+// stays still while you play it (see core/camera-follow.js).
 //
 // Same interface as Highway2D: setChart(chart), setOptions(o), render(state), fps.
 
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { stringColors } from '../core/music.js';
 import { computeAnchors, anchorAt, firstNoteAtOrAfter } from '../core/chart.js';
-import { CameraFollow } from '../core/camera-follow.js';
+import { CameraFollow, planCameraSegments } from '../core/camera-follow.js';
 
 const DEPTH = 40;            // world units from the strike line to the far end
 const MAX_FRET = 24;
@@ -23,7 +24,7 @@ const STRING_BASE = 0.42;    // height of the lowest drawn string above the floo
 // camera backs off until about camSpan frets fit across the strings.
 // The tilt is solved per frame so that the far end of the highway sits at
 // `farNdc` (just below the top edge) for any window shape.
-const CAM = { fov: 26, strikeNdc: 0.6, farNdc: 0.86, widthFactor: 0.6, extraWidth: 0.8 };
+const CAM = { fov: 26, strikeNdc: 0.6, farNdc: 0.86, widthFactor: 0.5, extraWidth: 0.5 };
 const GEM_W = 0.78, GEM_H = 0.34, GEM_D = 0.24;
 const PAST_KEEP = 0.045;     // seconds a gem stays after its hit time
 
@@ -94,7 +95,7 @@ export class Highway3D {
     this.follow = new CameraFollow();
     this.lit = new Float32Array(6);
     this.litPrev = new Float32Array(6);
-    this.handFret = null;
+    this.labelKey = '';
     this.lastRenderKey = '';
     this.quality = { maxDpr: 2, slowFor: 0 };
 
@@ -149,6 +150,17 @@ export class Highway3D {
       m.position.set(w, 0.006, -(DEPTH + 14) / 2 + 6);
       S.add(m);
     }
+    // Shades darken the frets outside the current camera frame (frets that
+    // aren't played in this passage). Unit-width planes, resized per frame.
+    const shadeMat = new THREE.MeshBasicMaterial({ color: BG, transparent: true, opacity: 0.72, depthWrite: false });
+    this.shades = [0, 1].map(() => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1, DEPTH + 30), shadeMat);
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(0, 0.02, -(DEPTH + 30) / 2 + 6);
+      m.renderOrder = 1;
+      S.add(m);
+      return m;
+    });
     // Fret numbers on the floor in front of the strings.
     this.fretLabels = [];
     for (let f = 1; f <= MAX_FRET; f++) {
@@ -194,9 +206,8 @@ export class Highway3D {
     const colors = stringColors(n);
     this.colors = colors;
     this.anchors = computeAnchors(chart.notes);
-    this.follow = new CameraFollow();
-    this.follow.reset(this.anchors, 0);
-    this.handFret = undefined;
+    this.follow = new CameraFollow(planCameraSegments(chart.notes));
+    this.labelKey = '';
     this.lastRenderKey = '';
 
     // Strings at the strike line.
@@ -392,18 +403,26 @@ export class Highway3D {
       }
       this.stringMats.forEach((m, s) => { m.emissiveIntensity = 0.45 + lit[s] * 1.4; });
 
-      // Camera follows the hand position (see core/camera-follow.js).
-      this.follow.update(this.anchors, t, speed, dt);
+      // Camera frames the current passage (see core/camera-follow.js).
+      this.follow.update(t, speed, dt);
+      const { lo: frameLo, hi: frameHi } = this.follow;
+      const [left, right] = this.shades;
+      left.scale.x = Math.max(0.001, frameLo + 3);
+      left.position.x = (frameLo - 3) / 2;
+      right.scale.x = Math.max(0.001, MAX_FRET + 3 - frameHi);
+      right.position.x = (frameHi + MAX_FRET + 3) / 2;
 
-      // Highlight fret numbers under the hand (only when the hand moves).
+      // Fret numbers: yellow under the hand, dim outside the frame.
       const cur = anchorAt(this.anchors, t);
       const hand = cur ? cur.fret : null;
-      if (hand !== this.handFret) {
-        this.handFret = hand;
+      const key = `${hand}|${Math.round(frameLo * 2)}|${Math.round(frameHi * 2)}`;
+      if (key !== this.labelKey) {
+        this.labelKey = key;
         this.fretLabels.forEach((sp, i) => {
           const f = i + 1;
           const inHand = hand !== null && f >= hand && f <= hand + 3;
-          sp.material = this.label(String(f), inHand ? '#f2c418' : '#7d8597');
+          const inFrame = f - 0.5 >= frameLo && f - 0.5 <= frameHi;
+          sp.material = this.label(String(f), inHand ? '#f2c418' : inFrame ? '#7d8597' : '#2e3442');
         });
       }
     }

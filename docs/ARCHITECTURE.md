@@ -301,15 +301,15 @@ on disk:
 * Gems (box, edges, glow sprite, stem to the floor, fret-number sprite, technique
   tag) are built once per note. Each frame only the notes inside the time window
   are positioned/shown (binary search), so the cost is independent of song length.
-* Camera (`core/camera-follow.js`, unit tested): pans to the hand positions of
-  the next 1.2 s with a critically damped spring. Zoom is planned over the next
-  3 s: it zooms out early and smoothly, and zooms in only after the narrower view
-  has been enough for 2.5 s (and by at least 2 frets), slowly. Seeks snap. On
-  21 Guns this cut zoom direction changes from 76 to 25 and the peak zoom speed
-  from 17.5 to 2.7 frets/s compared with 0.3.0. Its distance fits about span + margin frets across the strings
-  (aspect capped at 1.9 so wide "Both" strips show more frets rather than zooming
-  in). The tilt is solved each frame by bisection so that the far end of the
-  highway sits just below the top edge (`farNdc`) for any window shape.
+* Camera (`core/camera-follow.js`, unit tested, 0.3.2): the song is split into
+  **passages** whose fretted notes fit in about 9 frets (short excursions are merged
+  into a neighbour, and frames that contain each other are joined). The camera holds
+  **completely still** during a passage and frames exactly its frets. It moves only
+  between passages: it starts after the old passage's last note (at most 1.2 s ahead),
+  uses a critically damped glide, and moves faster when the gap is short. Frets
+  outside the frame are shaded and their numbers dimmed. Seeks snap. Open strings
+  and ghost notes never move the camera. All three test songs fit a single frame,
+  so the camera never moves in them. The same framing is used by the 2D view.
 * Narrow FOV (26°) + fog in the last ~30% keep far notes large and readable.
 * Performance (0.3.1): beat/bar lines, anchor lanes and sustain ribbons are merged
   into ~8 meshes (was >1,000 objects for 21 Guns); stems share one geometry; fret
