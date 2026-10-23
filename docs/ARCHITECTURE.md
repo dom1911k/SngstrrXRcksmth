@@ -1,6 +1,11 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **Phase 3 built (0.4.0)**: scoring (see `docs/SCORING.md`). Also built:
+Status: **Phase 4 built (0.5.0)**: auto bass muting (`core/auto-mute.js`, Songsterr's
+`controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
+configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
+bindings), highway clean-up with a hit indicator. **Correction:** Songsterr's
+`isCountin` is the count-in *setting*; "counting now" is detected as "play pressed
+but the position doesn't move". Phase 3 (0.4.x): scoring (see `docs/SCORING.md`). Also built:
 **V3 (0.3.x)**: 3D Rocksmith-style highway and standalone player, on
 top of Phase 2 (Songsterr adapter, chart format, highway in sync).
 Phase 1 (input, tuner, monitoring, calibration) and self-update are done too. This file

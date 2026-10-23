@@ -11,7 +11,12 @@
 //     store.get() -> state, store.dispatch(event, payload).
 //   - state.player.instance.getCursor()  -> playback position in "tab ms"
 //     (works for both the synth AudioPlayer and the original-recording video player)
-//   - state.player.{shouldPlay, speed, isCountin, isLoading}
+//   - state.player.{shouldPlay, speed, isLoading}; isCountin / isCountinBetweenLoops
+//     are the count-in SETTINGS (not "counting now"): counting is detected as
+//     "play pressed but the position doesn't move"
+//   - dispatch('controls/mute'): Songsterr's mute button for the shown track
+//     (Plus feature; not available with the original recording / video)
+//   - dispatch('player/toggleCountIn' | 'player/toggleCountInBetweenLoops')
 //   - state.cursor.position.{cursor, loopStart, loopEnd}   (tab ms; 0/0 = no loop)
 //   - state.part.current: the displayed track, with measures[].beatsLayouts[]
 //     and timestamps[] (one per beat layout in playback order, tab ms)
@@ -35,6 +40,8 @@
   let lastStatus = '';
   let lastSig = '';
   let lastSent = 0;
+  let lastCursor = null;
+  let lastMove = 0;
 
   const post = (msg) => window.postMessage({ source: SRC, ...msg }, location.origin);
 
@@ -102,7 +109,12 @@
     status('ok', '');
     const songId = s.meta && s.meta.current ? s.meta.current.songId : 0;
     // While paused and nothing changes, a 4x/second heartbeat is enough.
-    const sig = `${cursor}|${pl.shouldPlay}|${pl.isCountin}|${pl.isLoading}|${pl.speed}|${pos.loopStart}|${pos.loopEnd}|${songId}|${s.part.partId}|${partGeneration}|${(pl.partsMute || []).join(',')}`;
+    const nowMs = performance.now();
+    if (cursor !== lastCursor) { lastCursor = cursor; lastMove = nowMs; }
+    // Playing = play pressed AND the position moves (count-in and buffering don't).
+    const moving = nowMs - lastMove < 150;
+    const hasPlus = !!(s.user && s.user.hasPlus);
+    const sig = `${cursor}|${pl.shouldPlay}|${moving}|${pl.isCountin}|${pl.isCountinBetweenLoops}|${pl.videoOpened}|${hasPlus}|${pl.isLoading}|${pl.speed}|${pos.loopStart}|${pos.loopEnd}|${songId}|${s.part.partId}|${partGeneration}|${(pl.partsMute || []).join(',')}`;
     const now = performance.now();
     if (!pl.shouldPlay && sig === lastSig && now - lastSent < 250) return;
     lastSig = sig;
@@ -111,9 +123,13 @@
       type: 'tick',
       perf: now,
       cursor,
-      playing: !!pl.shouldPlay && !pl.isCountin && !pl.isLoading,
+      playing: !!pl.shouldPlay && moving && !pl.isLoading,
       shouldPlay: !!pl.shouldPlay,
-      countIn: !!pl.isCountin,
+      countIn: !!pl.shouldPlay && !moving && !!(pl.isCountin || pl.isCountinBetweenLoops),
+      countInEnabled: !!pl.isCountin,
+      countInLoopsEnabled: !!pl.isCountinBetweenLoops,
+      videoOpened: !!pl.videoOpened,
+      hasPlus,
       loading: !!pl.isLoading,
       speed: pl.speed || 100,
       loopStart: pos.loopStart || 0,
@@ -210,6 +226,23 @@
       case 'setLoop': store.dispatch('cursor/move', { ...pos, cursor: args.startMs, loopStart: args.startMs, loopEnd: args.endMs }); break;
       case 'clearLoop': store.dispatch('cursor/move', { ...pos, loopStart: 0, loopEnd: 0 }); break;
       case 'setSpeed': store.dispatch('player/changeSpeed', { speed: args.speed }); break;
+      case 'setCountIn': {
+        if (!!s.player.isCountin !== !!args.before) store.dispatch('player/toggleCountIn');
+        if (!!s.player.isCountinBetweenLoops !== !!args.loops) store.dispatch('player/toggleCountInBetweenLoops');
+        break;
+      }
+      case 'muteShownTrack': {
+        // Toggle Songsterr's own mute of the shown (bass) track to the wanted state.
+        const id = s.part.partId;
+        const muted = (s.player.partsMute || []).includes(id);
+        let result = 'ok';
+        if (muted === !!args.mute) result = 'unchanged';
+        else if (s.player.videoOpened) result = 'video';
+        else if (!(s.user && s.user.hasPlus)) result = 'no-plus';
+        else store.dispatch('controls/mute');
+        post({ type: 'muteResult', requestId: args.requestId, result, mute: !!args.mute });
+        break;
+      }
       case 'switchPart': {
         const songId = s.meta.current.songId;
         location.assign(location.pathname.replace(/-s\d+(t\d+)?$/, `-s${songId}t${args.partId}`));

@@ -31,6 +31,9 @@ canvas[hidden] { display: none; }
 .hud .left { color: #d4d9e3; }
 .hud .right { color: #f2c418; }
 .hud .center { position: absolute; left: 0; right: 0; top: 64px; text-align: center; color: #ffb347; }
+.notice { position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%); z-index: 4; background: rgba(16,18,24,.92);
+  border: 1px solid #3a3f49; border-radius: 8px; padding: 6px 14px; font: 600 14px system-ui; color: #e8e8ea; transition: opacity .25s; pointer-events: none; }
+.notice.hide { opacity: 0; }
 .debug { position: absolute; right: 10px; bottom: 8px; color: #6f7685; font: 11px system-ui; pointer-events: none; z-index: 2; }
 `;
 
@@ -52,6 +55,7 @@ export function createOverlay(adapter, {
   const hudCenter = h('div', { class: 'center' });
   const hud = h('div', { class: 'hud' }, hudLeft, hudRight, hudCenter);
   const debugEl = h('div', { class: 'debug' });
+  const notice = h('div', { class: 'notice hide' });
   const highway2d = new Highway2D(canvas2d);
   let highway3d = null;
   let highway3dFailed = false;
@@ -73,7 +77,7 @@ export function createOverlay(adapter, {
   );
   const grip = h('div', { class: 'grip', title: 'Drag to resize' });
   const msg = h('div', { class: 'msg', hidden: true });
-  const wrap = h('div', { class: 'wrap' }, canvas2d, canvas3d, hud, grip, msg, bar, debugEl);
+  const wrap = h('div', { class: 'wrap' }, canvas2d, canvas3d, hud, grip, msg, bar, debugEl, notice);
   const pill = h('button', { class: 'pill', hidden: true, onclick: () => updateSettings({ viewMode: 'both' }) }, '▲ Highway');
   root.append(wrap, pill);
   const scoreUI = session ? createScoreUI(wrap, session, () => active) : null;
@@ -220,5 +224,22 @@ export function createOverlay(adapter, {
   }
   requestAnimationFrame(frame);
 
-  return { host, scoreUI, get highway() { return active; } };
+  // Short confirmation (e.g. from a shortcut), shown on the highway.
+  let noticeTimer = null;
+  function notify(text) {
+    notice.textContent = text;
+    notice.classList.remove('hide');
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => notice.classList.add('hide'), 1600);
+  }
+
+  function toggleView() {
+    if (fixedMode) return;
+    const order = modes.map(([m]) => m);
+    const next = order[(order.indexOf(getSettings().viewMode) + 1) % order.length];
+    updateSettings({ viewMode: next });
+    notify(`View: ${modes.find(([m]) => m === next)[1]}`);
+  }
+
+  return { host, scoreUI, notify, toggleView, get highway() { return active; } };
 }

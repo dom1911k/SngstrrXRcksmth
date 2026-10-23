@@ -178,7 +178,7 @@ export class Highway2D {
       const y = stringY(i);
       ctx.strokeStyle = shade(this.colors[i], 0.85);
       ctx.globalAlpha = 0.85;
-      ctx.lineWidth = Math.max(1.5, (4.5 - row(i) * 0.6) * s);
+      ctx.lineWidth = Math.max(1, (2.6 - row(i) * 0.35) * s);
       ctx.beginPath(); ctx.moveTo(left - fretW * 0.3, y); ctx.lineTo(right + fretW * 0.3, y); ctx.stroke();
       ctx.globalAlpha = 1;
     }
@@ -201,6 +201,28 @@ export class Highway2D {
       visible.push(n);
     }
     for (let j = visible.length - 1; j >= 0; j--) this.drawNote(visible[j], { t, depth, proj, stringY, fretX, wireX, floorY, fretW, s, look });
+
+    // ---- hit indicator: soft spot on the string, brightest at the moment to play ----
+    for (let i = firstNoteAtOrAfter(notes, t - 0.16 * speed); i < notes.length && notes[i].t <= t + 0.6 * speed; i++) {
+      const n = notes[i];
+      if (n.flags.ghost) continue;
+      const real = (n.t - t) / speed;
+      const alpha = real > 0.04 ? 0.12 + 0.33 * (1 - real / 0.6) : real > -0.04 ? 0.95 : 0.95 * Math.max(0, 1 + (real + 0.04) / 0.12);
+      if (alpha <= 0.01) continue;
+      const a = anchorAt(this.anchors, n.t);
+      const x = n.fret > 0 ? fretX(n.fret) : (wireX(a ? a.fret - 1 : this.cam.lo) + wireX(a ? a.fret + 3 : this.cam.lo + 4)) / 2;
+      const w = n.fret > 0 ? fretW * 0.45 : fretW * 2;
+      const y = stringY(n.string);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, w);
+      g.addColorStop(0, this.colors[n.string] || '#fff');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(x, y, w, Math.max(4, 9 * s), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
 
     // ---- HUD ----
     const bar = this.barAt(t);

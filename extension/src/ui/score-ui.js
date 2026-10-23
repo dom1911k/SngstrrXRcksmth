@@ -45,8 +45,10 @@ export function createScoreUI(wrap, session, getHighway) {
   let toastTimer = null;
   let lastSummary = null;
 
+  let judged = 0;
   function renderStats(st) {
     if (!st) return;
+    judged = st.judged;
     acc.textContent = st.judged ? `${pct(st.accuracy)}` : '–';
     streak.textContent = st.streak >= 2 ? `streak ${st.streak}` : '';
   }
@@ -113,7 +115,7 @@ export function createScoreUI(wrap, session, getHighway) {
   function update(chartLoaded) {
     const active = session.active;
     const s = getSettings();
-    score.hidden = !active || !s.scoring || !s.showLiveScore;
+    score.hidden = !active || !s.scoring || !s.showLiveScore || !judged;
     hint.hidden = active || !chartLoaded || !s.scoring || session.engine.running;
   }
 

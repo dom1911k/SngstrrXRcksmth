@@ -67,6 +67,9 @@ export class SongsterrAdapter {
       this.onTick(msg);
     } else if (msg.type === 'song' && msg.requestId === this.requestId) {
       this.onSong(msg);
+    } else if (msg.type === 'muteResult') {
+      const resolve = this.muteWaiters && this.muteWaiters.get(msg.requestId);
+      if (resolve) { this.muteWaiters.delete(msg.requestId); resolve(msg.result); }
     }
   }
 
@@ -143,7 +146,30 @@ export class SongsterrAdapter {
       playerType: s.playerType,
       songsterrLatencyMs: s.latencyOffsetMs,
       partsMute: s.partsMute,
+      partId: s.partId,
+      bassMuted: (s.partsMute || []).includes(s.partId),
+      countInEnabled: s.countInEnabled,
+      countInLoopsEnabled: s.countInLoopsEnabled,
+      videoOpened: s.videoOpened,
+      hasPlus: s.hasPlus,
+      canMute: !s.videoOpened && s.hasPlus,
     };
+  }
+
+  // Mute/unmute the shown (bass) track with Songsterr's own mute button.
+  // Resolves 'ok' | 'unchanged' | 'video' (ORIG recording can't be muted) | 'no-plus' | 'timeout'.
+  setBassMuted(mute) {
+    this.muteWaiters = this.muteWaiters || new Map();
+    const requestId = (this.muteSeq = (this.muteSeq || 0) + 1);
+    return new Promise((resolve) => {
+      this.muteWaiters.set(requestId, resolve);
+      this.send({ type: 'command', cmd: 'muteShownTrack', args: { mute, requestId } });
+      setTimeout(() => { if (this.muteWaiters.delete(requestId)) resolve('timeout'); }, 1500);
+    });
+  }
+
+  setCountIn({ before, loops }) {
+    this.send({ type: 'command', cmd: 'setCountIn', args: { before, loops } });
   }
 
   play() { this.send({ type: 'command', cmd: 'play' }); }

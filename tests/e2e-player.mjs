@@ -28,6 +28,7 @@ const page = await ctx.newPage();
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 await page.goto(`chrome-extension://${id}/player/player.html`);
 await page.waitForTimeout(1000);
+await page.evaluate(async () => { const { updateSettings } = await import('../src/core/settings.js'); await updateSettings({ countIn: false, countInLoops: false }); });
 await page.setInputFiles('#chartFile', badPath);
 await page.waitForTimeout(200);
 const bad = await page.textContent('#status');

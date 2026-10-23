@@ -40,7 +40,13 @@ export const DEFAULTS = {
   hitWindowMs: 110,        // how early/late a note may be and still count
   onTimeMs: 40,            // within this it is "on time"
   deadNotes: 'attack',     // 'attack' = any muted attack counts | 'ignore'
-  showLiveScore: true,     // accuracy % and streak above the highway
+  showLiveScore: true,
+  // Practice
+  autoMuteBass: true,      // mute the song's bass track while the input is on
+  countIn: true,           // standalone player: one bar of clicks before playing
+  countInLoops: true,      // ...and before each loop restart
+  shortcuts: {},           // action -> [bindings]; empty = defaults
+  panelCollapsed: ['Shortcuts (keyboard or foot pedal)'], // folded panel sections     // accuracy % and streak above the highway
   autoTiming: true,        // learn a small timing correction while playing
   autoTimingMs: 0,         // the learned correction (added to the latency)
   schema: SCHEMA,

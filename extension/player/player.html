@@ -13,7 +13,7 @@
     <label class="btn">Open audio… <input id="audioFile" type="file" accept="audio/*,.mp3,.ogg,.wav,.m4a,.flac,.opus" hidden></label>
   </div>
   <div class="group transport">
-    <button id="restart" class="btn" title="Back to start (Home)">⏮</button>
+    <button id="restart" class="btn" title="Back to start (R / Home)">⏮</button>
     <button id="play" class="btn primary" title="Play / pause (Space)">▶</button>
     <span id="time" class="time">0:00 / 0:00</span>
   </div>
@@ -29,9 +29,9 @@
   </div>
   <div class="group">
     <span class="small">Loop</span>
-    <button id="loopA" class="btn" title="Loop start at current position ([)">A</button>
-    <button id="loopB" class="btn" title="Loop end at current position (])">B</button>
-    <button id="loopClear" class="btn" title="Clear loop (Backspace)">✕</button>
+    <button id="loopA" class="btn" title="Loop start at current position">A</button>
+    <button id="loopB" class="btn" title="Loop end at current position">B</button>
+    <button id="loopClear" class="btn" title="Clear loop (C)">✕</button>
   </div>
   <div class="group">
     <label class="small" title="Shift the chart against the audio if notes are early/late compared to the recording">Audio offset
@@ -48,7 +48,7 @@
   <p>Open a <b>bass chart</b> (.json, see <code>docs/CHART_FORMAT.md</code>, e.g. one downloaded from the
     Songsterr panel or made by your own tool) and the matching <b>audio file</b> (MP3, OGG, WAV, M4A, FLAC).
     You can also drag both files onto this page.</p>
-  <p class="small">Keys: Space play/pause · ← → 5 s back/forward · Home start · [ ] loop start/end · Backspace clear loop · + − speed</p>
+  <p class="small">Keys: Space play/pause · ← → 5 s back/forward · R restart · A / B loop start/end at the current bar · C clear loop · − + speed · all changeable in the BASS TRAINER panel (Practice)</p>
 </div>
 <script type="module" src="../src/player-main.js"></script>
 </body>

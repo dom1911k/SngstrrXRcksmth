@@ -30,6 +30,11 @@ header h1 { margin: 0; font-size: 15px; font-weight: 700; color: #f2c418; }
 .close { background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; line-height: 1; }
 section { padding: 12px 14px; border-bottom: 1px solid #23262c; }
 section:last-child { border-bottom: none; }
+h2.fold { cursor: pointer; user-select: none; }
+h2.fold::after { content: ' ▾'; color: #5f6673; }
+section.collapsed > *:not(h2:first-child) { display: none; }
+section.collapsed > h2:first-child { margin-bottom: 0; }
+section.collapsed > h2:first-child::after { content: ' ▸'; }
 h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #9aa0aa; }
 button.btn { background: #2a2e36; color: #fff; border: 1px solid #3a3f49; border-radius: 6px;
   padding: 6px 12px; font: inherit; cursor: pointer; }
@@ -71,4 +76,8 @@ input[type=range] { width: 100%; accent-color: #f2c418; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
 .kv span:nth-child(odd) { color: #8b919c; }
 ol { margin: 4px 0 8px 18px; padding: 0; }
+.sc { margin: 3px 0; font-size: 12px; flex-wrap: nowrap; }
+.sc .keys { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+kbd { background: #0e1014; border: 1px solid #3a3f49; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font: 11px/1.6 system-ui; color: #e8e8ea; }
+button.btn.small { padding: 2px 7px; font-size: 11px; }
 `;

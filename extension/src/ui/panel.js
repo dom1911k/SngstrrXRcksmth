@@ -119,7 +119,22 @@ export function createPanel(engine, { sections = [] } = {}) {
   const panel = h('div', { class: 'panel', hidden: true },
     h('header', {}, h('h1', {}, 'Bass Trainer'),
       h('button', { class: 'close', title: 'Close', onclick: () => { panel.hidden = true; } }, '×')),
-    updateBanner, ...sections, inputSection, tunerSection, monitorSection, calSection);
+    updateBanner, inputSection, ...sections, tunerSection, monitorSection, calSection);
+
+  // Collapsible sections: click a heading to fold it; remembered.
+  for (const sec of panel.querySelectorAll('section')) {
+    const head = sec.querySelector('h2');
+    if (!head) continue;
+    const key = head.textContent;
+    head.classList.add('fold');
+    if ((settings.panelCollapsed || []).includes(key)) sec.classList.add('collapsed');
+    head.addEventListener('click', () => {
+      sec.classList.toggle('collapsed');
+      const set = new Set(getSettings().panelCollapsed || []);
+      if (sec.classList.contains('collapsed')) set.add(key); else set.delete(key);
+      updateSettings({ panelCollapsed: [...set] });
+    });
+  }
   const launcher = h('button', { class: 'launcher', onclick: () => { panel.hidden = !panel.hidden; } }, 'BASS TRAINER', launcherDot);
   root.append(launcher, panel);
 

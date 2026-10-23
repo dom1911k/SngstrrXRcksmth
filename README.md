@@ -5,10 +5,11 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.4.0.** Rocksmith 2014-style **3D note highway** in sync with
-Songsterr's player, **scoring** of what you play (hit/miss, early/on time/late,
-accuracy, streak, summary), a **standalone player** for your own chart + audio file,
-tuner that follows the tab's tuning, latency calibration and monitoring.
+**Current version: 0.5.0.** Rocksmith 2014-style **3D note highway** in sync with
+Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
+**practice tools** (automatic bass muting, count-in, keyboard / foot-pedal
+shortcuts), a **standalone player** for your own chart + audio file, a tuner that
+follows the tab's tuning, latency calibration and monitoring.
 
 It only uses what your Songsterr account already shows you in the browser.
 It does not unlock anything.
@@ -117,7 +118,9 @@ Good Riddance, can be played too.
     neck is darkened. It stays still while you play a passage and only glides
     when the music moves to another part of the neck. For example, 21 Guns
     (frets 1–8) never moves the camera at all.
-  - Play each note when it reaches the strings; the string glows while it sounds.
+  - Play each note when it reaches the strings. A soft spot of light on the string,
+    at the note's fret, grows brighter as the note comes in and flashes briefly
+    at the exact moment to play. The string glows while the note sounds.
   - Coloured ribbons are held notes. A ribbon that bends sideways is a slide.
   - Wide bars are open strings. **X** = dead note; faded small notes = ghost notes;
     **H**/**P** = hammer-on/pull-off; **PM** = palm mute.
@@ -137,6 +140,36 @@ Settings in the panel, under **Song & highway**:
 - **Tab order:** puts G on top, like a tab, instead of Rocksmith's E-on-top.
 - **Download chart (JSON):** saves the song in the trainer's chart format
   ([`docs/CHART_FORMAT.md`](docs/CHART_FORMAT.md)) for use in other tools.
+
+### Practice tools (panel → **Practice**)
+- **Mute the song's bass track while the input is on:** when you click *Start
+  input*, the trainer mutes Songsterr's bass track so you only hear your own bass,
+  and turns it back on when you stop (or leave the page). This uses Songsterr's own
+  mute button, so it needs **Songsterr Plus** and the **SYNTH** sound (the ORIG.
+  recording can't be split into instruments). The panel says if it can't mute.
+  If you turn the bass back on yourself while playing, it stays on.
+- **Count-in** before playback and before each loop restart (on by default).
+  On Songsterr this switches Songsterr's own count-in on; the highway shows
+  "Count-in…" and waits. The standalone player clicks one bar at the song's tempo.
+- **Shortcuts** (keyboard or foot pedal; section *Shortcuts*, folded by default):
+
+  | Action | Default keys |
+  |---|---|
+  | Play / pause | Space |
+  | Restart (song or loop start) | Home, R |
+  | Loop start at the current bar | A |
+  | Loop end at the current bar (loops from the start bar) | B |
+  | Clear loop | C |
+  | Slower / faster (5 % steps) | Num − / Num + (also - and =) |
+  | Switch Highway / Both / Tab | V |
+
+  To use a **foot pedal**: most pedals type a key (often Page Down / Page Up or an
+  arrow). Click **Set** next to an action and step on the pedal; done. **+** adds a
+  second key for the same action. A short message on the highway confirms each
+  action ("Loop: bars 12–14", "Speed 85%"). Shortcuts work while the Songsterr page
+  (or player) has focus, so click on the page once if the panel's slider has focus.
+
+Panel sections can be folded by clicking their heading; the panel remembers it.
 
 ### Scoring
 1. Open the BASS TRAINER panel and click **Start input** (the cable must be
@@ -292,8 +325,8 @@ for detection.
   position, and a standalone player for chart files + local audio.
 - **Phase 3 (done, 0.4.0):** scoring: hit/miss, early/on time/late, accuracy, streak,
   summary, edge cases (dead notes, ghost notes, slides, ringing notes, octave errors).
-- **Phase 4:** automatic bass-track muting, count-in, configurable keyboard /
-  foot-pedal shortcuts, polish.
+- **Phase 4 (done, 0.5.0):** automatic bass-track muting, count-in, configurable
+  keyboard / foot-pedal shortcuts, cleaner highway with a subtle hit indicator.
 - **V2 (after scoring):** riff repeater with auto speed-up, wait mode, practice
   stats and weak spots, take recording.
 
@@ -310,6 +343,7 @@ node tests/e2e-phase1.mjs /tmp/a.wav shot.png     # Chromium + fake mic (needs P
 node tests/e2e-phase2.mjs [tab-url] [shot-prefix] # real Songsterr: highway sync (needs network)
 node tests/e2e-player.mjs /tmp/a.wav [shot.png]   # standalone player: chart + audio, speed, loop
 node tests/e2e-scoring.mjs [shot.png]             # scoring in the browser with a synthesized performance
+node tests/e2e-phase4.mjs /tmp/a.wav [shot.png]   # real Songsterr: count-in, shortcuts, mute status
 npx http-server -p 8123                           # then open /tests/highway-preview.html?t=78&style=3d
 ```
 

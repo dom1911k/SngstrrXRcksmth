@@ -7,6 +7,9 @@ import { createPanel } from './ui/panel.js';
 import { createOverlay } from './ui/overlay.js';
 import { createSongSection } from './ui/song-section.js';
 import { ScoringSession } from './scoring/session.js';
+import { AutoMute } from './core/auto-mute.js';
+import { createPracticeSection } from './ui/practice-section.js';
+import { createShortcutActions, installShortcuts } from './core/shortcuts.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (t) => {
@@ -20,11 +23,14 @@ const adapter = new LocalAdapter();
 const session = new ScoringSession(engine, adapter);
 let panel, overlay;
 const songSection = createSongSection(adapter, { onTabTuning: (t) => panel && panel.setTabTuning(t), showSummary: () => overlay && overlay.scoreUI && overlay.scoreUI.showLast() });
-panel = createPanel(engine, { sections: [songSection] });
+const autoMute = new AutoMute(engine, adapter);
+const practiceSection = createPracticeSection(adapter, autoMute);
+panel = createPanel(engine, { sections: [...practiceSection, ...songSection] });
 overlay = createOverlay(adapter, { controlsGap: 0, headerGap: 78, fixedMode: 'highway', session });
 document.body.append(overlay.host, panel.host);
+installShortcuts(createShortcutActions(adapter, { notify: (t) => overlay.notify(t) }));
 adapter.start();
-globalThis.bassTrainer = { engine, adapter, panel, overlay, session };
+globalThis.bassTrainer = { engine, adapter, panel, overlay, session, autoMute };
 
 let statusTimer;
 function status(text, ok = false) {
@@ -95,23 +101,12 @@ function setLoopPoint(which) {
   }
 }
 
+// Arrow keys seek (the other keys are the shared, configurable shortcuts).
 window.addEventListener('keydown', (e) => {
   if (e.target.closest && e.target.closest('input, select, textarea')) return;
-  const k = e.key;
-  if (k === ' ') { adapter.toggle(); e.preventDefault(); }
-  else if (k === 'ArrowLeft') adapter.seek(adapter.getTime() - 5);
-  else if (k === 'ArrowRight') adapter.seek(adapter.getTime() + 5);
-  else if (k === 'Home') adapter.seek(adapter.loop ? adapter.loop.start : 0);
-  else if (k === '[') setLoopPoint('a');
-  else if (k === ']') setLoopPoint('b');
-  else if (k === 'Backspace') { pendingA = null; adapter.clearLoop(); }
-  else if (k === '+' || k === '=' || k === '-') {
-    const opts = [...$('speed').options].map((o) => Number(o.value));
-    const i = opts.indexOf(Math.round(adapter.speed * 100));
-    const next = opts[Math.max(0, Math.min(opts.length - 1, (i < 0 ? opts.indexOf(100) : i) + (k === '-' ? -1 : 1)))];
-    $('speed').value = next;
-    adapter.setSpeed(next);
-  } else return;
+  if (e.key === 'ArrowLeft') adapter.seek(adapter.getTime() - 5);
+  else if (e.key === 'ArrowRight') adapter.seek(adapter.getTime() + 5);
+  else return;
   e.preventDefault();
 });
 

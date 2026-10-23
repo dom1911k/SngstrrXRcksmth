@@ -45,7 +45,7 @@ await page.waitForTimeout(300);
 await page.evaluate(async ([from, lead, click]) => {
   const { engine, adapter } = globalThis.bassTrainer;
   const { updateSettings } = await import('../src/core/settings.js');
-  await updateSettings({ calibrationMs: 0, fineTuneMs: 0, scoring: true, showFeedback: true });
+  await updateSettings({ calibrationMs: 0, fineTuneMs: 0, autoTimingMs: 0, scoring: true, countIn: false, countInLoops: false });
   await new Promise((resolve) => {
     const off = engine.on('onset', (o) => {
       off();

@@ -172,6 +172,43 @@ export class Highway3D {
     this.scene.add(S);
   }
 
+  // Hit indicator: a soft spot on the string at the note's fret. It brightens
+  // as the note approaches (last ~0.6 s), flashes briefly at the exact moment
+  // to play, then fades. Purely a timing cue, not a judgement.
+  updateTargets(t, speed) {
+    if (!this.targetPool) {
+      this.targetPool = Array.from({ length: 14 }, () => {
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
+        sp.visible = false;
+        sp.renderOrder = 5;
+        this.scene.add(sp);
+        return sp;
+      });
+    }
+    const notes = this.chart.notes;
+    const before = 0.6 * speed, after = 0.16 * speed;
+    let used = 0;
+    for (let i = firstNoteAtOrAfter(notes, t - after); i < notes.length && notes[i].t <= t + before && used < this.targetPool.length; i++) {
+      const n = notes[i];
+      if (n.flags.ghost) continue;
+      const o = this.noteObjs[i];
+      const real = (n.t - t) / speed;           // seconds until the note, real time
+      let alpha;
+      if (real > 0.04) alpha = 0.12 + 0.33 * (1 - real / 0.6);
+      else if (real > -0.04) alpha = 0.95;
+      else alpha = 0.95 * Math.max(0, 1 + (real + 0.04) / 0.12);
+      if (alpha <= 0.01) continue;
+      const sp = this.targetPool[used++];
+      sp.material.color.set(this.colors[n.string] || '#ffffff');
+      sp.material.opacity = alpha;
+      const open = n.fret === 0;
+      sp.scale.set(open ? 4.2 : 1.0, real > -0.04 && real < 0.04 ? 0.42 : 0.3, 1);
+      sp.position.set(o.obj.position.x, o.obj.position.y, 0.03);
+      sp.visible = true;
+    }
+    for (let k = used; k < this.targetPool.length; k++) this.targetPool[k].visible = false;
+  }
+
   setOptions(o) {
     const invertChanged = o.invertStrings !== undefined && o.invertStrings !== this.options.invertStrings;
     Object.assign(this.options, o);
@@ -186,6 +223,7 @@ export class Highway3D {
   }
 
   clearChart() {
+    if (this.targetPool) for (const sp of this.targetPool) sp.visible = false;
     for (const g of [this.timeGroup, this.noteGroup]) {
       for (const child of [...g.children]) {
         g.remove(child);
@@ -210,11 +248,13 @@ export class Highway3D {
     this.lastRenderKey = '';
 
     // Strings at the strike line.
-    this.stringMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.5, roughness: 0.4 }));
+    this.stringMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.35, roughness: 0.4 }));
+    // Thinner strings, graded like real ones (lowest = thickest).
+    const radii = n >= 5 ? [0.025, 0.021, 0.018, 0.015, 0.013] : [0.021, 0.018, 0.015, 0.013];
     for (let s = 0; s < n; s++) {
       const row = this.options.invertStrings ? n - 1 - s : s;
-      const radius = 0.035 + (n - 1 - row) * 0.0 + (s === 0 ? 0.02 : s === 1 ? 0.012 : 0.006);
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, MAX_FRET + 3, 10), this.stringMats[s]);
+      const radius = radii[s] || 0.013;
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, MAX_FRET + 3, 8), this.stringMats[s]);
       m.rotation.z = Math.PI / 2;
       m.position.set(MAX_FRET / 2, this.stringY(s), 0);
       this.scene.add(m);
@@ -222,15 +262,15 @@ export class Highway3D {
     }
 
     // Materials.
-    this.gemMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.45, roughness: 0.35, metalness: 0.1 }));
+    this.gemMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.4, roughness: 0.35, metalness: 0.1 }));
     this.ghostMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.3, transparent: true, opacity: 0.35 }));
     this.deadMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).multiplyScalar(0.35), emissive: c, emissiveIntensity: 0.12, roughness: 0.6 }));
-    this.stemMats = colors.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.45, fog: true }));
+    this.stemMats = colors.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.28, fog: true }));
     this.tailMats = colors.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.55, side: THREE.DoubleSide, clippingPlanes: this.clipStrike, depthWrite: false }));
-    this.glowMats = colors.map((c) => new THREE.SpriteMaterial({ map: this.glowTex, color: c, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.glowMats = colors.map((c) => new THREE.SpriteMaterial({ map: this.glowTex, color: c, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
     const gemGeo = new THREE.BoxGeometry(GEM_W, GEM_H, GEM_D); gemGeo.userData.shared = true;
     const edgeGeo = new THREE.EdgesGeometry(gemGeo); edgeGeo.userData.shared = true;
-    const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 });
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 });
 
     // Beat lines and anchor lanes live in seconds (timeGroup is scaled by k).
     // Merged into a few meshes: one draw call per kind instead of hundreds.
@@ -286,7 +326,7 @@ export class Highway3D {
         obj.add(edges);
       }
       const glow = new THREE.Sprite(this.glowMats[s]);
-      glow.scale.set(open ? 4.6 : 1.5, 0.9, 1);
+      glow.scale.set(open ? 4.4 : 1.3, 0.7, 1);
       glow.position.z = -0.02;
       glow.renderOrder = -1;
       obj.add(glow);
@@ -314,9 +354,9 @@ export class Highway3D {
       if (note.flags.harmonic) tags.push('◆');
       if (note.flags.bend) tags.push('⤴');
       if (tags.length) {
-        const sp = new THREE.Sprite(this.label(tags.join(' '), '#e8e8ea'));
-        sp.scale.set(0.55, 0.55, 1);
-        sp.position.set(0, GEM_H / 2 + 0.24, 0);
+        const sp = new THREE.Sprite(this.label(tags.join(' '), '#8b93a3'));
+        sp.scale.set(0.36, 0.36, 1);
+        sp.position.set(0, GEM_H / 2 + 0.16, 0);
         obj.add(sp);
       }
       obj.position.set(x, y, -1000);
@@ -385,13 +425,10 @@ export class Highway3D {
         const dz = (o.note.t - t) * k;
         o.obj.visible = true;
         o.obj.position.z = -dz;
-        // Hit flash: grow a little as the note reaches the strings.
-        const near = Math.abs(o.note.t - t);
-        const pop = near < 0.07 ? 1 + (0.07 - near) * 4 : 1;
-        o.obj.scale.setScalar(pop);
       }
       this.visibleFrom = from;
       this.visibleTo = to;
+      this.updateTargets(t, speed);
 
       // Strings light up while a note on them is sounding.
       const lit = this.lit;
@@ -400,7 +437,7 @@ export class Highway3D {
         const n = notes[i];
         if (n.t <= t && t <= n.t + Math.max(0.12, n.dur)) lit[n.string] = Math.max(lit[n.string], 1 - (t - n.t) / Math.max(0.3, n.dur + 0.2));
       }
-      this.stringMats.forEach((m, s) => { m.emissiveIntensity = 0.45 + lit[s] * 1.4; });
+      this.stringMats.forEach((m, s) => { m.emissiveIntensity = 0.35 + lit[s] * 1.0; });
 
       // Camera frames the current passage (see core/camera-follow.js).
       this.follow.update(t, speed, dt);

@@ -36,7 +36,15 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
     h('div', { class: 'muted' }, 'How long a note is visible before you play it. Higher = see further ahead, notes move slower.'),
     check('gemFretNumbers', 'Fret numbers on the notes (3D)'),
     check('invertStrings', 'Tab order (G on top) instead of Rocksmith order (E on top)'),
-    h('h2', { style: { marginTop: '12px' } }, 'Scoring'),
+    check('showDebug', 'Show sync diagnostics on the highway'),
+    h('div', { class: 'row' }, exportBtn,
+      adapter.name === 'Songsterr player' && typeof chrome !== 'undefined' && chrome.runtime
+        ? h('button', { class: 'btn', title: 'Practise with your own audio file and a chart', onclick: () => chrome.runtime.sendMessage({ type: 'openPlayer' }) }, 'Open standalone player')
+        : null),
+  );
+
+  const scoringSection = h('section', {},
+    h('h2', {}, 'Scoring'),
     check('scoring', 'Score my playing (needs the input started below)'),
     check('showLiveScore', 'Show accuracy and streak above the highway while playing'),
     check('autoTiming', 'Automatic timing correction (learns small, constant early/late offsets while you play)'),
@@ -45,12 +53,6 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
     h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Dead notes (x)'),
       select('deadNotes', [['attack', 'any muted attack counts'], ['ignore', 'not scored']])),
     showSummary ? h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => showSummary() }, 'Show summary of the current pass')) : null,
-    h('h2', { style: { marginTop: '12px' } }, 'More'),
-    check('showDebug', 'Show sync diagnostics on the highway'),
-    h('div', { class: 'row' }, exportBtn,
-      adapter.name === 'Songsterr player' && typeof chrome !== 'undefined' && chrome.runtime
-        ? h('button', { class: 'btn', title: 'Practise with your own audio file and a chart', onclick: () => chrome.runtime.sendMessage({ type: 'openPlayer' }) }, 'Open standalone player')
-        : null),
   );
 
   let lastInfo = null;
@@ -87,5 +89,5 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   }
 
-  return section;
+  return [section, scoringSection];
 }

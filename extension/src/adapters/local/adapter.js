@@ -8,6 +8,7 @@
 
 import { SongClock } from '../../core/clock.js';
 import { validateChart, normalizeChart } from '../../core/chart.js';
+import { getSettings, updateSettings } from '../../core/settings.js';
 
 export class LocalAdapter {
   constructor() {
@@ -23,6 +24,7 @@ export class LocalAdapter {
     this.speed = 1;
     this.loop = null;
     this.virtual = { playing: false, base: 0, perf: 0 };
+    this.counting = null;      // count-in in progress: { timer, until }
     this.audio.addEventListener('ended', () => this.emit('pause', this.getState()));
     this.audio.addEventListener('error', () => this.emit('error', 'This audio file cannot be played by Chrome (try MP3, OGG, WAV, M4A or FLAC).'));
   }
@@ -31,7 +33,10 @@ export class LocalAdapter {
     const tick = () => {
       requestAnimationFrame(tick);
       const time = this.rawTime();
-      if (this.loop && this.isPlaying() && time >= this.loop.end) this.seek(this.loop.start);
+      if (this.loop && this.isPlaying() && time >= this.loop.end) {
+        this.seek(this.loop.start);
+        if (this.settingOr('countInLoops', true)) { this.stopPlayback(); this.startWithCountIn(); }
+      }
       this.clock.update({ perf: performance.now(), time: this.rawTime(), playing: this.isPlaying(), speed: this.speed });
     };
     requestAnimationFrame(tick);
@@ -116,8 +121,12 @@ export class LocalAdapter {
     return {
       ready: true,
       playing: this.isPlaying(),
-      shouldPlay: this.isPlaying(),
-      countIn: false,
+      shouldPlay: this.isPlaying() || !!this.counting,
+      countIn: !!this.counting,
+      countInEnabled: this.settingOr('countIn', true),
+      countInLoopsEnabled: this.settingOr('countInLoops', true),
+      bassMuted: false,
+      canMute: false,
       speed: this.speed,
       loop: this.loop,
       playerType: this.hasAudio() ? 'audio file' : 'no audio',
@@ -126,7 +135,52 @@ export class LocalAdapter {
     };
   }
 
+  settingOr(key, fallback) {
+    try { return getSettings()[key]; } catch { return fallback; }
+  }
+
   play() {
+    if (this.counting || this.isPlaying()) return;
+    if (this.settingOr('countIn', true)) this.startWithCountIn();
+    else this.startPlayback();
+  }
+
+  // One bar of clicks at the song's tempo (and current speed), then play.
+  startWithCountIn() {
+    const t = this.rawTime();
+    const bars = this.chart ? this.chart.bars : [];
+    let bar = bars[0];
+    for (const b of bars) { if (b.t <= t + 1e-3) bar = b; else break; }
+    const beats = bar && bar.sig ? bar.sig[0] : 4;
+    const bpm = (bar && bar.bpm) || 120;
+    const beat = 60 / bpm / this.speed;
+    if (!this.clickCtx) this.clickCtx = new AudioContext({ latencyHint: 'interactive' });
+    const ctx = this.clickCtx;
+    if (ctx.state !== 'running') ctx.resume();
+    const start = ctx.currentTime + 0.08;
+    for (let i = 0; i < beats; i++) {
+      const when = start + i * beat;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.frequency.value = i === 0 ? 1760 : 1320;
+      g.gain.setValueAtTime(0, when);
+      g.gain.linearRampToValueAtTime(i === 0 ? 0.7 : 0.45, when + 0.001);
+      g.gain.exponentialRampToValueAtTime(0.001, when + 0.05);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(when);
+      osc.stop(when + 0.06);
+    }
+    const ms = (0.08 + beats * beat) * 1000;
+    this.counting = { until: performance.now() + ms, timer: setTimeout(() => { this.counting = null; this.startPlayback(); }, ms) };
+    this.emit('play', this.getState());
+  }
+
+  stopPlayback() {
+    if (this.hasAudio()) this.audio.pause();
+    else this.virtual = { playing: false, base: this.rawTime(), perf: performance.now() };
+  }
+
+  startPlayback() {
     if (this.hasAudio()) {
       // Before the audio starts (negative chart time) just seek to its start.
       this.audio.play().catch((err) => this.emit('error', `Could not play audio: ${err.message}`));
@@ -137,12 +191,12 @@ export class LocalAdapter {
   }
 
   pause() {
-    if (this.hasAudio()) this.audio.pause();
-    else this.virtual = { playing: false, base: this.rawTime(), perf: performance.now() };
+    if (this.counting) { clearTimeout(this.counting.timer); this.counting = null; }
+    this.stopPlayback();
     this.emit('pause', this.getState());
   }
 
-  toggle() { if (this.isPlaying()) this.pause(); else this.play(); }
+  toggle() { if (this.isPlaying() || this.counting) this.pause(); else this.play(); }
 
   seek(t) {
     const target = Math.max(-this.offset, Math.min(t, this.duration() || t));
@@ -167,4 +221,9 @@ export class LocalAdapter {
   }
 
   switchTrack() { /* not applicable */ }
+
+  // A local audio file can't be split into instruments.
+  setBassMuted() { return Promise.resolve('local'); }
+
+  setCountIn({ before, loops }) { updateSettings({ countIn: before, countInLoops: loops }); }
 }
