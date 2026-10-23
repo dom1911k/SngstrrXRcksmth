@@ -76,9 +76,61 @@ class OnsetBand {
   }
 }
 
+// Autocorrelation of x[0..W) for lags 0..maxLag via FFT (zero-padded so the
+// circular correlation equals the linear one). ~3x faster than the direct sum
+// at bass window sizes, identical results.
+class FastAcf {
+  constructor(W, maxLag) {
+    let N = 1;
+    while (N < W + maxLag + 1) N <<= 1;
+    this.N = N;
+    const levels = Math.log2(N);
+    this.rev = new Uint32Array(N);
+    for (let i = 0; i < N; i++) {
+      let r = 0;
+      for (let b = 0; b < levels; b++) r |= ((i >> b) & 1) << (levels - 1 - b);
+      this.rev[i] = r;
+    }
+    this.cos = new Float64Array(N / 2);
+    this.sin = new Float64Array(N / 2);
+    for (let i = 0; i < N / 2; i++) { this.cos[i] = Math.cos((2 * Math.PI * i) / N); this.sin[i] = -Math.sin((2 * Math.PI * i) / N); }
+    this.re = new Float64Array(N);
+    this.im = new Float64Array(N);
+  }
+  fft() {
+    const { N, rev, cos, sin, re, im } = this;
+    for (let i = 0; i < N; i++) {
+      const j = rev[i];
+      if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+    }
+    for (let size = 2; size <= N; size <<= 1) {
+      const half = size >> 1, step = N / size;
+      for (let i = 0; i < N; i += size) {
+        for (let j = i, k = 0; j < i + half; j++, k += step) {
+          const l = j + half;
+          const tre = re[l] * cos[k] - im[l] * sin[k];
+          const tim = re[l] * sin[k] + im[l] * cos[k];
+          re[l] = re[j] - tre; im[l] = im[j] - tim;
+          re[j] += tre; im[j] += tim;
+        }
+      }
+    }
+  }
+  compute(x, W, maxLag, out) {
+    const { N, re, im } = this;
+    re.fill(0); im.fill(0);
+    for (let i = 0; i < W; i++) re[i] = x[i];
+    this.fft();
+    for (let i = 0; i < N; i++) { re[i] = re[i] * re[i] + im[i] * im[i]; im[i] = 0; }
+    this.fft(); // power spectrum is real and even: forward FFT = N * inverse
+    for (let t = 0; t <= maxLag; t++) out[t] = re[t] / N;
+  }
+}
+
 // MPM on a window x[0..W). Returns { f0, clarity } (f0 = 0 when nothing found).
-// Exported via globalThis for unit tests running outside a worklet.
-function mpm(x, W, fs, minLag, maxLag, nsdf, k, periodLimit = maxLag) {
+// `acf` (optional) is the precomputed autocorrelation; otherwise it is summed
+// directly. Exported via globalThis for unit tests running outside a worklet.
+function mpm(x, W, fs, minLag, maxLag, nsdf, k, periodLimit = maxLag, acf = null) {
   // m(tau) = sum_{j<W-tau} x[j]^2 + x[j+tau]^2, computed incrementally.
   let m = 0;
   for (let j = 0; j < W; j++) m += 2 * x[j] * x[j];
@@ -86,10 +138,14 @@ function mpm(x, W, fs, minLag, maxLag, nsdf, k, periodLimit = maxLag) {
   nsdf[0] = 1;
   for (let tau = 1; tau <= maxLag; tau++) {
     m -= x[W - tau] * x[W - tau] + x[tau - 1] * x[tau - 1];
-    let acf = 0;
-    const n = W - tau;
-    for (let j = 0; j < n; j++) acf += x[j] * x[j + tau];
-    nsdf[tau] = m > 1e-12 ? (2 * acf) / m : 0;
+    let r;
+    if (acf) r = acf[tau];
+    else {
+      r = 0;
+      const n = W - tau;
+      for (let j = 0; j < n; j++) r += x[j] * x[j + tau];
+    }
+    nsdf[tau] = m > 1e-12 ? (2 * r) / m : 0;
   }
   // Skip the initial positive lobe around tau = 0.
   let tau = 1;
@@ -129,6 +185,7 @@ function mpm(x, W, fs, minLag, maxLag, nsdf, k, periodLimit = maxLag) {
 }
 
 globalThis.__bassTrainerMpm = mpm;
+globalThis.__bassTrainerFastAcf = FastAcf;
 
 class PitchProcessor extends AudioWorkletProcessor {
   constructor(options) {
@@ -184,6 +241,8 @@ class PitchProcessor extends AudioWorkletProcessor {
     this.W = Math.min(this.ringSize - 1, Math.max(2 * this.periodLimit + 4, this.maxLag + 8));
     this.window = new Float32Array(this.W);
     this.nsdf = new Float32Array(this.maxLag + 2);
+    this.acf = new Float64Array(this.maxLag + 2);
+    this.fastAcf = new FastAcf(this.W, this.maxLag);
   }
 
   analyse(tEnd) {
@@ -200,7 +259,8 @@ class PitchProcessor extends AudioWorkletProcessor {
     const rms = Math.sqrt(sumSq / W);
     let f0 = 0, clarity = 0;
     if (rms > 1e-4) {
-      const r = mpm(this.window, W, this.fs, this.minLag, this.maxLag, this.nsdf, this.k, this.periodLimit);
+      this.fastAcf.compute(this.window, W, this.maxLag, this.acf);
+      const r = mpm(this.window, W, this.fs, this.minLag, this.maxLag, this.nsdf, this.k, this.periodLimit, this.acf);
       f0 = r.f0; clarity = r.clarity;
       if (f0 < this.minFreq * 0.97 || f0 > this.maxFreq) { f0 = 0; clarity = 0; }
     }

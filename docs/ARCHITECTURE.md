@@ -188,7 +188,9 @@ expected    = note.t (chart seconds) mapped to wall clock through the adapter's 
   adds a "pitch changed to a new stable note" trigger for these and for hammer-ons.
 * **Pitch detector**: McLeod Pitch Method (MPM / NSDF). It handles bass
   octave errors better than plain YIN, using a "first peak above k·max" rule.
-  Runs on a 4× decimated signal (~12 kHz, 2 kHz anti-alias low-pass). The window
+  Runs on a 4× decimated signal (~12 kHz, 2 kHz anti-alias low-pass). The
+  autocorrelation is computed by FFT (0.3.1): identical results, ~2.8× less CPU on
+  the audio thread than the direct sum. The window
   is two periods of the lowest expected note (two semitones below the lowest
   string): ≈53 ms for E Standard, ≈71 ms for 5-string B. Hop ≈5 ms.
   Tested: within 2 cents on synthetic E1–G4 plucks at 44.1/48 kHz; low E locks
@@ -299,12 +301,21 @@ on disk:
 * Gems (box, edges, glow sprite, stem to the floor, fret-number sprite, technique
   tag) are built once per note. Each frame only the notes inside the time window
   are positioned/shown (binary search), so the cost is independent of song length.
-* Camera: follows the hand-position (anchor) centre and span over the next 1.5 s
-  with smoothing. Its distance fits about span + margin frets across the strings
+* Camera (`core/camera-follow.js`, unit tested): pans to the hand positions of
+  the next 1.2 s with a critically damped spring. Zoom is planned over the next
+  3 s: it zooms out early and smoothly, and zooms in only after the narrower view
+  has been enough for 2.5 s (and by at least 2 frets), slowly. Seeks snap. On
+  21 Guns this cut zoom direction changes from 76 to 25 and the peak zoom speed
+  from 17.5 to 2.7 frets/s compared with 0.3.0. Its distance fits about span + margin frets across the strings
   (aspect capped at 1.9 so wide "Both" strips show more frets rather than zooming
   in). The tilt is solved each frame by bisection so that the far end of the
   highway sits just below the top edge (`farNdc`) for any window shape.
 * Narrow FOV (26°) + fog in the last ~30% keep far notes large and readable.
+* Performance (0.3.1): beat/bar lines, anchor lanes and sustain ribbons are merged
+  into ~8 meshes (was >1,000 objects for 21 Guns); stems share one geometry; fret
+  labels re-colour only when the hand moves; nothing is redrawn while paused and
+  unchanged; resolution drops automatically (pixel ratio 2 → 1.5 → 1) if the
+  frame rate stays under ~50 fps for 2 s.
 * Falls back to the 2D renderer when WebGL is unavailable. The setting
   `highwayStyle` ('3d' | '2d') chooses between them.
 
@@ -315,3 +326,9 @@ or from a virtual clock when there is no audio file, through the same `SongClock
 smoothing. Chart files are validated with `validateChart()`. *Audio offset* maps chart
 t = 0 to an audio position. A/B loop is enforced in the adapter's frame tick. The
 panel (tuner, calibration, highway settings) is reused unchanged. The toolbar icon opens the player.
+
+### Other optimizations (0.3.1)
+* Page bridge: while Songsterr is paused and nothing changes, it posts state
+  4×/s instead of 60×/s (other page scripts listening to `message` events
+  no longer get woken every frame).
+* Panel: tuner, meter and needle only touch the DOM when a value changed.

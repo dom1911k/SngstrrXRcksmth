@@ -74,3 +74,20 @@ test('no onsets from silence/noise floor or a long decay', () => {
   const onsets = p.messages.filter((m) => m.type === 'onset');
   assert.equal(onsets.length, 1);
 });
+
+test('FFT autocorrelation gives the same pitch as the direct sum', () => {
+  const p = createProcessor();
+  const { proc, mpm } = p;
+  const FastAcf = p.ctx.__bassTrainerFastAcf;
+  const W = proc.W, maxLag = proc.maxLag;
+  const fs = proc.fs;
+  for (const f of [41.2, 55, 73.4, 98, 196]) {
+    const x = new Float32Array(W);
+    for (let i = 0; i < W; i++) x[i] = Math.sin(2 * Math.PI * f * i / fs) + 0.6 * Math.sin(4 * Math.PI * f * i / fs + 1) + 0.3 * Math.sin(6 * Math.PI * f * i / fs + 2);
+    const acf = new Float64Array(maxLag + 2);
+    new FastAcf(W, maxLag).compute(x, W, maxLag, acf);
+    const a = mpm(x, W, fs, proc.minLag, maxLag, new Float32Array(maxLag + 2), 0.9, proc.periodLimit);
+    const b = mpm(x, W, fs, proc.minLag, maxLag, new Float32Array(maxLag + 2), 0.9, proc.periodLimit, acf);
+    assert.ok(Math.abs(a.f0 - b.f0) < 1e-6 && Math.abs(a.clarity - b.clarity) < 1e-6, `${f}: ${a.f0} vs ${b.f0}`);
+  }
+});

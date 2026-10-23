@@ -33,6 +33,8 @@
   let lastPart = null;
   let partGeneration = 0;
   let lastStatus = '';
+  let lastSig = '';
+  let lastSent = 0;
 
   const post = (msg) => window.postMessage({ source: SRC, ...msg }, location.origin);
 
@@ -98,9 +100,16 @@
     } catch { /* fall back to store cursor */ }
     const pos = (s.cursor && s.cursor.position) || {};
     status('ok', '');
+    const songId = s.meta && s.meta.current ? s.meta.current.songId : 0;
+    // While paused and nothing changes, a 4x/second heartbeat is enough.
+    const sig = `${cursor}|${pl.shouldPlay}|${pl.isCountin}|${pl.isLoading}|${pl.speed}|${pos.loopStart}|${pos.loopEnd}|${songId}|${s.part.partId}|${partGeneration}|${(pl.partsMute || []).join(',')}`;
+    const now = performance.now();
+    if (!pl.shouldPlay && sig === lastSig && now - lastSent < 250) return;
+    lastSig = sig;
+    lastSent = now;
     post({
       type: 'tick',
-      perf: performance.now(),
+      perf: now,
       cursor,
       playing: !!pl.shouldPlay && !pl.isCountin && !pl.isLoading,
       shouldPlay: !!pl.shouldPlay,
@@ -109,7 +118,7 @@
       speed: pl.speed || 100,
       loopStart: pos.loopStart || 0,
       loopEnd: pos.loopEnd || 0,
-      songId: s.meta && s.meta.current ? s.meta.current.songId : 0,
+      songId,
       revisionId: p.revisionId || 0,
       partId: s.part.partId,
       partGeneration,

@@ -267,45 +267,63 @@ export function createPanel(engine, { sections = [] } = {}) {
     return `Could not start input: ${err && err.message ? err.message : err}`;
   }
 
-  // Render loop (only does work while the panel is visible).
+  // Render loop (only does work while the panel is visible). Only writes to
+  // the DOM when a value actually changed, to avoid needless page re-layouts.
+  const put = (el, prop, v) => { if (el[prop] !== v) el[prop] = v; };
+  // Browsers normalise style values (e.g. colours to rgb()), so remember what we set.
+  const lastCss = new WeakMap();
+  const css = (el, key, v) => {
+    let m = lastCss.get(el);
+    if (!m) lastCss.set(el, (m = {}));
+    if (m[key] !== v) { m[key] = v; el.style[key] = v; }
+  };
+  let shownNote = '';
+  let shownMismatch = '';
   function frame() {
     requestAnimationFrame(frame);
     if (panel.hidden) return;
     const rmsDb = dbfs(level.rms), peakDb = dbfs(level.peak);
-    const pct = (db) => `${Math.max(0, Math.min(100, ((db + 60) / 60) * 100))}%`;
-    meterFill.style.width = pct(rmsDb);
-    meterPeak.style.left = pct(peakDb);
+    const pct = (db) => `${Math.max(0, Math.min(100, ((db + 60) / 60) * 100)).toFixed(1)}%`;
+    css(meterFill, 'width', pct(rmsDb));
+    css(meterPeak, 'left', pct(peakDb));
     if (engine.running) {
       const clipping = performance.now() < clipUntil;
-      levelText.className = clipping ? 'bad' : 'muted';
-      levelText.textContent = clipping ? 'Clipping! Lower the cable input level in Windows sound settings.'
-        : peakDb > -60 ? `Peak ${peakDb.toFixed(0)} dBFS${peakDb < -30 && level.rms > 0.0005 ? ' (quiet: aim for -20…-6 when plucking hard)' : ''}` : 'No signal';
+      put(levelText, 'className', clipping ? 'bad' : 'muted');
+      put(levelText, 'textContent', clipping ? 'Clipping! Lower the cable input level in Windows sound settings.'
+        : peakDb > -60 ? `Peak ${peakDb.toFixed(0)} dBFS${peakDb < -30 && level.rms > 0.0005 ? ' (quiet: aim for -20…-6 when plucking hard)' : ''}` : 'No signal');
     } else {
-      levelText.textContent = '';
+      put(levelText, 'textContent', '');
     }
 
     const r = tuner.reading;
     if (r) {
-      const m = r.note.match(/^([A-G]#?)(-?\d+)$/);
-      noteEl.replaceChildren(m[1], h('small', {}, m[2]));
+      if (r.note !== shownNote) {
+        const m = r.note.match(/^([A-G]#?)(-?\d+)$/);
+        noteEl.replaceChildren(m[1], h('small', {}, m[2]));
+        shownNote = r.note;
+      }
       const c = Math.round(r.cents);
-      centsEl.textContent = `${c > 0 ? '+' : ''}${c} cents · ${r.freq.toFixed(2)} Hz`;
+      put(centsEl, 'textContent', `${c > 0 ? '+' : ''}${c} cents · ${r.freq.toFixed(2)} Hz`);
       const shown = r.string >= 0 ? r.stringCents : r.cents;
-      needle.style.left = `${50 + Math.max(-50, Math.min(50, shown))}%`;
-      needle.style.opacity = 1;
-      needle.style.background = Math.abs(shown) <= 3 ? '#5fd38d' : Math.abs(shown) <= 10 ? '#f2c418' : '#ff5a5f';
-      noteEl.style.color = Math.abs(r.cents) <= 3 ? '#5fd38d' : '#e8e8ea';
+      css(needle, 'left', `${(50 + Math.max(-50, Math.min(50, shown))).toFixed(1)}%`);
+      css(needle, 'opacity', '1');
+      css(needle, 'background', Math.abs(shown) <= 3 ? '#5fd38d' : Math.abs(shown) <= 10 ? '#f2c418' : '#ff5a5f');
+      css(noteEl, 'color', Math.abs(r.cents) <= 3 ? '#5fd38d' : '#e8e8ea');
     } else {
-      needle.style.opacity = 0.2;
+      css(needle, 'opacity', '0.2');
     }
     [...stringsEl.children].forEach((el, i) => {
-      const active = r && r.string === i;
-      el.classList.toggle('active', !!active);
-      el.querySelector('.c').textContent = active ? `${r.stringCents > 0 ? '+' : ''}${Math.round(r.stringCents)}¢` : '';
+      const active = !!(r && r.string === i);
+      if (el.classList.contains('active') !== active) el.classList.toggle('active', active);
+      put(el.querySelector('.c'), 'textContent', active ? `${r.stringCents > 0 ? '+' : ''}${Math.round(r.stringCents)}¢` : '');
     });
     const mm = tuner.mismatch();
     const target = tuningSelect.value === TAB ? 'this tab' : tuningSelect.value;
-    mismatchEl.replaceChildren(...mm.map((w) => h('div', {}, `⚠ ${w.text} for ${target}.`)));
+    const text = mm.map((w) => `⚠ ${w.text} for ${target}.`).join('\n');
+    if (text !== shownMismatch) {
+      shownMismatch = text;
+      mismatchEl.replaceChildren(...mm.map((w) => h('div', {}, `⚠ ${w.text} for ${target}.`)));
+    }
   }
 
   async function checkUpdates() {

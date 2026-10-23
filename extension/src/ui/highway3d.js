@@ -10,6 +10,7 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { stringColors } from '../core/music.js';
 import { computeAnchors, anchorAt, firstNoteAtOrAfter } from '../core/chart.js';
+import { CameraFollow } from '../core/camera-follow.js';
 
 const DEPTH = 40;            // world units from the strike line to the far end
 const MAX_FRET = 24;
@@ -22,7 +23,7 @@ const STRING_BASE = 0.42;    // height of the lowest drawn string above the floo
 // camera backs off until about camSpan frets fit across the strings.
 // The tilt is solved per frame so that the far end of the highway sits at
 // `farNdc` (just below the top edge) for any window shape.
-const CAM = { fov: 26, strikeNdc: 0.6, farNdc: 0.86, widthFactor: 0.72, extraWidth: 1.2 };
+const CAM = { fov: 26, strikeNdc: 0.6, farNdc: 0.86, widthFactor: 0.6, extraWidth: 0.8 };
 const GEM_W = 0.78, GEM_H = 0.34, GEM_D = 0.24;
 const PAST_KEEP = 0.045;     // seconds a gem stays after its hit time
 
@@ -42,6 +43,23 @@ function labelTexture(text, { color = '#ffffff', size = 128, font = 'bold 84px s
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   return tex;
+}
+
+// One mesh for many flat quads lying on (or parallel to) the floor, in the
+// time group's coordinates (z in seconds). quads: [x0, x1, t0, t1, y, x0b?, x1b?]
+// where x0b/x1b are the x edges at t1 (for slides); defaults to x0/x1.
+function mergedQuads(quads, material) {
+  const pos = new Float32Array(quads.length * 18);
+  let o = 0;
+  for (const [x0, x1, t0, t1, y, x0b = x0, x1b = x1] of quads) {
+    pos.set([x0, y, -t0, x1, y, -t0, x1b, y, -t1, x0, y, -t0, x1b, y, -t1, x0b, y, -t1], o);
+    o += 18;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.frustumCulled = false; // spans the whole song; culling would not help
+  return mesh;
 }
 
 function glowTexture() {
@@ -73,8 +91,12 @@ export class Highway3D {
     this.chart = null;
     this.fps = 60;
     this.lastFrame = 0;
-    this.camX = 4;
-    this.camSpan = 8;
+    this.follow = new CameraFollow();
+    this.lit = new Float32Array(6);
+    this.litPrev = new Float32Array(6);
+    this.handFret = null;
+    this.lastRenderKey = '';
+    this.quality = { maxDpr: 2, slowFor: 0 };
 
     const r = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     r.setClearColor(BG);
@@ -142,6 +164,7 @@ export class Highway3D {
   setOptions(o) {
     const invertChanged = o.invertStrings !== undefined && o.invertStrings !== this.options.invertStrings;
     Object.assign(this.options, o);
+    this.lastRenderKey = '';
     if (invertChanged && this.chart) this.setChart(this.chart);
   }
 
@@ -171,8 +194,10 @@ export class Highway3D {
     const colors = stringColors(n);
     this.colors = colors;
     this.anchors = computeAnchors(chart.notes);
-    const first = this.anchors[0];
-    this.camX = first ? first.fret + 1 : 4;
+    this.follow = new CameraFollow();
+    this.follow.reset(this.anchors, 0);
+    this.handFret = undefined;
+    this.lastRenderKey = '';
 
     // Strings at the strike line.
     this.stringMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.5, roughness: 0.4 }));
@@ -197,37 +222,38 @@ export class Highway3D {
     const edgeGeo = new THREE.EdgesGeometry(gemGeo); edgeGeo.userData.shared = true;
     const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 });
 
-    // Beat lines and anchor bands live in seconds (timeGroup is scaled by k).
-    const beatMat = new THREE.MeshBasicMaterial({ color: 0x8a93aa, transparent: true, opacity: 0.35, clippingPlanes: this.clipFloor, depthWrite: false });
-    const barMat = new THREE.MeshBasicMaterial({ color: 0xdfe4f0, transparent: true, opacity: 0.6, clippingPlanes: this.clipFloor, depthWrite: false });
+    // Beat lines and anchor lanes live in seconds (timeGroup is scaled by k).
+    // Merged into a few meshes: one draw call per kind instead of hundreds.
+    const beatMat = new THREE.MeshBasicMaterial({ color: 0x8a93aa, transparent: true, opacity: 0.35, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
+    const barMat = new THREE.MeshBasicMaterial({ color: 0xdfe4f0, transparent: true, opacity: 0.6, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
+    const beatQuads = [], barQuads = [];
     for (const b of chart.beats) {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(MAX_FRET, b.downbeat ? 0.028 : 0.014), b.downbeat ? barMat : beatMat);
-      m.rotation.x = -Math.PI / 2;
-      m.position.set(MAX_FRET / 2, 0.012, -b.t);
-      this.timeGroup.add(m);
+      const w = b.downbeat ? 0.028 : 0.014;
+      (b.downbeat ? barQuads : beatQuads).push([0, MAX_FRET, b.t - w / 2, b.t + w / 2, 0.012]);
     }
-    const anchorMat = new THREE.MeshBasicMaterial({ color: 0x8fb4ff, transparent: true, opacity: 0.16, clippingPlanes: this.clipFloor, depthWrite: false });
-    const anchorEdgeMat = new THREE.MeshBasicMaterial({ color: 0xbcd2ff, transparent: true, opacity: 0.5, clippingPlanes: this.clipFloor, depthWrite: false });
+    if (beatQuads.length) this.timeGroup.add(mergedQuads(beatQuads, beatMat));
+    if (barQuads.length) this.timeGroup.add(mergedQuads(barQuads, barMat));
+
+    const anchorMat = new THREE.MeshBasicMaterial({ color: 0x8fb4ff, transparent: true, opacity: 0.16, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
+    const anchorEdgeMat = new THREE.MeshBasicMaterial({ color: 0xbcd2ff, transparent: true, opacity: 0.5, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
     const end = chart.duration + 2;
-    this.anchorLabels = [];
+    const laneQuads = [], edgeQuads = [];
     for (const a of this.anchors) {
-      const len = Math.max(0.05, Math.min(a.until, end) - a.t);
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(4, len), anchorMat);
-      m.rotation.x = -Math.PI / 2;
-      m.position.set(a.fret + 1, 0.008, -(a.t + len / 2));
-      this.timeGroup.add(m);
-      for (const x of [a.fret - 1, a.fret + 3]) {
-        const e = new THREE.Mesh(new THREE.PlaneGeometry(0.05, len), anchorEdgeMat);
-        e.rotation.x = -Math.PI / 2;
-        e.position.set(x, 0.01, -(a.t + len / 2));
-        this.timeGroup.add(e);
-      }
+      const t1 = a.t + Math.max(0.05, Math.min(a.until, end) - a.t);
+      laneQuads.push([a.fret - 1, a.fret + 3, a.t, t1, 0.008]);
+      for (const x of [a.fret - 1, a.fret + 3]) edgeQuads.push([x - 0.025, x + 0.025, a.t, t1, 0.01]);
       // Fret number where the hand moves (yellow, on the floor).
       const sp = new THREE.Sprite(this.label(String(a.fret), '#f2c418'));
       sp.scale.set(0.9, 0.9, 1);
       sp.position.set(a.fret - 1.45, 0.45, -a.t);
       this.timeGroup.add(sp);
     }
+    if (laneQuads.length) {
+      this.timeGroup.add(mergedQuads(laneQuads, anchorMat));
+      this.timeGroup.add(mergedQuads(edgeQuads, anchorEdgeMat));
+    }
+    const tailQuads = colors.map(() => []);
+    const stemGeo = new THREE.BoxGeometry(0.04, 1, 0.04); stemGeo.userData.shared = true;
 
     // Notes.
     const prevOnString = [];
@@ -257,7 +283,8 @@ export class Highway3D {
       // Stem down to the floor.
       const stemH = y - GEM_H / 2;
       if (stemH > 0.02) {
-        const stem = new THREE.Mesh(new THREE.BoxGeometry(0.04, stemH, 0.04), this.stemMats[s]);
+        const stem = new THREE.Mesh(stemGeo, this.stemMats[s]);
+        stem.scale.y = stemH;
         stem.position.y = -GEM_H / 2 - stemH / 2;
         obj.add(stem);
       }
@@ -292,25 +319,19 @@ export class Highway3D {
         const toFret = note.flags.slide && note.flags.slide.toFret !== null && note.flags.slide.toFret !== undefined ? note.flags.slide.toFret : null;
         const x1 = open ? x : toFret !== null ? Math.max(0.5, toFret - 0.5) : x;
         const hw = open ? 0.35 : 0.16;
-        const geo = new THREE.BufferGeometry();
-        const t0 = note.t, t1 = note.t + note.dur;
-        geo.setAttribute('position', new THREE.Float32BufferAttribute([
-          x - hw, y, -t0, x + hw, y, -t0, x1 + hw, y, -t1,
-          x - hw, y, -t0, x1 + hw, y, -t1, x1 - hw, y, -t1,
-        ], 3));
-        const tail = new THREE.Mesh(geo, this.tailMats[s]);
-        this.timeGroup.add(tail);
+        tailQuads[s].push([x - hw, x + hw, note.t, note.t + note.dur, y, x1 - hw, x1 + hw]);
       }
       this.noteObjs.push({ note, obj, gem });
       prevOnString[s] = note;
     }
+    tailQuads.forEach((q, s) => { if (q.length) this.timeGroup.add(mergedQuads(q, this.tailMats[s])); });
     this.visibleFrom = 0;
     this.visibleTo = 0;
   }
 
   resize() {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.quality.maxDpr);
     if (w !== this.w || h !== this.h || dpr !== this.dpr) {
       this.w = w; this.h = h; this.dpr = dpr;
       this.renderer.setPixelRatio(dpr);
@@ -326,6 +347,7 @@ export class Highway3D {
     const dt = this.lastFrame ? Math.min(0.1, (nowMs - this.lastFrame) / 1000) : 0.016;
     if (this.lastFrame) this.fps = this.fps * 0.9 + (1 / Math.max(dt, 1e-3)) * 0.1;
     this.lastFrame = nowMs;
+    this.adaptQuality(dt);
     this.resize();
     if (!this.w || !this.h) return;
 
@@ -362,47 +384,47 @@ export class Highway3D {
       this.visibleTo = to;
 
       // Strings light up while a note on them is sounding.
-      const lit = new Array(chart.instrument.strings).fill(0);
+      const lit = this.lit;
+      lit.fill(0);
       for (let i = Math.max(0, from - 40); i < to; i++) {
         const n = notes[i];
         if (n.t <= t && t <= n.t + Math.max(0.12, n.dur)) lit[n.string] = Math.max(lit[n.string], 1 - (t - n.t) / Math.max(0.3, n.dur + 0.2));
       }
       this.stringMats.forEach((m, s) => { m.emissiveIntensity = 0.45 + lit[s] * 1.4; });
 
-      // Camera follows the hand position over the next ~1.5 s.
-      let lo = Infinity, hi = -Infinity;
-      for (const a of this.anchors) {
-        if (a.until < t || a.t > t + 1.5 * speed) continue;
-        lo = Math.min(lo, a.fret - 1);
-        hi = Math.max(hi, a.fret + 3);
-      }
-      if (!Number.isFinite(lo)) { const a = anchorAt(this.anchors, t); lo = a ? a.fret - 1 : 0; hi = lo + 4; }
-      const targetX = (lo + hi) / 2;
-      const targetSpan = Math.max(6, hi - lo + 2);
-      const follow = Math.min(1, dt * 2.5);
-      this.camX += (targetX - this.camX) * follow;
-      this.camSpan += (targetSpan - this.camSpan) * follow;
+      // Camera follows the hand position (see core/camera-follow.js).
+      this.follow.update(this.anchors, t, speed, dt);
 
-      // Highlight fret numbers under the hand.
+      // Highlight fret numbers under the hand (only when the hand moves).
       const cur = anchorAt(this.anchors, t);
-      this.fretLabels.forEach((sp, i) => {
-        const f = i + 1;
-        const inHand = cur && f >= cur.fret && f <= cur.fret + 3;
-        sp.material = this.label(String(f), inHand ? '#f2c418' : '#7d8597');
-      });
+      const hand = cur ? cur.fret : null;
+      if (hand !== this.handFret) {
+        this.handFret = hand;
+        this.fretLabels.forEach((sp, i) => {
+          const f = i + 1;
+          const inHand = hand !== null && f >= hand && f <= hand + 3;
+          sp.material = this.label(String(f), inHand ? '#f2c418' : '#7d8597');
+        });
+      }
     }
+
+    // Nothing moves while paused: skip drawing the same picture again.
+    const camX = this.follow.x, camSpan = this.follow.span;
+    const key = `${t.toFixed(4)}|${camX.toFixed(3)}|${camSpan.toFixed(3)}|${this.w}x${this.h}|${this.dpr}|${k.toFixed(4)}|${this.chart ? this.chart.notes.length : 0}`;
+    if (!state.playing && key === this.lastRenderKey) return;
+    this.lastRenderKey = key;
 
     // Camera: behind and above the strings, looking down the highway.
     const cam = this.camera;
     const tanV = Math.tan(THREE.MathUtils.degToRad(CAM.fov) / 2);
-    const halfW = this.camSpan * CAM.widthFactor + CAM.extraWidth;    // half width at the strings
+    const halfW = camSpan * CAM.widthFactor + CAM.extraWidth;         // half width at the strings
     // Wide, short windows show more frets instead of zooming in.
     const d0 = halfW / (tanV * Math.min(1.9, Math.max(0.6, cam.aspect))); // distance to the strike line
     const place = (pitch) => {
       const down = pitch + Math.atan(CAM.strikeNdc * tanV);            // angle down to the strike line
       const camH = d0 * Math.sin(down), camZ = d0 * Math.cos(down);
-      cam.position.set(this.camX, camH, camZ);
-      cam.lookAt(this.camX, 0, camZ - camH / Math.tan(pitch));
+      cam.position.set(camX, camH, camZ);
+      cam.lookAt(camX, 0, camZ - camH / Math.tan(pitch));
       cam.updateMatrixWorld();
     };
     let lo = THREE.MathUtils.degToRad(2), hi = THREE.MathUtils.degToRad(45);
@@ -410,10 +432,22 @@ export class Highway3D {
     for (let i = 0; i < 14; i++) {
       const mid = (lo + hi) / 2;
       place(mid);
-      far.set(this.camX, 0, -DEPTH).project(cam);
+      far.set(camX, 0, -DEPTH).project(cam);
       if (far.y > CAM.farNdc) hi = mid; else lo = mid;
     }
     place((lo + hi) / 2);
     this.renderer.render(this.scene, cam);
+  }
+
+  // If the PC can't keep up (< ~50 fps for 2 s while playing), render at a
+  // lower resolution instead of stuttering. Never raises it again in a session.
+  adaptQuality(dt) {
+    const q = this.quality;
+    if (dt > 1 / 50 && dt < 0.1) q.slowFor += dt; else q.slowFor = Math.max(0, q.slowFor - dt * 0.5);
+    if (q.slowFor > 2 && (this.dpr || 1) > 1) {
+      q.maxDpr = this.dpr > 1.5 ? 1.5 : 1;
+      q.slowFor = 0;
+      console.info(`[Bass Trainer] 3D highway: lowering resolution (pixel ratio ${q.maxDpr}) to keep it smooth`);
+    }
   }
 }
