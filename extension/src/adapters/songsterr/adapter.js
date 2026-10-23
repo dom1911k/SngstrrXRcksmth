@@ -14,6 +14,7 @@ const TO_BRIDGE = 'bass-trainer-ext';
 
 export class SongsterrAdapter {
   constructor() {
+    this.name = 'Songsterr player';
     this.listeners = new Map();
     this.clock = new SongClock();
     this.status = { state: 'starting', detail: 'Connecting to Songsterr…' };

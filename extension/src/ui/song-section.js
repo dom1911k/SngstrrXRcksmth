@@ -30,17 +30,22 @@ export function createSongSection(adapter, { onTabTuning }) {
       ...slider('visualDelayMs', -100, 300, 5, (v) => `${v} ms`)),
     h('div', { class: 'muted' }, 'Move until notes cross the strings exactly when you hear them (the wireless headset makes sound arrive later than the picture).'),
     h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Note speed'),
-      ...slider('lookahead', 1.2, 4, 0.1, (v) => `${Number(v).toFixed(1)} s ahead`)),
+      ...slider('lookahead', 1.5, 6, 0.1, (v) => `${Number(v).toFixed(1)} s ahead`)),
+    h('div', { class: 'muted' }, 'How long a note is visible before you play it. Higher = see further ahead, notes move slower.'),
+    check('gemFretNumbers', 'Fret numbers on the notes (3D)'),
     check('invertStrings', 'Tab order (G on top) instead of Rocksmith order (E on top)'),
     check('showDebug', 'Show sync diagnostics on the highway'),
-    h('div', { class: 'row' }, exportBtn),
+    h('div', { class: 'row' }, exportBtn,
+      adapter.name === 'Songsterr player' && typeof chrome !== 'undefined' && chrome.runtime
+        ? h('button', { class: 'btn', title: 'Practise with your own audio file and a chart', onclick: () => chrome.runtime.sendMessage({ type: 'openPlayer' }) }, 'Open standalone player')
+        : null),
   );
 
   let lastInfo = null;
 
   adapter.on('status', (st) => {
     statusEl.className = st.state === 'ok' ? 'good' : st.state === 'error' ? 'bad' : 'muted';
-    statusEl.textContent = st.state === 'ok' ? 'Connected to the Songsterr player.' : st.detail;
+    statusEl.textContent = st.state === 'ok' ? `Connected to the ${adapter.name || 'player'}.` : st.detail;
   });
 
   adapter.on('chart', (info) => {

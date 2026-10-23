@@ -1,0 +1,31 @@
+:root { color-scheme: dark; }
+html, body { margin: 0; height: 100%; background: #06070c; color: #e8e8ea; font: 14px/1.4 system-ui, "Segoe UI", sans-serif; overflow: hidden; }
+header { position: fixed; top: 0; left: 0; right: 0; height: 56px; display: flex; align-items: center; gap: 18px; padding: 0 14px;
+  background: #15171c; border-bottom: 1px solid #2c2f36; z-index: 10; white-space: nowrap; }
+.brand { font-weight: 800; color: #f2c418; font-size: 16px; }
+.brand span { color: #8b919c; font-weight: 600; }
+.group { display: flex; align-items: center; gap: 6px; }
+#seekRow { position: fixed; top: 56px; left: 0; right: 0; height: 22px; background: #101217; border-bottom: 1px solid #2c2f36; z-index: 10; display: flex; align-items: center; padding: 0 10px; }
+#seekRow input { width: 100%; margin: 0; accent-color: #f2c418; }
+.btn { background: #2a2e36; color: #fff; border: 1px solid #3a3f49; border-radius: 6px; padding: 6px 11px; font: inherit; cursor: pointer; display: inline-block; }
+.btn:hover { background: #343944; }
+.btn.primary { background: #e8202a; border-color: #e8202a; min-width: 42px; }
+.btn.on { background: #f2c418; color: #111; border-color: #f2c418; }
+.small { color: #9aa0aa; font-size: 12px; }
+.link { color: #6db3ff; }
+.time { font-variant-numeric: tabular-nums; color: #c9ced8; min-width: 96px; text-align: center; }
+select, input[type=number] { background: #0e1014; color: #e8e8ea; border: 1px solid #3a3f49; border-radius: 6px; padding: 4px 6px; font: inherit; }
+input[type=number] { width: 70px; }
+.spacer { flex: 1; }
+.status { position: fixed; top: 86px; left: 50%; transform: translateX(-50%); z-index: 2147483000; background: #2b1416; color: #ff8b8f;
+  border: 1px solid #5a2328; border-radius: 8px; padding: 8px 14px; white-space: pre-line; max-width: 80%; }
+.status:empty { display: none; }
+.status.ok { background: #10291a; color: #5fd38d; border-color: #1d4a2e; }
+.drop { position: fixed; inset: 78px 0 0 0; z-index: 2147483002; background: rgba(242,196,24,.12); border: 3px dashed #f2c418;
+  display: flex; align-items: center; justify-content: center; font-size: 22px; color: #f2c418; }
+.drop[hidden] { display: none; }
+.empty { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); max-width: 640px; text-align: center; z-index: 2147482995;
+  background: rgba(21,23,28,.95); border: 1px solid #2c2f36; border-radius: 12px; padding: 22px 28px; }
+.empty[hidden] { display: none; }
+.empty h1 { color: #f2c418; font-size: 22px; margin-top: 0; }
+code { background: #0e1014; padding: 1px 5px; border-radius: 4px; }

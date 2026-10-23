@@ -5,9 +5,10 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: Phase 2 (0.2.0).** Rocksmith-style note highway in sync with
-Songsterr's player, tuner that follows the tab's tuning, latency calibration and
-monitoring. Scoring comes in Phase 3 (see [Roadmap](#roadmap)).
+**Current version: 0.3.0.** Rocksmith 2014-style **3D note highway** in sync with
+Songsterr's player, a **standalone player** for your own chart + audio file,
+tuner that follows the tab's tuning, latency calibration and monitoring.
+Scoring comes in Phase 3 (see [Roadmap](#roadmap)).
 
 It only uses what your Songsterr account already shows you in the browser.
 It does not unlock anything.
@@ -51,7 +52,7 @@ You don't need Git or any programming tools.
    contains `manifest.json`).
 6. "Bass Trainer for Songsterr" now appears in the list. Click the
    puzzle-piece icon in Chrome's toolbar and **pin** it. Clicking its icon opens
-   the update page.
+   the standalone player (see "Standalone player" below).
 
 This is the only time you need to download a ZIP. Later versions install from
 inside the extension (next section).
@@ -65,8 +66,8 @@ The extension updates itself from GitHub. You don't need to download anything by
 
 **When there's a new version**, the Bass Trainer panel on Songsterr shows a yellow
 bar **"Update available: 0.1.1 → 0.2.0"**, and the BASS TRAINER tab gets a red dot.
-(It checks GitHub every few hours. You can also check any time by clicking the
-extension's icon in Chrome's toolbar, which opens the update page.)
+(It checks GitHub every few hours. You can also check any time: click the
+extension's icon in Chrome's toolbar, then **Updates** at the top right of the player.)
 
 1. Click **Update**. The update page opens.
 2. **The first time only:** click **Choose extension folder…** and pick the
@@ -103,31 +104,58 @@ Good Riddance, can be played too.
 - It works with both of Songsterr's sound sources (**ORIG.** recording and
   **SYNTH**). To practise without the recorded bass, use Songsterr's mixer to
   mute the bass track in SYNTH mode. (Phase 4 does this automatically.)
-- Layout, as in Rocksmith 2014:
-  - **Colour and row = string:** E red (top), A yellow, D blue, G orange.
-  - **Left–right = fret,** numbered under the strings.
-  - The lighter band on the floor shows where your hand should be (4 frets). A
-    yellow number in the distance tells you a hand move is coming.
-  - Notes fly toward the strings. Play each note when it reaches its string.
-  - Tails are held notes; a tail that bends sideways is a slide.
-  - **X** = dead note, **(n)** = ghost note, **H/P** = hammer-on/pull-off,
-    **PM** = palm mute.
+- Layout, as in Rocksmith 2014 (3D view):
+  - The fretboard lies in front of you and the highway runs into the distance.
+    You see about 3.5 seconds ahead (adjustable).
+  - **Colour and height = string:** E red (top), A yellow, D blue, G orange.
+    Notes far away appear higher up and drop onto their string as they arrive.
+  - **Left–right = fret,** numbered on the floor in front of the strings. The
+    frets under your hand are yellow.
+  - The lit lane on the floor shows where your hand should be (4 frets). The
+    camera glides along with it, like in Rocksmith. A big yellow number in the
+    distance marks where the hand moves next.
+  - Play each note when it reaches the strings; the string glows while it sounds.
+  - Coloured ribbons are held notes. A ribbon that bends sideways is a slide.
+  - Wide bars are open strings. **X** = dead note; faded small notes = ghost notes;
+    **H**/**P** = hammer-on/pull-off; **PM** = palm mute.
 - **Highway / Both / Tab** (bottom left of the highway) switches between highway
   only, highway under the tab, and tab only. In *Both* you can drag the top edge
-  of the highway to resize it.
+  of the highway to resize it. Bigger is easier to read.
+- **3D / 2D** switches between the Rocksmith-style 3D highway and the simpler,
+  flat 2D one. 2D is used automatically if your PC can't do WebGL.
 
 Settings in the panel, under **Song & highway**:
 - **Highway timing:** with a wireless headset the sound reaches you a bit after
   the picture. Play a song and move this slider until notes cross the strings
   exactly when you **hear** them. 40–120 ms is typical.
-- **Note speed:** how early notes appear.
+- **Note speed:** how many seconds ahead you see (default 3.5 s). Higher = you
+  see further ahead and notes move more slowly.
+- **Fret numbers on the notes (3D):** turn off for a cleaner, more Rocksmith-like look.
 - **Tab order:** puts G on top, like a tab, instead of Rocksmith's E-on-top.
 - **Download chart (JSON):** saves the song in the trainer's chart format
   ([`docs/CHART_FORMAT.md`](docs/CHART_FORMAT.md)) for use in other tools.
 
+### Standalone player (your own audio)
+Click the extension's icon in Chrome's toolbar, or **Open standalone player** in the
+panel. A page opens where you can practise without Songsterr:
+
+1. **Open chart…** loads a bass chart (.json in the [chart format](docs/CHART_FORMAT.md)).
+   It can come from your own tool, or from **Download chart (JSON)** on Songsterr.
+2. **Open audio…** loads the song (MP3, OGG, WAV, M4A, FLAC). You can also drag
+   both files onto the page.
+3. Press **▶** (or Space). Speed changes keep the pitch. **A** / **B** set a loop
+   (or `[` and `]`), **✕** clears it, and ← / → jump 5 seconds.
+4. If the notes are consistently early or late compared with the recording, change
+   **Audio offset** (in ms) until they line up. This happens when the chart's bar 1
+   doesn't start exactly where the audio file starts.
+
+The tuner, calibration and highway settings are the same as on Songsterr (open
+the BASS TRAINER tab on the right). Chrome asks once more for microphone access,
+because the player is a separate page. Without an audio file, the chart plays silently.
+
 ### Starting the input
 
-1. Open any tab on songsterr.com.
+1. Open any tab on songsterr.com (or the standalone player).
 2. Click the yellow **BASS TRAINER** tab on the right edge of the page.
 3. Click **Start input**. The first time, Chrome asks to use your microphone for
    songsterr.com: click **Allow**. (The Real Tone Cable counts as a microphone.)
@@ -228,14 +256,16 @@ for detection.
 ## Roadmap
 
 - **Phase 1 (done):** cable input, tuner, monitoring, latency calibration.
-- **Phase 2 (this version):** read the song from Songsterr, chart format, Rocksmith-2014-style
+- **Phase 2 (done):** read the song from Songsterr, chart format, Rocksmith-2014-style
   note highway synced to Songsterr playback (play, pause, seek, loop, speed).
+- **V3 (done, 0.3.0):** 3D Rocksmith-style highway with a camera following the hand
+  position, and a standalone player for chart files + local audio.
 - **Phase 3:** scoring: hit/miss, early/on time/late, accuracy, streak, summary,
   edge cases (dead notes, ghost notes, slides, ringing notes, octave errors).
 - **Phase 4:** automatic bass-track muting, count-in, configurable keyboard /
   foot-pedal shortcuts, polish.
-- **Later:** riff repeater with auto speed-up, wait mode, practice stats, take
-  recording (V2); 3D highway and local audio + chart files (V3).
+- **V2 (after scoring):** riff repeater with auto speed-up, wait mode, practice
+  stats and weak spots, take recording.
 
 Design details are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -248,6 +278,14 @@ node --test tests/*.test.mjs                      # DSP, logic and updater unit 
 node tests/make-wav.mjs /tmp/a.wav                # synthetic bass recording
 node tests/e2e-phase1.mjs /tmp/a.wav shot.png     # Chromium + fake mic (needs Playwright)
 node tests/e2e-phase2.mjs [tab-url] [shot-prefix] # real Songsterr: highway sync (needs network)
+node tests/e2e-player.mjs /tmp/a.wav [shot.png]   # standalone player: chart + audio, speed, loop
+npx http-server -p 8123                           # then open /tests/highway-preview.html?t=78&style=3d
+```
+
+The 3D highway uses [three.js](https://threejs.org) r170 (MIT), bundled unmodified in
+`extension/vendor/three/`.
+
+```
 ```
 
 ### Releasing an update

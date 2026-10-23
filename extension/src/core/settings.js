@@ -2,6 +2,18 @@
 // survives clearing Songsterr's site data) and localStorage elsewhere (tests).
 
 const KEY = 'bassTrainerSettings';
+const SCHEMA = 2;
+
+// Adjust settings saved by older versions.
+function migrate(stored) {
+  const v = stored.schema || 1;
+  if (v < 2) {
+    // 0.3.0: longer default look-ahead for the 3D highway.
+    if (stored.lookahead === undefined || stored.lookahead <= 2.4) stored.lookahead = 3.5;
+  }
+  stored.schema = SCHEMA;
+  return stored;
+}
 
 export const DEFAULTS = {
   deviceId: '',
@@ -18,9 +30,12 @@ export const DEFAULTS = {
   viewMode: 'both',        // 'both' | 'highway' | 'tab'
   highwayHeight: 0.42,     // fraction of the window height in 'both' mode
   visualDelayMs: 60,       // shift the highway so notes cross the line when you HEAR them
-  lookahead: 2.4,          // seconds a note is visible before it must be played
+  lookahead: 3.5,          // seconds a note is visible before it must be played
+  highwayStyle: '3d',      // '3d' (Rocksmith-style, WebGL) | '2d'
+  gemFretNumbers: true,    // fret numbers on the 3D note gems
   invertStrings: false,    // false = Rocksmith (low E on top); true = tab order
   showDebug: false,
+  schema: SCHEMA,
 };
 
 const hasChromeStorage = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
@@ -40,7 +55,7 @@ export async function loadSettings() {
   } catch (err) {
     console.warn('[Bass Trainer] could not read settings', err);
   }
-  cache = { ...DEFAULTS, ...stored };
+  cache = { ...DEFAULTS, ...migrate(stored) };
   return cache;
 }
 

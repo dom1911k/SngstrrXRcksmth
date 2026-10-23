@@ -1,6 +1,7 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **Phase 2 built** (Songsterr adapter, chart format, 2D highway in sync).
+Status: **V3 built (0.3.0)**: 3D Rocksmith-style highway and standalone player, on
+top of Phase 2 (Songsterr adapter, chart format, highway in sync).
 Phase 1 (input, tuner, monitoring, calibration) and self-update are done too. This file
 is the design reference for all phases and is kept up to date.
 
@@ -281,3 +282,36 @@ on disk:
 * Then `chrome.runtime.reload()`. `onInstalled(reason: 'update')` reloads open
   Songsterr tabs, and the panel shows "Updated to version …".
 * Releasing = bump `manifest.json` version and push to the default branch.
+
+---
+
+## 11. V3: 3D highway and standalone player
+
+**3D highway** (`ui/highway3d.js`, three.js r170 vendored in `extension/vendor/three/`):
+* World: x = frets (1 unit each, nut at 0), y = up (floor at 0, strings stacked
+  above it, low E on top), z = time (strike line at z = 0, the future at −z).
+  40 world units ≙ the look-ahead (default 3.5 s of real time, × speed in song time).
+* Static scene: floor, fret wires, fret numbers, strings (glow while a note sounds).
+* `timeGroup` holds everything that is a length in time (beat/bar lines, anchor
+  lanes with their "next fret" labels, sustain/slide ribbons). It is built once in
+  seconds and moved/scaled each frame (`position.z = t·k`, `scale.z = k`).
+  Clipping planes cut ribbons at the strike line.
+* Gems (box, edges, glow sprite, stem to the floor, fret-number sprite, technique
+  tag) are built once per note. Each frame only the notes inside the time window
+  are positioned/shown (binary search), so the cost is independent of song length.
+* Camera: follows the hand-position (anchor) centre and span over the next 1.5 s
+  with smoothing. Its distance fits about span + margin frets across the strings
+  (aspect capped at 1.9 so wide "Both" strips show more frets rather than zooming
+  in). The tilt is solved each frame by bisection so that the far end of the
+  highway sits just below the top edge (`farNdc`) for any window shape.
+* Narrow FOV (26°) + fog in the last ~30% keep far notes large and readable.
+* Falls back to the 2D renderer when WebGL is unavailable. The setting
+  `highwayStyle` ('3d' | '2d') chooses between them.
+
+**Standalone player** (`player/player.html`, `src/player-main.js`,
+`adapters/local/adapter.js`): implements the same adapter interface as the
+Songsterr adapter. Time comes from an `<audio>` element (`preservesPitch`, `playbackRate`),
+or from a virtual clock when there is no audio file, through the same `SongClock`
+smoothing. Chart files are validated with `validateChart()`. *Audio offset* maps chart
+t = 0 to an audio position. A/B loop is enforced in the adapter's frame tick. The
+panel (tuner, calibration, highway settings) is reused unchanged. The toolbar icon opens the player.

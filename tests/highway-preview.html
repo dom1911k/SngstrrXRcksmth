@@ -1,0 +1,24 @@
+<!doctype html>
+<!-- Dev preview of the highways with a fixture chart: serve the repo root
+     (e.g. `npx http-server -p 8123`) and open /tests/highway-preview.html?t=78&style=3d -->
+<html><head><meta charset="utf-8"><title>Highway preview</title>
+<style>html,body{margin:0;height:100%;background:#000}canvas{width:100%;height:100%;display:block}</style></head>
+<body><canvas id="c"></canvas>
+<script type="module">
+import { songsterrToChart } from '../extension/src/adapters/songsterr/to-chart.js';
+const q = new URLSearchParams(location.search);
+const fixture = q.get('song') || '21-guns-bass';
+const song = await (await fetch(`./fixtures/${fixture}.json`)).json();
+const { chart } = songsterrToChart(song);
+const style = q.get('style') || '3d';
+const mod = style === '3d' ? await import('../extension/src/ui/highway3d.js') : await import('../extension/src/ui/highway2d.js');
+const Cls = style === '3d' ? mod.Highway3D : mod.Highway2D;
+const hw = new Cls(document.getElementById('c'));
+hw.setOptions({ lookahead: Number(q.get('look') || 3.5), invertStrings: q.has('invert') });
+hw.setChart(chart);
+const t0 = Number(q.get('t') || 0);
+window.__hw = hw;
+let frames = 0;
+function loop() { hw.render({ time: t0 + (q.has('play') ? frames / 60 : 0), speed: 1, playing: true }); frames++; if (frames < 120) requestAnimationFrame(loop); else window.__done = true; }
+loop();
+</script></body></html>

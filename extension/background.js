@@ -1,4 +1,4 @@
-// Service worker: update checks, opening the updater page, and reloading
+// Service worker: update checks, opening the player/updater pages, and reloading
 // Songsterr tabs after an update so they pick up the new code.
 import { fetchLatest, compareVersions } from './src/core/updater.js';
 
@@ -35,10 +35,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === 'openUpdater') {
     chrome.runtime.openOptionsPage();
   }
+  if (msg && msg.type === 'openPlayer') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('player/player.html') });
+  }
   return false;
 });
 
-chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
+chrome.action.onClicked.addListener(() => chrome.tabs.create({ url: chrome.runtime.getURL('player/player.html') }));
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason !== 'update') return;
