@@ -1,7 +1,18 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **proposal (before Phase 1)**. Nothing here is built yet. This file is
-the design reference for all later phases and will be kept up to date.
+Status: **Phase 1 built** (input, tuner, monitoring, calibration). This file
+is the design reference for all phases and is kept up to date.
+
+## 0. Decisions (from the owner, October 2026)
+
+| Question | Decision |
+|---|---|
+| Highway look | Mirror **Rocksmith 2014** as closely as possible in 2D: notes approach from the distance down a perspective highway toward the fretboard at the bottom, horizontal position = fret, lane/colour = string, fret numbers on gems, sustain tails, highlighted anchor (hand-position) zone, low E drawn at the top as in Rocksmith's default (an "invert strings" option for tab order). The 3D version (V3) keeps the same layout with a real camera. |
+| String colours | Rocksmith 2014: E red, A yellow, D blue, G orange. 5-string low B: green (Rocksmith bass has no 5th colour). |
+| Dead notes (x) | Any muted attack in the window counts as a hit. |
+| Updating | No Git: README describes Download ZIP → extract into the same folder → reload. Manifest has a fixed `key` so the extension ID (and saved settings) survive moving the folder. |
+| Acceptance songs | Green Day: *Good Riddance (Time of Your Life)*, *21 Guns*; La Sera: *Love That's Gone*. |
+
 
 ---
 
@@ -53,28 +64,33 @@ JavaScript, so updating never needs Node or any tools.
 ```
 extension/
   manifest.json
+  content/loader.js       (imports src/main.js as a module)
+  src/                    (everything below lives in extension/src/)
   adapters/
     songsterr/            ← the ONLY Songsterr-specific code
       page-bridge.js      (MAIN world: finds the store, reads player clock, dispatches)
       adapter.js          (isolated world: talks to bridge, emits typed events)
       to-chart.js         (Songsterr part JSON + playback timeline → chart JSON)
   core/
+    music.js              note/frequency maths, tuning presets, Rocksmith colours
+    tuner.js              tuner model (steady reading, tuning-mismatch warnings)
     chart.js              chart schema, validation, helpers (string→MIDI, etc.)
     clock.js              "song time now" = player time + latency compensation, smoothing
     settings.js           chrome.storage wrapper (calibration, keybindings, device id)
   audio/
-    input.js              device picker, getUserMedia (all processing OFF), AudioContext
+    engine.js             device picker, getUserMedia (all processing OFF), AudioContext,
+                          monitoring gain (default 0), click generator
     pitch-worklet.js      AudioWorklet: onset detector + McLeod (MPM) pitch detector
-    monitor.js            monitoring gain node (default 0)
-    calibration.js        click generator + offset measurement
+    calibration.js        play-along clicks + offset measurement
   scoring/
     matcher.js            expected notes ↔ detected events, tolerance windows
     rules.js              edge-case policy (dead/ghost/slide/ringing/octave/fast)
     session.js            accuracy, streak, per-bar results, summary
   ui/
+    panel.js              Phase 1 panel (input, tuner, monitoring, calibration)
     overlay.js            shadow-DOM container on the Songsterr page, view modes
     highway2d.js          canvas renderer (60 fps, requestAnimationFrame)
-    tuner.js, panel.js, summary.js
+    summary.js            end-of-song / end-of-loop summary
   input/
     shortcuts.js          configurable keyboard map (foot pedal = keystrokes)
 docs/
@@ -156,13 +172,20 @@ expected    = note.t (chart seconds) mapped to wall clock through the adapter's 
   noiseSuppression:false, autoGainControl:false, channelCount:1}})`, plus
   Chrome's `googAutoGainControl`-style legacy flags off. `AudioContext` with
   `latencyHint:'interactive'` at the device's native rate (Real Tone Cable = 48 kHz).
-* **Onset detector** (fast, about 5–10 ms): energy/high-frequency flux on 128-sample
-  blocks. It gives the *timing* of a note.
+* **Onset detector** (timing): two high-passed bands (>250 Hz string attack,
+  >1.5 kHz pick/finger click), energy smoothed over ~10 ms, compared with the
+  *loudest* level of the previous ~48 ms. A ringing note never exceeds its own
+  recent maximum, so only a new attack fires, including re-plucking a ringing
+  string. A 50 ms refractory period applies. Tested: within 6 ms of the true attack.
+  Limitation: attacks with no click at all (very soft fingerstyle) are missed. Phase 3
+  adds a "pitch changed to a new stable note" trigger for these and for hammer-ons.
 * **Pitch detector**: McLeod Pitch Method (MPM / NSDF). It handles bass
   octave errors better than plain YIN, using a "first peak above k·max" rule.
-  Window 2048 samples (≈43 ms) covers low E (41.2 Hz, period 24 ms) with
-  ≈1.8 periods. 5-string low B (30.9 Hz) uses a 3072 window, selected from tuning.
-  Hop 256 samples (≈5 ms).
+  Runs on a 4× decimated signal (~12 kHz, 2 kHz anti-alias low-pass). The window
+  is two periods of the lowest expected note (two semitones below the lowest
+  string): ≈53 ms for E Standard, ≈71 ms for 5-string B. Hop ≈5 ms.
+  Tested: within 2 cents on synthetic E1–G4 plucks at 44.1/48 kHz; low E locks
+  within 80 ms of the attack; weak-fundamental low E has no octave error.
 * Pitch is reported per onset as "the stable pitch in the first 30–80 ms
   after the onset". Timing comes from the onset, not from when pitch locked.
 * The tuner uses the same detector with a longer window and smoothing,
