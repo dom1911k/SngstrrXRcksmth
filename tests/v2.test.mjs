@@ -218,3 +218,43 @@ test('takes: song-time mapping, slicing and WAV', () => {
   const wav = encodeWav(new Float32Array([0, 0.5, -1]), 48000);
   assert.equal(wav.size, 44 + 6);
 });
+
+test('input check: plain-language warnings from repeated misses', async () => {
+  const { diagnose } = await import('../extension/src/core/input-monitor.js');
+  const note = { midi: 40, flags: {} };
+  const many = (r, n = 6) => Array.from({ length: n }, () => ({ status: 'miss', note, offsetMs: null, played: null, ...r }));
+  assert.equal(diagnose(many({ reason: 'not-heard' }, 5)), '');
+  assert.match(diagnose(many({ reason: 'not-heard' }), { sinceOnsetMs: 10000 }), /No sound from your bass/);
+  assert.match(diagnose(many({ reason: 'not-heard' }), { sinceOnsetMs: 500 }), /not recognised/);
+  assert.match(diagnose(many({ reason: 'timing', offsetMs: 180 })), /180 ms late/);
+  assert.match(diagnose(many({ reason: 'wrong-note', played: 39 })), /1 semitone lower/);
+  assert.equal(diagnose(many({ reason: 'wrong-note', played: 47 })), '');
+});
+
+test('timing correction is remembered per sound source', async () => {
+  const { sourceKeyOf } = await import('../extension/src/scoring/session.js');
+  assert.equal(sourceKeyOf({ videoOpened: true }), 'songsterr-orig');
+  assert.equal(sourceKeyOf({ videoOpened: false, playerType: 'synth' }), 'songsterr-synth');
+  assert.equal(sourceKeyOf({ playerType: 'audio file' }), 'player-audio file');
+  await loadSettings();
+  await updateSettings({ autoTimingMs: 30, autoTimingBySource: { 'songsterr-orig': -20 } });
+  const chart = makeChart();
+  const adapter = fakeAdapter(chart);
+  adapter.state.videoOpened = false;
+  const engine = new Emitter();
+  engine.running = true;
+  engine.ctxToPerf = (t) => t * 1000;
+  const session = new ScoringSession(engine, adapter);
+  adapter.emit('chart', { chart, isBassLike: true });
+  fakeNow = 50000;
+  session.tick();
+  const { getSettings } = await import('../extension/src/core/settings.js');
+  assert.equal(getSettings().autoTimingMs, 30);                 // unknown source keeps the value
+  adapter.state.videoOpened = true;                             // switch to ORIG
+  fakeNow += 1500; session.tick();
+  assert.equal(getSettings().autoTimingMs, -20);
+  assert.equal(getSettings().autoTimingBySource['songsterr-synth'], 30);
+  adapter.state.videoOpened = false;                            // and back
+  fakeNow += 1500; session.tick();
+  assert.equal(getSettings().autoTimingMs, 30);
+});

@@ -45,6 +45,9 @@ export const DEFAULTS = {
   gemFretNumbers: true,    // fret numbers on the 3D note gems
   invertStrings: false,    // false = Rocksmith (low E on top); true = tab order
   showDebug: false,
+  hitSparks: true,         // sparks on the strings when you hit a note (3D)
+  timingMarks: false,      // small early/late dot after each hit (3D)
+  glowEffects: true,       // soft glow (bloom) on strings and notes (3D)
   // Scoring
   scoring: true,
   hitWindowMs: 140,        // how early/late a note may be and still count
@@ -66,6 +69,7 @@ export const DEFAULTS = {
   panelCollapsed: ['Shortcuts (keyboard or foot pedal)', 'Record & listen back'], // folded panel sections
   autoTiming: true,        // learn a small timing correction while playing
   autoTimingMs: 0,         // the learned correction (added to the latency)
+  autoTimingBySource: {},  // learned correction per sound source (Songsterr ORIG / SYNTH, audio file)
   schema: SCHEMA,
 };
 

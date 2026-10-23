@@ -35,12 +35,15 @@ export function createPanel(engine, { sections = [] } = {}) {
   const meterPeak = h('div', { class: 'peak' });
   const levelText = h('span', { class: 'muted' }, '');
   const inputInfo = h('div', { class: 'muted' }, 'Not started.');
+  // What the pitch detector hears right now (to check the cable quickly).
+  const hearEl = h('span', { class: 'muted', title: 'The note the trainer hears right now' });
+  let lastClear = null;
 
   const inputSection = h('section', {},
     h('h2', {}, 'Input'),
     h('div', { class: 'row' }, startBtn, deviceSelect),
     h('div', { class: 'meter' }, meterFill, meterPeak),
-    h('div', { class: 'row' }, levelText),
+    h('div', { class: 'row' }, levelText, hearEl),
     inputInfo,
   );
 
@@ -228,7 +231,10 @@ export function createPanel(engine, { sections = [] } = {}) {
     if (l.peak >= 0.98) clipUntil = performance.now() + 1500;
   });
 
-  engine.on('frame', (f) => tuner.push(f));
+  engine.on('frame', (f) => {
+    tuner.push(f);
+    if (f.f0 > 0 && f.clarity >= 0.85) lastClear = { f0: f.f0, at: performance.now() };
+  });
 
   function renderLatency() {
     const s = getSettings();
@@ -246,7 +252,7 @@ export function createPanel(engine, { sections = [] } = {}) {
     }
     autoInfo.replaceChildren(...(s.autoTiming
       ? [`Learned while playing: ${s.autoTimingMs > 0 ? '+' : ''}${s.autoTimingMs || 0} ms `,
-        s.autoTimingMs ? h('button', { class: 'btn', onclick: () => updateSettings({ autoTimingMs: 0 }) }, 'Reset') : null].filter(Boolean)
+        s.autoTimingMs ? h('button', { class: 'btn', onclick: () => updateSettings({ autoTimingMs: 0, autoTimingBySource: {} }) }, 'Reset') : null].filter(Boolean)
       : ['Automatic timing correction is off (Song & highway → Scoring).']));
   }
 
@@ -272,7 +278,7 @@ export function createPanel(engine, { sections = [] } = {}) {
         return;
       }
       // A fresh calibration replaces what was learned while playing.
-      await updateSettings({ calibrationMs: r.offsetMs, calibrationSpreadMs: r.spreadMs, calibratedAt: Date.now(), autoTimingMs: 0 });
+      await updateSettings({ calibrationMs: r.offsetMs, calibrationSpreadMs: r.spreadMs, calibratedAt: Date.now(), autoTimingMs: 0, autoTimingBySource: {} });
       const cls = r.quality === 'good' ? 'good' : r.quality === 'ok' ? 'warn' : 'bad';
       calStatus.replaceChildren(...[
         h('span', { class: cls }, `Saved. Consistency ±${r.spreadMs} ms (${r.quality}), ${r.used}/${r.total} notes used.`),
@@ -314,8 +320,12 @@ export function createPanel(engine, { sections = [] } = {}) {
       put(levelText, 'className', clipping ? 'bad' : 'muted');
       put(levelText, 'textContent', clipping ? 'Clipping! Lower the cable input level in Windows sound settings.'
         : peakDb > -60 ? `Peak ${peakDb.toFixed(0)} dBFS${peakDb < -30 && level.rms > 0.0005 ? ' (quiet: aim for -20…-6 when plucking hard)' : ''}` : 'No signal');
+      const heard = lastClear && performance.now() - lastClear.at < 250 ? noteName(69 + 12 * Math.log2(lastClear.f0 / 440)) : null;
+      put(hearEl, 'className', heard ? 'good' : 'muted');
+      put(hearEl, 'textContent', heard ? `· hearing ${heard}` : '· hearing: –');
     } else {
       put(levelText, 'textContent', '');
+      put(hearEl, 'textContent', '');
     }
 
     const r = tuner.reading;

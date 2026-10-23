@@ -40,6 +40,9 @@ canvas[hidden] { display: none; }
 .withbar .hint { top: 24px; }
 .hud .center.wait { left: 50%; right: auto; transform: translateX(-50%); top: 40px; white-space: nowrap; color: #fff; font-size: 18px;
   background: rgba(10,12,16,.88); border: 1px solid #f2c418; border-radius: 8px; padding: 5px 14px; }
+.warnbox { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); z-index: 4; max-width: min(640px, 90%);
+  background: rgba(43,36,16,.95); border: 1px solid #6a5418; color: #f2c418; border-radius: 8px; padding: 7px 14px; font: 600 13px/1.4 system-ui; text-align: center; }
+.warnbox[hidden] { display: none; }
 .debug { position: absolute; right: 10px; bottom: 8px; color: #6f7685; font: 11px system-ui; pointer-events: none; z-index: 2; }
 `;
 
@@ -53,6 +56,7 @@ export function createOverlay(adapter, {
   wait = null,           // WaitMode (optional)
   takes = null,          // Takes (optional)
   riff = null,           // RiffRepeater (optional)
+  monitor = null,        // InputMonitor: warnings + held-note feedback (optional)
 } = {}) {
   const host = h('div', { id: 'bass-trainer-highway' });
   const root = host.attachShadow({ mode: 'open' });
@@ -66,6 +70,7 @@ export function createOverlay(adapter, {
   const hud = h('div', { class: 'hud' }, hudLeft, hudRight, hudCenter);
   const debugEl = h('div', { class: 'debug' });
   const notice = h('div', { class: 'notice hide' });
+  const warnBox = h('div', { class: 'warnbox', hidden: true });
   const highway2d = new Highway2D(canvas2d);
   let highway3d = null;
   let highway3dFailed = false;
@@ -87,7 +92,7 @@ export function createOverlay(adapter, {
   );
   const grip = h('div', { class: 'grip', title: 'Drag to resize' });
   const msg = h('div', { class: 'msg', hidden: true });
-  const wrap = h('div', { class: 'wrap' }, canvas2d, canvas3d, hud, grip, msg, bar, debugEl, notice);
+  const wrap = h('div', { class: 'wrap' }, canvas2d, canvas3d, hud, grip, msg, bar, debugEl, notice, warnBox);
   const pill = h('button', { class: 'pill', hidden: true, onclick: () => updateSettings({ viewMode: 'both' }) }, '▲ Highway');
   root.append(wrap, pill);
   const scoreUI = session ? createScoreUI(wrap, session, () => active) : null;
@@ -146,7 +151,7 @@ export function createOverlay(adapter, {
     }
     const opts = { lookahead: s.lookahead, invertStrings: s.invertStrings, showDebug: s.showDebug };
     highway2d.setOptions(opts);
-    if (highway3d) highway3d.setOptions({ ...opts, showFretNumbers: s.gemFretNumbers });
+    if (highway3d) highway3d.setOptions({ ...opts, showFretNumbers: s.gemFretNumbers, sparks: s.hitSparks, timingMarks: s.timingMarks, glow: s.glowEffects });
   }
   onSettingsChange(layout);
   window.addEventListener('resize', () => layout());
@@ -222,7 +227,13 @@ export function createOverlay(adapter, {
       wrap.classList.toggle('withbar', progressUI.visible);
     }
     const waitMsg = wait && wait.enabled ? wait.message : '';
+    if (monitor) {
+      const w = st.ready && st.shouldPlay && !(wait && wait.enabled) ? monitor.warning : '';
+      if (warnBox.textContent !== w) warnBox.textContent = w;
+      warnBox.hidden = !w;
+    }
     active.render({ time, speed, playing, loop, message: active === highway2d ? message || waitMsg : message,
+      heard: monitor && playing ? monitor.heardMidi() : null,
       topInset: progressUI && progressUI.visible ? 18 : 0,
       debug: `sync err ${(adapter.clock.lastError * 1000).toFixed(1)} ms · snaps ${adapter.clock.snaps} · t ${time.toFixed(2)}s · ${st.playerType || ''}` });
     if (active === highway3d) {
@@ -246,6 +257,16 @@ export function createOverlay(adapter, {
     }
   }
   requestAnimationFrame(frame);
+
+  // Sparks / timing dots for scored notes (3D only).
+  if (session) {
+    session.on('result', (r) => {
+      if (active === highway3d && highway3d) {
+        const st = adapter.getState();
+        highway3d.onResult(r, { speed: st.ready ? st.speed : 1 });
+      }
+    });
+  }
 
   // Short confirmation (e.g. from a shortcut), shown on the highway.
   let noticeTimer = null;

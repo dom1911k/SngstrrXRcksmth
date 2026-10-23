@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.6.1.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.7.0.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -127,6 +127,13 @@ Good Riddance, can be played too.
     at the exact moment to play. The string glows and vibrates while the note
     sounds, and the lit hand lane pulses gently on every beat (stronger on the
     first beat of a bar).
+  - When you hit a note, it **sparks** on the strings, as in Rocksmith (only hits;
+    nothing is shown for misses). While you hold a long note at the right pitch, a
+    bright flare stays on the string.
+  - Notes are rounded gems with a bright outline and a soft shadow on the floor.
+    Section names (VERSE, CHORUS…) float above the highway where a section starts.
+    The lit hand lane slides over to the next hand position, and the fret numbers
+    of the next position light up softly just before you have to move.
   - Coloured ribbons are held notes. A ribbon that bends sideways is a slide; a
     wavy ribbon is vibrato.
   - Wide bars are open strings. **X** = dead note; faded small notes = ghost notes;
@@ -152,6 +159,10 @@ Settings in the panel, under **Song & highway**:
 - **Note speed:** how many seconds ahead you see (default 4.5 s). Higher = you
   see further ahead and notes move more slowly.
 - **Fret numbers on the notes (3D):** turn off for a cleaner, more Rocksmith-like look.
+- **Sparks when you hit a note**, **glow effects** (soft glow on strings and notes;
+  turns itself off if your PC can't keep up) and **timing dots** (off by default:
+  after each hit a small dot shows where the note was when you played it: blue =
+  early, green = on time, orange = late) can be switched on/off here.
 - **Tab order:** puts G on top, like a tab, instead of Rocksmith's E-on-top.
 - **Download chart (JSON):** saves the song in the trainer's chart format
   ([`docs/CHART_FORMAT.md`](docs/CHART_FORMAT.md)) for use in other tools.
@@ -228,7 +239,9 @@ These need the input to be running (*Start input*).
 
 ### Scoring
 1. Open the BASS TRAINER panel and click **Start input** (the cable must be
-   running). Calibrate once if you haven't.
+   running). Calibrate once if you haven't. Next to the level meter the panel shows
+   **hearing E1** (the note it hears right now). If it says "hearing: –" while you
+   play, the trainer doesn't get your bass: check the input device and level.
 2. Press play and play along. Above the highway you see a small accuracy % and your
    streak (can be hidden). There are no hit/miss markers on the notes.
 3. **End of the song:** a summary with accuracy, early/on time/late/missed counts,
@@ -241,12 +254,22 @@ These need the input to be running (*Start input*).
 5. **Timing:** the trainer learns small, constant early/late offsets while you
    play (*automatic timing correction*), so correctly played notes aren't
    lost to latency. The learned value is shown in the panel's calibration section,
-   with a Reset button. It resets when you calibrate again.
+   with a Reset button. It resets when you calibrate again. It is remembered
+   separately for Songsterr's **ORIG.** and **SYNTH** sound (they can differ a
+   little) and for the standalone player.
+6. **When scoring keeps failing**, a yellow box on the highway says why, in plain
+   words: no sound from your bass (wrong input, cable not connected), notes not
+   recognised (play harder / level too low), right notes but all late or early
+   (calibrate again), or everything a semitone off (check your tuning). It
+   disappears with your next hit.
 
 Settings (panel, **Song & highway → Scoring**): scoring on/off, live accuracy on/off,
 automatic timing correction on/off, timing window (Strict ±80 / Normal ±140 /
 Relaxed ±190 ms), dead notes (any muted attack counts, or not scored), and
 "Show summary of the current pass".
+
+**5-string basses** work too: open a 5-string tab and the tuner, the pitch
+detection (down to low B) and the highway (5 strings, low B in green) follow it.
 
 Not scored by design: ghost notes; slide destinations that aren't picked again;
 upper notes of chords. A note that keeps ringing never counts twice; you have to
@@ -388,6 +411,10 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.7.0:** input check ("hearing …" and warnings), timing dots (optional),
+  timing correction per sound source, 5-string check; Rocksmith feel: hit sparks,
+  sustain flare, rounded gems with shadows, section names on the highway, sliding
+  hand lane with a preview of the next position, glow effects.
 
 Design details are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 

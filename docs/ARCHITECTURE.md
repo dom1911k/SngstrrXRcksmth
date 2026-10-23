@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **V2 built (0.6.1)**: riff repeater, wait mode, practice history with
+Status: **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -412,3 +412,50 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
 * Tests: `tests/v2.test.mjs` (unit), `tests/e2e-v2.mjs` (player in Chromium with a
   fake microphone: take recorded and played back in sync, history saved, progress
   card, wait mode stop/resume, riff repeater speed-up).
+
+---
+
+## 13. Input check and Rocksmith-style effects (0.7.0)
+
+* **Input check** (`core/input-monitor.js`): keeps the last clear pitch frame
+  (clarity ≥ 0.85) → `heardMidi()` (used for the sustain flare). `diagnose()` (pure,
+  tested) looks at the last 6 consecutive misses: all *not-heard* → "no sound" (no
+  onset for 4 s) or "not recognised"; ≥ 5 *timing* → "all N ms late/early,
+  calibrate"; ≥ 5 *wrong-note* with the same ±1–2 semitone offset → "check your
+  tuning". Any hit clears it. Shown in `.warnbox` on the highway while the song
+  plays. The panel shows "hearing X" from the engine's frames.
+* **Timing correction per source** (`ScoringSession.checkSource`, `sourceKeyOf`):
+  `autoTimingBySource` maps `songsterr-orig` / `songsterr-synth` /
+  `player-<type>` to the learned value; switching source swaps `autoTimingMs`.
+  Reset and calibration clear the map.
+* **Timing dots** (setting `timingMarks`, off): a dot at z = offset·speed·k (where
+  the note was when you played: beyond the strings = early), coloured by rating.
+* **Effects** (`ui/highway3d-fx.js`):
+  * `Particles`: pool of 120 additive sprites; `burst()` = white flash + coloured
+    ring + 10–14 sparks with gravity. Triggered by `onResult()` for hits
+    (overlay forwards the session's `'result'` events). Rendering continues while
+    particles are alive even when paused.
+  * Gems: `roundedGemGeometry` (extruded rounded rectangle, bevel) + `LineLoop`
+    outline; a soft shadow quad on the floor (polygonOffset). Each note is
+    `obj` (position; stem, shadow, chord frame) → `body` (gem, outline, glow,
+    labels; scaled with distance by `GEM_GROW`).
+  * Section names: wide canvas-texture sprites in `timeGroup` at the section start,
+    above the strings, clipped at the strike line.
+  * Hand lane: the last ≤ 0.22 s of an anchor's lane is a trapezoid to the next
+    anchor's range (edges too), so the lane slides. Fret labels of the next anchor
+    turn soft yellow 0.7 s (real time) before it.
+  * Sustain flare: in `updateTargets`, notes currently sustaining (dur ≥ 0.3 s) whose
+    pitch (± octave) matches `state.heard` get a bright pulsing glow at the strike
+    line and boost their string's emissive.
+  * `Bloom`: the scene is drawn normally to the screen; a half-size copy (linear
+    HalfFloat target) → bright pass (max channel, threshold 0.65) → 2× separable
+    9-tap blur at quarter size → added on top (additive quad, strength 0.38).
+    Rendering the main picture through a linear target changed transparent
+    blending (lane looked washed out), hence the separate copy. `adaptQuality`
+    turns bloom off if still slow at pixel ratio 1; any error falls back to plain
+    rendering. Setting `glowEffects`.
+  * Beat/bar lines clip just after the strings (0.3 units) so they don't glow over
+    the fret numbers.
+* 5-string: verified with a synthetic 5-string chart in the player (5 strings, low
+  B green, detector minimum from the tab's tuning).
+

@@ -143,6 +143,22 @@ out.riff = await page.evaluate(async () => {
   return { start, after: adapter.getState().speed };
 });
 
+// 6. Input check: the fake microphone is silent now -> a warning on the highway.
+out.warning = await page.evaluate(async () => {
+  const { adapter } = globalThis.bassTrainer;
+  const { updateSettings } = await import('../src/core/settings.js');
+  await updateSettings({ riffRepeater: false });
+  adapter.clearLoop();
+  adapter.setSpeed(100);
+  adapter.seek(70);
+  adapter.play();
+  const box = document.getElementById('bass-trainer-highway').shadowRoot.querySelector('.warnbox');
+  for (let i = 0; i < 100 && box.hidden; i++) await new Promise((r) => setTimeout(r, 100));
+  adapter.pause();
+  return box.hidden ? null : box.textContent;
+});
+if (shot) await page.screenshot({ path: `${shot}-warning.png` });
+
 console.log(JSON.stringify(out, null, 1));
 await ctx.close();
 const r = out.recorded, w = out.wait;
@@ -151,6 +167,7 @@ const ok = r.takes === 1 && r.duration > 10 && r.peak > 0.05 && r.records === 1 
   && out.playback.playing && out.playback.source && Math.abs(out.playback.syncMs) <= 30 && out.playback.suspended.includes('take') && !out.playback.after.length
   && w.state === 'waiting' && !w.playing && Math.abs(w.at - (w.target + 0.06)) < 0.03 && w.resumed && w.next > w.target
   && Math.abs(out.riff.start - 0.7) < 1e-6 && Math.abs(out.riff.after - 0.75) < 1e-6
+  && out.warning && /No sound|not recognised/.test(out.warning)
   && !errors.length;
 if (!ok) { console.error('FAIL'); process.exit(1); }
 console.log('PASS');

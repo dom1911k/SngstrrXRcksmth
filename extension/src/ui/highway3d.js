@@ -12,6 +12,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { stringColors } from '../core/music.js';
 import { computeAnchors, anchorAt, firstNoteAtOrAfter } from '../core/chart.js';
 import { CameraFollow, planCameraSegments } from '../core/camera-follow.js';
+import { roundedGemGeometry, shadowTexture, wideLabelTexture, Particles, Bloom } from './highway3d-fx.js';
 
 const DEPTH = 40;            // world units from the strike line to the far end
 const MAX_FRET = 24;
@@ -91,12 +92,13 @@ export class Highway3D {
 
   constructor(canvas) {
     this.canvas = canvas;
-    this.options = { lookahead: 4.5, invertStrings: false, showDebug: false, showFretNumbers: true };
+    this.options = { lookahead: 4.5, invertStrings: false, showDebug: false, showFretNumbers: true, glow: true, sparks: true, timingMarks: false };
     this.chart = null;
     this.fps = 60;
     this.lastFrame = 0;
     this.follow = new CameraFollow();
     this.lit = new Float32Array(6);
+    this.sustainLit = new Float32Array(6);
     this.litPrev = new Float32Array(6);
     this.labelKey = '';
     this.lastRenderKey = '';
@@ -125,9 +127,12 @@ export class Highway3D {
     // Clip time-objects that have passed the strike line (z > 0).
     this.clipStrike = [new THREE.Plane(new THREE.Vector3(0, 0, -1), 0.05)];
     this.clipFloor = [new THREE.Plane(new THREE.Vector3(0, 0, -1), 1.2)];
+    this.clipBeats = [new THREE.Plane(new THREE.Vector3(0, 0, -1), 0.3)]; // beat lines vanish just after the strings
 
     this.labelCache = new Map();
     this.glowTex = glowTexture();
+    this.shadowTex = shadowTexture();
+    this.particles = new Particles(this.scene);
     this.buildStatic();
     this.timeGroup = new THREE.Group();   // children in seconds along -z; scaled per frame
     this.noteGroup = new THREE.Group();   // gems, positioned per frame
@@ -154,7 +159,7 @@ export class Highway3D {
     S.add(floor);
     // Fret wires running into the distance.
     const wireMat = new THREE.MeshBasicMaterial({ color: 0x6d7790 });
-    const nutMat = new THREE.MeshBasicMaterial({ color: 0xe6e6e6 });
+    const nutMat = new THREE.MeshBasicMaterial({ color: 0xc4c8d0 });
     for (let w = 0; w <= MAX_FRET; w++) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w === 0 ? 0.08 : 0.035, 0.01, DEPTH + 14), w === 0 ? nutMat : wireMat);
       m.position.set(w, 0.006, -(DEPTH + 14) / 2 + 6);
@@ -186,7 +191,7 @@ export class Highway3D {
   // Hit indicator: a soft spot on the string at the note's fret. It brightens
   // as the note approaches (last ~0.6 s), flashes briefly at the exact moment
   // to play, then fades. Purely a timing cue, not a judgement.
-  updateTargets(t, speed) {
+  updateTargets(t, speed, heard) {
     if (!this.targetPool) {
       this.targetPool = Array.from({ length: 14 }, () => {
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
@@ -217,6 +222,25 @@ export class Highway3D {
       sp.position.set(o.obj.position.x, o.obj.position.y, 0.03);
       sp.visible = true;
     }
+    // Held notes: while you hold the right pitch, a bright flare stays on the
+    // string at the note's fret (Rocksmith's sustain feedback).
+    this.sustainLit.fill(0);
+    if (heard) {
+      for (let i = Math.max(0, firstNoteAtOrAfter(notes, t - 8)); i < notes.length && notes[i].t <= t && used < this.targetPool.length; i++) {
+        const n = notes[i];
+        if (n.dur < 0.3 || t > n.t + n.dur || n.flags.dead || n.flags.ghost) continue;
+        const d = heard - n.midi;
+        if (!(Math.abs(d) < 0.6 || Math.abs(Math.abs(d) - 12) < 0.6)) continue;
+        const o = this.noteObjs[i];
+        const sp = this.targetPool[used++];
+        sp.material.color.set(this.colors[n.string] || '#ffffff');
+        sp.material.opacity = 0.75 + 0.15 * Math.sin(performance.now() / 60);
+        sp.scale.set(n.fret === 0 ? 4.4 : 1.25, 0.5, 1);
+        sp.position.set(o.obj.position.x, o.obj.position.y, 0.03);
+        sp.visible = true;
+        this.sustainLit[n.string] = 1;
+      }
+    }
     for (let k = used; k < this.targetPool.length; k++) this.targetPool[k].visible = false;
   }
 
@@ -235,10 +259,14 @@ export class Highway3D {
 
   clearChart() {
     if (this.targetPool) for (const sp of this.targetPool) sp.visible = false;
+    this.particles.clear();
     for (const g of [this.timeGroup, this.noteGroup]) {
       for (const child of [...g.children]) {
         g.remove(child);
-        child.traverse((o) => { if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); });
+        child.traverse((o) => {
+          if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
+          if (o.userData.ownMaterial) { o.material.map.dispose(); o.material.dispose(); }
+        });
       }
     }
     if (this.stringMeshes) for (const m of this.stringMeshes) { this.scene.remove(m); m.geometry.dispose(); }
@@ -279,14 +307,18 @@ export class Highway3D {
     this.stemMats = colors.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.28, fog: true }));
     this.tailMats = colors.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.55, side: THREE.DoubleSide, clippingPlanes: this.clipStrike, depthWrite: false }));
     this.glowMats = colors.map((c) => new THREE.SpriteMaterial({ map: this.glowTex, color: c, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
-    const gemGeo = new THREE.BoxGeometry(GEM_W, GEM_H, GEM_D); gemGeo.userData.shared = true;
-    const edgeGeo = new THREE.EdgesGeometry(gemGeo); edgeGeo.userData.shared = true;
-    const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 });
+    // Rounded gems with a bright outline and a soft shadow on the floor.
+    const { geo: gemGeo, outline: edgeGeo } = roundedGemGeometry(GEM_W, GEM_H, GEM_D);
+    gemGeo.userData.shared = true; edgeGeo.userData.shared = true;
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 });
+    const shadowGeo = new THREE.PlaneGeometry(1, 1); shadowGeo.userData.shared = true;
+    shadowGeo.rotateX(-Math.PI / 2);
+    const shadowMat = new THREE.MeshBasicMaterial({ map: this.shadowTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
 
     // Beat lines and anchor lanes live in seconds (timeGroup is scaled by k).
     // Merged into a few meshes: one draw call per kind instead of hundreds.
-    const beatMat = new THREE.MeshBasicMaterial({ color: 0x8a93aa, transparent: true, opacity: 0.35, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
-    const barMat = new THREE.MeshBasicMaterial({ color: 0xdfe4f0, transparent: true, opacity: 0.6, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
+    const beatMat = new THREE.MeshBasicMaterial({ color: 0x8a93aa, transparent: true, opacity: 0.35, clippingPlanes: this.clipBeats, depthWrite: false, side: THREE.DoubleSide });
+    const barMat = new THREE.MeshBasicMaterial({ color: 0xdfe4f0, transparent: true, opacity: 0.6, clippingPlanes: this.clipBeats, depthWrite: false, side: THREE.DoubleSide });
     const beatQuads = [], barQuads = [];
     for (const b of chart.beats) {
       const w = b.downbeat ? 0.028 : 0.014;
@@ -299,14 +331,37 @@ export class Highway3D {
     const anchorEdgeMat = new THREE.MeshBasicMaterial({ color: 0xbcd2ff, transparent: true, opacity: 0.5, clippingPlanes: this.clipFloor, depthWrite: false, side: THREE.DoubleSide });
     const end = chart.duration + 2;
     const laneQuads = [], edgeQuads = [];
-    for (const a of this.anchors) {
+    this.anchors.forEach((a, i) => {
       const t1 = a.t + Math.max(0.05, Math.min(a.until, end) - a.t);
-      laneQuads.push([a.fret - 1, a.fret + 3, a.t, t1, 0.008]);
-      for (const x of [a.fret - 1, a.fret + 3]) edgeQuads.push([x - 0.025, x + 0.025, a.t, t1, 0.01]);
+      const next = this.anchors[i + 1];
+      const lo = a.fret - 1, hi = a.fret + 3;
+      if (next && Math.abs(next.t - t1) < 0.01 && next.fret !== a.fret) {
+        // The lane slides over to the next hand position just before it.
+        const d = Math.min(0.22, 0.35 * (t1 - a.t));
+        const nlo = next.fret - 1, nhi = next.fret + 3;
+        laneQuads.push([lo, hi, a.t, t1 - d, 0.008], [lo, hi, t1 - d, t1, 0.008, nlo, nhi]);
+        for (const [x, nx] of [[lo, nlo], [hi, nhi]]) {
+          edgeQuads.push([x - 0.025, x + 0.025, a.t, t1 - d, 0.01], [x - 0.025, x + 0.025, t1 - d, t1, 0.01, nx - 0.025, nx + 0.025]);
+        }
+      } else {
+        laneQuads.push([lo, hi, a.t, t1, 0.008]);
+        for (const x of [lo, hi]) edgeQuads.push([x - 0.025, x + 0.025, a.t, t1, 0.01]);
+      }
       // Fret number where the hand moves (yellow, on the floor).
       const sp = new THREE.Sprite(this.label(String(a.fret), '#f2c418'));
       sp.scale.set(0.9, 0.9, 1);
       sp.position.set(a.fret - 1.45, 0.45, -a.t);
+      this.timeGroup.add(sp);
+    });
+    // Section names floating above the lane where a section starts.
+    for (const sec of chart.sections || []) {
+      if (!Number.isFinite(sec.t) || !sec.name) continue;
+      const a = anchorAt(this.anchors, sec.t + 0.01);
+      const mat = new THREE.SpriteMaterial({ map: wideLabelTexture(sec.name.toUpperCase()), transparent: true, opacity: 0.85, depthWrite: false, clippingPlanes: this.clipStrike });
+      const sp = new THREE.Sprite(mat);
+      sp.scale.set(3.6, 0.9, 1);
+      sp.position.set(a ? a.fret + 1 : 3, STRING_BASE + (n - 1) * STRING_GAP + 1.1, -sec.t);
+      sp.userData.ownMaterial = true;
       this.timeGroup.add(sp);
     }
     if (laneQuads.length) {
@@ -326,21 +381,27 @@ export class Highway3D {
       const a0 = anchor ? anchor.fret - 1 : 0;
       const x = open ? a0 + 2 : note.fret - 0.5;
       const obj = new THREE.Group();
+      const body = new THREE.Group();   // the gem itself (grows with distance)
+      obj.add(body);
       const mat = note.flags.dead ? this.deadMats[s] : note.flags.ghost ? this.ghostMats[s] : this.gemMats[s];
       const gem = new THREE.Mesh(gemGeo, mat);
       if (open) gem.scale.set(4 / GEM_W * 0.96, 0.55, 1);
       if (note.flags.ghost) gem.scale.multiplyScalar(0.8);
-      obj.add(gem);
+      body.add(gem);
       if (!note.flags.ghost) {
-        const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+        const edges = new THREE.LineLoop(edgeGeo, edgeMat);
         edges.scale.copy(gem.scale);
-        obj.add(edges);
+        body.add(edges);
+        const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+        shadow.scale.set(open ? 4.2 : GEM_W * 1.5, 1, 0.7);
+        shadow.position.y = -y + 0.02;
+        obj.add(shadow);
       }
       const glow = new THREE.Sprite(this.glowMats[s]);
       glow.scale.set(open ? 4.4 : 1.3, 0.7, 1);
       glow.position.z = -0.02;
       glow.renderOrder = -1;
-      obj.add(glow);
+      body.add(glow);
       // Stem down to the floor.
       const stemH = y - GEM_H / 2;
       if (stemH > 0.02) {
@@ -356,7 +417,7 @@ export class Highway3D {
         sp.scale.set(0.5, 0.5, 1);
         sp.position.set(0, 0.02, GEM_D / 2 + 0.03);
         sp.renderOrder = 2;
-        obj.add(sp);
+        body.add(sp);
       }
       // Technique tag above the gem.
       const tags = [];
@@ -368,7 +429,7 @@ export class Highway3D {
         const sp = new THREE.Sprite(this.label(tags.join(' '), '#8b93a3'));
         sp.scale.set(0.36, 0.36, 1);
         sp.position.set(0, GEM_H / 2 + 0.16, 0);
-        obj.add(sp);
+        body.add(sp);
       }
       obj.position.set(x, y, -1000);
       obj.visible = false;
@@ -392,7 +453,7 @@ export class Highway3D {
           tailQuads[s].push([x - hw, x + hw, note.t, note.t + note.dur, y, x1 - hw, x1 + hw]);
         }
       }
-      this.noteObjs.push({ note, obj, gem });
+      this.noteObjs.push({ note, obj, gem, body });
       prevOnString[s] = note;
     }
     tailQuads.forEach((q, s) => { if (q.length) this.timeGroup.add(mergedQuads(q, this.tailMats[s])); });
@@ -453,6 +514,7 @@ export class Highway3D {
       this.renderer.setSize(w, h, false);
       this.camera.aspect = Math.max(0.1, w / Math.max(1, h));
       this.camera.updateProjectionMatrix();
+      if (this.bloom) this.bloom.setSize(Math.round(w * dpr), Math.round(h * dpr));
     }
   }
 
@@ -491,11 +553,11 @@ export class Highway3D {
         o.obj.visible = true;
         o.obj.position.z = -dz;
         // Far gems a bit bigger so they stay readable with the flatter view.
-        o.obj.scale.setScalar(1 + GEM_GROW * Math.max(0, Math.min(1, dz / DEPTH)));
+        o.body.scale.setScalar(1 + GEM_GROW * Math.max(0, Math.min(1, dz / DEPTH)));
       }
       this.visibleFrom = from;
       this.visibleTo = to;
-      this.updateTargets(t, speed);
+      this.updateTargets(t, speed, state.heard);
 
       // Strings light up while a note on them is sounding.
       const lit = this.lit;
@@ -504,7 +566,7 @@ export class Highway3D {
         const n = notes[i];
         if (n.t <= t && t <= n.t + Math.max(0.12, n.dur)) lit[n.string] = Math.max(lit[n.string], 1 - (t - n.t) / Math.max(0.3, n.dur + 0.2));
       }
-      this.stringMats.forEach((m, s) => { m.emissiveIntensity = 0.35 + lit[s] * 1.0; });
+      this.stringMats.forEach((m, s) => { m.emissiveIntensity = 0.25 + lit[s] * 1.0 + this.sustainLit[s] * 0.8; });
       // ...and vibrate a little (only visible while it rings).
       this.stringMeshes.forEach((m, s) => {
         m.position.y = this.stringY(s) + (state.playing ? lit[s] * 0.014 * Math.sin(nowMs * (0.11 - s * 0.012) + s) : 0);
@@ -526,21 +588,26 @@ export class Highway3D {
       // Fret numbers: yellow under the hand, dim outside the frame.
       const cur = anchorAt(this.anchors, t);
       const hand = cur ? cur.fret : null;
-      const key = `${hand}|${Math.round(frameLo * 2)}|${Math.round(frameHi * 2)}`;
+      // The next hand position lights up a moment before you move there.
+      const nextA = cur ? this.anchors[this.anchors.indexOf(cur) + 1] : null;
+      const soon = nextA && nextA.fret !== hand && (nextA.t - t) / speed < 0.7 ? nextA.fret : null;
+      const key = `${hand}|${soon}|${Math.round(frameLo * 2)}|${Math.round(frameHi * 2)}`;
       if (key !== this.labelKey) {
         this.labelKey = key;
         this.fretLabels.forEach((sp, i) => {
           const f = i + 1;
           const inHand = hand !== null && f >= hand && f <= hand + 3;
+          const inNext = soon !== null && f >= soon && f <= soon + 3;
           const inFrame = f - 0.5 >= frameLo && f - 0.5 <= frameHi;
-          sp.material = this.label(String(f), inHand ? '#f2c418' : inFrame ? '#7d8597' : '#2e3442');
+          sp.material = this.label(String(f), inHand ? '#f2c418' : inNext ? '#c9b25a' : inFrame ? '#7d8597' : '#2e3442');
         });
       }
     }
 
     // Nothing moves while paused: skip drawing the same picture again.
     const camX = this.follow.x, camSpan = this.follow.span;
-    const key = `${t.toFixed(4)}|${camX.toFixed(3)}|${camSpan.toFixed(3)}|${this.w}x${this.h}|${this.dpr}|${k.toFixed(4)}|${this.chart ? this.chart.notes.length : 0}`;
+    this.particles.update(dt);
+    const key = `${this.particles.active ? nowMs : ''}|${t.toFixed(4)}|${camX.toFixed(3)}|${camSpan.toFixed(3)}|${this.w}x${this.h}|${this.dpr}|${k.toFixed(4)}|${this.chart ? this.chart.notes.length : 0}`;
     if (!state.playing && key === this.lastRenderKey) return;
     this.lastRenderKey = key;
 
@@ -573,7 +640,44 @@ export class Highway3D {
     const fog = this.scene.fog;
     fog.near = d0 + DEPTH * C.fogStart;
     fog.far = d0 + DEPTH * 1.08;
-    this.renderer.render(this.scene, cam);
+    this.draw();
+  }
+
+  // Render, with the glow pass when it is on (and the PC can afford it).
+  draw() {
+    if (this.options.glow && !this.quality.noGlow) {
+      try {
+        if (!this.bloom) {
+          this.bloom = new Bloom(this.renderer);
+          this.bloom.setSize(Math.round(this.w * this.dpr), Math.round(this.h * this.dpr));
+        }
+        this.bloom.render(this.scene, this.camera);
+        return;
+      } catch (err) {
+        console.warn('[Bass Trainer] glow effect unavailable', err);
+        this.quality.noGlow = true;
+        this.renderer.setRenderTarget(null);
+      }
+    }
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  // A scored note (from the ScoringSession). Hits get a spark burst at the
+  // strings; with timing marks on, a small dot shows where the note was when
+  // you played it (beyond the strings = early, in front = late).
+  onResult(r, { speed = 1 } = {}) {
+    if (!this.chart || r.status !== 'hit') return;
+    const o = this.noteObjs[r.index];
+    if (!o) return;
+    const color = this.colors[o.note.string] || '#ffffff';
+    if (this.options.sparks) this.particles.burst(o.obj.position.x, o.obj.position.y, color, o.note.fret === 0);
+    if (this.options.timingMarks && r.offsetMs !== null) {
+      const k = DEPTH / (this.options.lookahead * speed);
+      const z = Math.max(-2.5, Math.min(1.2, (r.offsetMs / 1000) * speed * k));
+      const c = r.rating === 'ontime' ? '#5fd38d' : r.rating === 'early' ? '#58b6ff' : '#ffa040';
+      this.particles.spawn({ x: o.obj.position.x, y: o.obj.position.y + 0.3, z, color: c, life: 0.9, size: 0.32, opacity: 0.95 });
+    }
+    this.lastRenderKey = '';
   }
 
   // If the PC can't keep up (< ~50 fps for 2 s while playing), render at a
@@ -585,6 +689,10 @@ export class Highway3D {
       q.maxDpr = this.dpr > 1.5 ? 1.5 : 1;
       q.slowFor = 0;
       console.info(`[Bass Trainer] 3D highway: lowering resolution (pixel ratio ${q.maxDpr}) to keep it smooth`);
+    } else if (q.slowFor > 2 && this.options.glow && !q.noGlow && this.bloom) {
+      q.noGlow = true;
+      q.slowFor = 0;
+      console.info('[Bass Trainer] 3D highway: turning the glow effect off to keep it smooth');
     }
   }
 }

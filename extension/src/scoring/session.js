@@ -22,6 +22,12 @@ import { Scorer } from './scorer.js';
 import { getSettings, updateSettings, totalLatencyMs, onSettingsChange } from '../core/settings.js';
 
 const CLOSE_GRACE_MS = 300;
+
+// 'orig' (Songsterr's recording / video), 'synth', or the player's source.
+export function sourceKeyOf(st) {
+  if (st.videoOpened !== undefined) return st.videoOpened ? 'songsterr-orig' : 'songsterr-synth';
+  return st.playerType ? `player-${st.playerType}` : 'default';
+}
 const DECISION_MS = 200;      // detector needs up to ~150 ms to decide a pitch
 // Automatic timing correction: after every AUTO_SAMPLES timing measurements
 // (hits + right notes just outside the window), move the correction a part of
@@ -146,10 +152,30 @@ export class ScoringSession {
     this.scorer.addEvent({ ...ev, t: clock.timeAt(perf) }, speed);
   }
 
+  // The learned timing correction is kept per sound source: Songsterr's ORIG
+  // recording and its SYNTH playback (or an audio file) can differ slightly.
+  checkSource(now) {
+    if (now < (this.sourceCheckAt || 0)) return;
+    this.sourceCheckAt = now + 1000;
+    const st = this.adapter.getState();
+    if (!st.ready) return;
+    const key = sourceKeyOf(st);
+    if (key === this.sourceKey) return;
+    const s = getSettings();
+    const map = { ...(s.autoTimingBySource || {}) };
+    if (this.sourceKey) map[this.sourceKey] = s.autoTimingMs || 0;
+    this.sourceKey = key;
+    const next = map[key] !== undefined ? map[key] : s.autoTimingMs || 0;
+    map[key] = next;
+    this.timingSamples = [];
+    updateSettings({ autoTimingBySource: map, ...(next !== s.autoTimingMs ? { autoTimingMs: next } : {}) });
+  }
+
   tick() {
     if (!this.scorer) return;
     const clock = this.adapter.clock;
     const now = performance.now();
+    this.checkSource(now);
     // Only score while the input is on: notes passed while it was off (or
     // suspended) are not misses. Turning it on starts a fresh pass from here.
     const active = this.active;
@@ -221,7 +247,7 @@ export class ScoringSession {
     if (Math.abs(median) < AUTO_MIN_MS) return;
     const next = Math.max(-AUTO_LIMIT_MS, Math.min(AUTO_LIMIT_MS, Math.round((s.autoTimingMs || 0) + median * AUTO_GAIN)));
     if (next !== s.autoTimingMs) {
-      updateSettings({ autoTimingMs: next });
+      updateSettings({ autoTimingMs: next, autoTimingBySource: { ...(s.autoTimingBySource || {}), [this.sourceKey || 'default']: next } });
       this.emit('autotiming', { ms: next, median });
     }
   }
