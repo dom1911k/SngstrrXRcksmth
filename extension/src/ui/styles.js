@@ -10,6 +10,12 @@ export const PANEL_CSS = `
   box-shadow: 0 2px 12px rgba(0,0,0,.4);
 }
 .launcher:hover { color: #fff; }
+.launcher-dot { display: inline-block; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: #e8202a; }
+.launcher-dot[hidden] { display: none; }
+.update { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 14px; background: #2b2410; color: #f2c418; border-bottom: 1px solid #4a3d12; }
+.update.done { background: #10291a; color: #5fd38d; border-color: #1d4a2e; }
+.update[hidden] { display: none; }
 .panel {
   position: fixed; right: 12px; top: 72px; z-index: 2147483001;
   width: 360px; max-height: calc(100vh - 190px); overflow-y: auto;

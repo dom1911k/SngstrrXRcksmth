@@ -102,11 +102,15 @@ export function createPanel(engine) {
     chromeInfo,
   );
 
+  // ---------- Updates ----------
+  const updateBanner = h('div', { class: 'update', hidden: true });
+  const launcherDot = h('span', { class: 'launcher-dot', hidden: true });
+
   const panel = h('div', { class: 'panel', hidden: true },
     h('header', {}, h('h1', {}, 'Bass Trainer'),
       h('button', { class: 'close', title: 'Close', onclick: () => { panel.hidden = true; } }, '×')),
-    inputSection, tunerSection, monitorSection, calSection);
-  const launcher = h('button', { class: 'launcher', onclick: () => { panel.hidden = !panel.hidden; } }, 'BASS TRAINER');
+    updateBanner, inputSection, tunerSection, monitorSection, calSection);
+  const launcher = h('button', { class: 'launcher', onclick: () => { panel.hidden = !panel.hidden; } }, 'BASS TRAINER', launcherDot);
   root.append(launcher, panel);
 
   // ---------- behaviour ----------
@@ -281,9 +285,36 @@ export function createPanel(engine) {
     mismatchEl.replaceChildren(...mm.map((w) => h('div', {}, `⚠ ${w.text} for ${tuningSelect.value}.`)));
   }
 
+  async function checkUpdates() {
+    if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) return;
+    try {
+      const { justUpdated } = await chrome.storage.local.get('justUpdated');
+      if (justUpdated && Date.now() - justUpdated.at < 10 * 60 * 1000) {
+        updateBanner.className = 'update done';
+        updateBanner.replaceChildren(`Updated to version ${justUpdated.to}.`);
+        updateBanner.hidden = false;
+        chrome.storage.local.remove('justUpdated');
+        return;
+      }
+      const r = await chrome.runtime.sendMessage({ type: 'checkUpdate' });
+      if (r && r.available) {
+        updateBanner.className = 'update';
+        updateBanner.replaceChildren(
+          h('span', {}, `Update available: ${r.current} → ${r.latest}`),
+          h('button', { class: 'btn primary', onclick: () => chrome.runtime.sendMessage({ type: 'openUpdater' }) }, 'Update'));
+        updateBanner.hidden = false;
+        launcherDot.hidden = false;
+      }
+    } catch (err) {
+      // Extension was reloaded/updated while this tab stayed open.
+      console.warn('[Bass Trainer] update check failed', err);
+    }
+  }
+
   renderStrings();
   renderLatency();
   onSettingsChange(renderLatency);
+  checkUpdates();
   calBtn.disabled = true;
   requestAnimationFrame(frame);
 

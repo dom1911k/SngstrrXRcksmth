@@ -49,21 +49,46 @@ You don't need Git or any programming tools.
 4. Turn on **Developer mode** (switch at the top right).
 5. Click **Load unpacked** and select the **`extension`** folder (the one that
    contains `manifest.json`).
-6. "Bass Trainer for Songsterr" now appears in the list. Optional: click the
-   puzzle-piece icon in Chrome's toolbar and pin it.
+6. "Bass Trainer for Songsterr" now appears in the list. Click the
+   puzzle-piece icon in Chrome's toolbar and **pin** it. Clicking its icon opens
+   the update page.
+
+This is the only time you need to download a ZIP. Later versions install from
+inside the extension (next section).
 
 Chrome may sometimes show a notice about developer-mode extensions. That's normal
 for extensions installed this way. Keep it enabled.
 
-## 3. Updating to a new version
+## 3. Updating (one click, from inside the extension)
 
-1. Download the new ZIP (same link as above).
-2. Extract it **into the same folder as before**, replacing the old files.
-3. Open `chrome://extensions` and click the **↻ reload** arrow on the Bass
-   Trainer card.
-4. Reload any open Songsterr tabs.
+The extension updates itself from GitHub. You don't need to download anything by hand.
 
-Your settings (input device, calibration, tuning) are kept across updates.
+**When there's a new version**, the Bass Trainer panel on Songsterr shows a yellow
+bar **"Update available: 0.1.1 → 0.2.0"**, and the BASS TRAINER tab gets a red dot.
+(It checks GitHub every few hours. You can also check any time by clicking the
+extension's icon in Chrome's toolbar, which opens the update page.)
+
+1. Click **Update**. The update page opens.
+2. **The first time only:** click **Choose extension folder…** and pick the
+   **`extension`** folder you loaded in step 2 above (for example
+   `Documents\BassTrainer\extension`). Chrome asks whether to let the extension
+   edit files in it. Choose **Edit files**, and if offered, **Allow on every visit**.
+3. Click **Update now**. It downloads only the changed files, restarts itself and
+   reloads your Songsterr tabs. The panel then says "Updated to version …".
+
+Your settings (input device, calibration, tuning) are kept.
+
+Notes:
+- If Chrome asks again for permission to edit the folder, click Allow. Chrome
+  sometimes asks again after a restart.
+- The updater only writes inside the folder you chose, and only after checking
+  that it really is this extension's folder.
+- If an update fails, nothing is half-changed: all files are downloaded and checked
+  before anything is written. **Re-download all files** on the update page repairs
+  a broken install.
+- Manual fallback: download the ZIP again (step 2), extract it **into the same folder**
+  replacing the old files, then click **↻** on the Bass Trainer card in
+  `chrome://extensions` and reload Songsterr.
 
 ## 4. Using it
 
@@ -143,7 +168,12 @@ Design details are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 No build step: the `extension/` folder is loaded as-is. Tests use Node 20+:
 
 ```
-node --test tests/*.test.mjs                      # DSP + logic unit tests
+node --test tests/*.test.mjs                      # DSP, logic and updater unit tests
 node tests/make-wav.mjs /tmp/a.wav                # synthetic bass recording
 node tests/e2e-phase1.mjs /tmp/a.wav shot.png     # Chromium + fake mic (needs Playwright)
 ```
+
+### Releasing an update
+Bump `"version"` in `extension/manifest.json` and push to the repository's default
+branch. Installed copies see the higher version and offer the update. Only files
+under `extension/` are synced.

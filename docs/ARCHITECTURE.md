@@ -10,7 +10,7 @@ is the design reference for all phases and is kept up to date.
 | Highway look | Mirror **Rocksmith 2014** as closely as possible in 2D: notes approach from the distance down a perspective highway toward the fretboard at the bottom, horizontal position = fret, lane/colour = string, fret numbers on gems, sustain tails, highlighted anchor (hand-position) zone, low E drawn at the top as in Rocksmith's default (an "invert strings" option for tab order). The 3D version (V3) keeps the same layout with a real camera. |
 | String colours | Rocksmith 2014: E red, A yellow, D blue, G orange. 5-string low B: green (Rocksmith bass has no 5th colour). |
 | Dead notes (x) | Any muted attack in the window counts as a hit. |
-| Updating | No Git: README describes Download ZIP → extract into the same folder → reload. Manifest has a fixed `key` so the extension ID (and saved settings) survive moving the folder. |
+| Updating | One-click self-update from inside the extension (see §10). Manual ZIP install only the first time. Manifest has a fixed `key` so the extension ID (and saved settings) survive moving the folder. |
 | Acceptance songs | Green Day: *Good Riddance (Time of Your Life)*, *21 Guns*; La Sera: *Love That's Gone*. |
 
 
@@ -248,3 +248,28 @@ expected    = note.t (chart seconds) mapped to wall clock through the adapter's 
 * Loop events plus a per-pass accuracy number drive auto speed-up later.
 * Wait mode uses `adapter.pause()` + the matcher's "next expected note" state.
 * Recording: the input graph already has a tap point for a `MediaRecorder`.
+
+---
+
+## 10. Self-update
+
+Chrome can't replace an unpacked extension by itself, and installing a self-hosted
+`.crx` on Windows needs enterprise policy. So the extension updates its own files
+on disk:
+
+* `background.js` (service worker) checks GitHub every 6 h when the Songsterr panel
+  opens: `GET /repos/…` (default branch), then `/commits/{branch}`, then
+  `extension/manifest.json` at that commit. No token is needed because the repository is public.
+* If the remote `version` is higher, the panel shows an **Update** bar, which opens
+  `updater/updater.html` (also the toolbar button and the options page).
+* The updater page keeps a File System Access directory handle to the
+  extension folder in IndexedDB. The user picks it once, and it is verified by
+  `manifest.json` name + `key`.
+* `applyUpdate` compares each file's git blob SHA-1 with the tree and downloads only
+  the changed files from `raw.githubusercontent.com` at the exact commit. It verifies
+  their hashes and **writes nothing unless every download succeeded**. It writes
+  `manifest.json` last and removes files that an earlier update installed but that
+  are gone upstream. User files are never touched.
+* Then `chrome.runtime.reload()`. `onInstalled(reason: 'update')` reloads open
+  Songsterr tabs, and the panel shows "Updated to version …".
+* Releasing = bump `manifest.json` version and push to the default branch.

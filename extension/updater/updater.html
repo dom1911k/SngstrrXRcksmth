@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bass Trainer: updates</title>
+<link rel="stylesheet" href="updater.css">
+</head>
+<body>
+<main>
+  <h1>Bass Trainer: updates</h1>
+
+  <section>
+    <div class="versions">
+      <div><span class="label">Installed</span><span id="current" class="ver">…</span></div>
+      <div><span class="label">Latest on GitHub</span><span id="latest" class="ver">…</span></div>
+    </div>
+    <p id="latestInfo" class="muted"></p>
+    <p id="status"></p>
+    <div class="row">
+      <button id="updateBtn" class="primary" disabled>Update now</button>
+      <button id="checkBtn">Check again</button>
+    </div>
+    <div id="progress" class="muted"></div>
+  </section>
+
+  <section>
+    <h2>Extension folder</h2>
+    <p class="muted">To update itself, the extension needs permission to write into the folder you
+      loaded in <code>chrome://extensions</code> (the folder called <b>extension</b> that contains
+      <code>manifest.json</code>, for example <code>Documents\BassTrainer\extension</code>).
+      You only choose it once.</p>
+    <p id="folder">No folder chosen yet.</p>
+    <div class="row"><button id="folderBtn">Choose extension folder…</button></div>
+  </section>
+
+  <section>
+    <h2>If something goes wrong</h2>
+    <p class="muted"><button id="repairBtn" class="link">Re-download all files</button> repairs a broken install.
+      You can always update by hand too: download the ZIP from
+      <a href="https://github.com/dom1911k/SngstrrXRcksmth" target="_blank" rel="noreferrer">GitHub</a>,
+      extract it over the same folder and click ↻ on <code>chrome://extensions</code>.</p>
+  </section>
+</main>
+<script type="module" src="updater.js"></script>
+</body>
+</html>
