@@ -14,6 +14,13 @@ export const DEFAULTS = {
   calibratedAt: null,
   fineTuneMs: 0,
   lowLatency: true,
+  // Highway
+  viewMode: 'both',        // 'both' | 'highway' | 'tab'
+  highwayHeight: 0.42,     // fraction of the window height in 'both' mode
+  visualDelayMs: 60,       // shift the highway so notes cross the line when you HEAR them
+  lookahead: 2.4,          // seconds a note is visible before it must be played
+  invertStrings: false,    // false = Rocksmith (low E on top); true = tab order
+  showDebug: false,
 };
 
 const hasChromeStorage = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;

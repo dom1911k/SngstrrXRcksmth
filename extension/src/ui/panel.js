@@ -1,14 +1,14 @@
-// Phase 1 panel: input, tuner, monitoring and latency calibration.
+// Panel: song & highway, input, tuner, monitoring and latency calibration.
 import { h } from './dom.js';
 import { PANEL_CSS } from './styles.js';
-import { TUNINGS, noteName, stringColors, detectorMinFreq } from '../core/music.js';
+import { TUNINGS, noteName, stringColors, detectorMinFreq, tuningName } from '../core/music.js';
 import { TunerModel } from '../core/tuner.js';
 import { getSettings, updateSettings, totalLatencyMs, onSettingsChange } from '../core/settings.js';
 import { runCalibration, CALIBRATION_DEFAULTS } from '../audio/calibration.js';
 
 const dbfs = (v) => (v > 0 ? 20 * Math.log10(v) : -Infinity);
 
-export function createPanel(engine) {
+export function createPanel(engine, { sections = [] } = {}) {
   const settings = getSettings();
   const host = h('div', { id: 'bass-trainer-root' });
   const root = host.attachShadow({ mode: 'open' });
@@ -19,6 +19,8 @@ export function createPanel(engine) {
     host.addEventListener(type, (e) => e.stopPropagation());
   }
 
+  const TAB = '__tab__';
+  let tabTuning = null;
   let tuning = TUNINGS[settings.tuningName] || TUNINGS['E Standard'];
   const tuner = new TunerModel({ tuning, refA: settings.refA });
   let level = { rms: 0, peak: 0 };
@@ -60,7 +62,7 @@ export function createPanel(engine) {
     h('h2', {}, 'Tuner'),
     h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Target tuning'), tuningSelect),
     noteEl, centsEl, scale, stringsEl, mismatchEl,
-    h('div', { class: 'muted' }, 'The highway (Phase 2) will set this automatically from the tab.'),
+    h('div', { class: 'muted' }, 'Set automatically from the tab when a bass track is open.'),
   );
 
   // ---------- Monitoring ----------
@@ -115,7 +117,7 @@ export function createPanel(engine) {
   const panel = h('div', { class: 'panel', hidden: true },
     h('header', {}, h('h1', {}, 'Bass Trainer'),
       h('button', { class: 'close', title: 'Close', onclick: () => { panel.hidden = true; } }, '×')),
-    updateBanner, inputSection, tunerSection, monitorSection, calSection);
+    updateBanner, ...sections, inputSection, tunerSection, monitorSection, calSection);
   const launcher = h('button', { class: 'launcher', onclick: () => { panel.hidden = !panel.hidden; } }, 'BASS TRAINER', launcherDot);
   root.append(launcher, panel);
 
@@ -128,11 +130,22 @@ export function createPanel(engine) {
   }
 
   function changeTuning(name) {
-    tuning = TUNINGS[name];
+    tuning = name === TAB ? tabTuning : TUNINGS[name];
     tuner.setTuning(tuning, settings.refA);
     engine.setMinFreq(detectorMinFreq(tuning, settings.refA));
-    updateSettings({ tuningName: name });
+    if (name !== TAB) updateSettings({ tuningName: name });
     renderStrings();
+  }
+
+  // Called when a tab with a bass track is loaded: tune to the tab.
+  function setTabTuning(t) {
+    if (tabTuning && t.length === tabTuning.length && t.every((v, i) => v === tabTuning[i])) return;
+    tabTuning = t;
+    let opt = tuningSelect.querySelector(`option[value="${TAB}"]`);
+    if (!opt) { opt = h('option', { value: TAB }); tuningSelect.prepend(opt); }
+    opt.textContent = `From tab: ${tuningName(t)}`;
+    tuningSelect.value = TAB;
+    changeTuning(TAB);
   }
 
   async function toggleInput(restart = false) {
@@ -291,7 +304,8 @@ export function createPanel(engine) {
       el.querySelector('.c').textContent = active ? `${r.stringCents > 0 ? '+' : ''}${Math.round(r.stringCents)}¢` : '';
     });
     const mm = tuner.mismatch();
-    mismatchEl.replaceChildren(...mm.map((w) => h('div', {}, `⚠ ${w.text} for ${tuningSelect.value}.`)));
+    const target = tuningSelect.value === TAB ? 'this tab' : tuningSelect.value;
+    mismatchEl.replaceChildren(...mm.map((w) => h('div', {}, `⚠ ${w.text} for ${target}.`)));
   }
 
   async function checkUpdates() {
@@ -327,5 +341,5 @@ export function createPanel(engine) {
   calBtn.disabled = true;
   requestAnimationFrame(frame);
 
-  return { host, open: () => { panel.hidden = false; } };
+  return { host, open: () => { panel.hidden = false; }, setTabTuning };
 }

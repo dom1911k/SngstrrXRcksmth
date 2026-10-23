@@ -40,6 +40,7 @@ button.btn:disabled { opacity: .5; cursor: default; }
 select, input[type=number] { background: #0e1014; color: #e8e8ea; border: 1px solid #3a3f49;
   border-radius: 6px; padding: 5px 6px; font: inherit; max-width: 100%; }
 .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
+label.row { flex-wrap: nowrap; align-items: flex-start; }
 .grow { flex: 1; min-width: 0; }
 .muted { color: #8b919c; font-size: 12px; }
 .warn { color: #ffb347; }

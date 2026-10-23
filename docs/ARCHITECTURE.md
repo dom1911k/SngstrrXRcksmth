@@ -1,6 +1,7 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **Phase 1 built** (input, tuner, monitoring, calibration). This file
+Status: **Phase 2 built** (Songsterr adapter, chart format, 2D highway in sync).
+Phase 1 (input, tuner, monitoring, calibration) and self-update are done too. This file
 is the design reference for all phases and is kept up to date.
 
 ## 0. Decisions (from the owner, October 2026)
@@ -28,8 +29,10 @@ findings in your browser.
 | Content Security Policy | No CSP header and no CSP `<meta>` on tab pages. | Overlay, worklets and canvas are not blocked today. An extension is unaffected even if they add a CSP later. |
 | Song metadata | Every tab page embeds `<script id="state" type="application/json">` with `meta.current`: songId, revisionId, the track list with **tuning as MIDI numbers** (e.g. bass `[43,38,33,28]` = G D A E), `isBassGuitar`, `popularTrackBass`. | Tuning and bass-track detection come from structured data. No scraping needed. |
 | Note data | Each track loads as a JSON document: `measures[] → voices[] → beats[] → notes[]`, with `fret`, `string` (0 = highest string), `duration` `[1,8]`, `dots`, `tie`, `dead`, `ghost`, `hp` (hammer/pull), `slide` (`"legato"`, `"shift"`, …), `letRing`, `staccato`, `accentuated`, plus `signature`, `marker` (section names) and `automations.tempo`. | Clean structured source for the chart converter. The adapter reads what the page has already loaded instead of fetching anything extra. |
-| App state | Preact 10 with a *storeon* store (`dispatch('player/togglePlay')`, `on('@changed')`, …). In production the store is **not** exposed on `window` (`window.__store__` is only set on non-prod builds). | The adapter must find the store through Preact's component tree from `#root`. This is the most fragile part, and all of it stays inside the adapter. |
-| Playback position | `state.player.instance` has `getCurrentTime()` and `getPosition() → {cursor, loopStart, loopEnd}`. `state.playings.playings` is the generated **playback timeline** (repeats unrolled, tempo applied). `state.player.speed`, `shouldPlay`, `isCountin`, `isCountinBetweenLoops`. | We can read the exact player clock instead of watching the moving cursor, and resync from it every frame. |
+| App state | Preact 10 with Songsterr's own store (`get()`, `dispatch(event, payload)`, `on`, `subscribeWithSelector`). In production it is **not** exposed on `window` (`window.__store__` is only set on non-prod builds). *Verified in Phase 2:* it is passed as `props.store` to top-level components (`AppErrorBoundary`, `CursorProvider`, …) and found by walking `#root.__k`. | The adapter must find the store through Preact's component tree. This is the most fragile part, and all of it stays inside `adapters/songsterr/`. |
+| Playback position | *Verified in Phase 2:* `state.player.instance.getCursor()` returns the play position in **tab milliseconds**. It works for both the synth `AudioPlayer` and the original-recording video player (which maps video time through per-bar `videoPoints`/`audioPoints`). It advances smoothly in real time × speed, jumps on seek, and wraps at loop end. `state.cursor.position = {cursor, loopStart, loopEnd}`. `state.player.speed` (%), `shouldPlay`, `isCountin`. | We read the exact player clock every animation frame. Measured sync error between overlay and player: < 0.5 ms through play/seek/speed/loop/pause. |
+| Beat timing | `state.part.current.timestamps[]`: one tab-ms time per **beat layout** (`measures[].beatsLayouts[]`) in playback order. It already includes tempo changes and gradual (linear) tempo changes. `state.playings.metronomeTimeline[]`: beats with `timestamp`, `beatNum`, `bpm`. Repeat fields on measures: `repeatStart`, `repeat` (play count on the closing bar), `alternateEnding: [passes]`. | The converter uses Songsterr's own times instead of recomputing tempo, and only interpolates inside a bar. It checks that the repeat-expanded beat-layout count equals `timestamps.length`. |
+| Tracks | Each track: `partId`, `instrument`, `tuning` (MIDI, **highest string first**), `isBassGuitar`. Track URLs: `…-s{songId}t{partId}` redirects to that track. Good Riddance has no bass guitar but a **Contrabass** track in E A D G. | "Bass-like" = bass guitar, or a non-drum track whose lowest string ≤ A1. The highway offers a switch button when another track is shown. |
 | Events | `player/togglePlay`, `player/changeSpeed`, `player/toggleLoop`, `cursor/move`, `cursor/loop`, `player/toggleCountIn`, `player/toggleCountInBetweenLoops`, `player/setMixerPlayableParts` (mute/solo; `partsMute` in state). | Play/pause/seek/loop/speed are store events we can subscribe to. **Count-in and count-in between loops already exist natively**, so we drive Songsterr's own count-in instead of building a second one. |
 | Audio engine | Songsterr decodes in a Web Worker and plays through its own `AudioContext` + AudioWorklet. When exactly one part is muted and it is bass, Songsterr loads a dedicated "minus" mix (`…/m/{partId}.opus`). | Muting the bass through Songsterr's own mixer gives you a real backing track without bass. |
 | Built-in latency | `state.audioLatencyOffset.ms` (Songsterr's own audio-latency setting). | The adapter reports it so we don't compensate twice. |
@@ -148,11 +151,14 @@ judged_time = detected_onset_time − calibration_offset
 expected    = note.t (chart seconds) mapped to wall clock through the adapter's player clock
 ```
 
-* **One clock.** Each animation frame the adapter samples
-  `player.getCurrentTime()` together with `performance.now()`. Between samples
-  we extrapolate at `speed`. If extrapolation and the player differ by more
-  than 30 ms (or after any seek/loop/play event) we snap to the player.
-  So the highway resyncs instead of drifting.
+* **One clock.** Each animation frame the page bridge samples
+  `player.instance.getCursor()` together with `performance.now()` and posts it
+  to the extension. `core/clock.js` extrapolates at `speed` between samples. Small
+  differences are slewed out (15% per frame); differences over 50 ms (seek, loop
+  restart, buffering) snap to the player. So the highway resyncs instead of drifting.
+* **Visual delay.** What you hear lags the player position by the output
+  latency (Chrome buffer + wireless headset). The highway therefore shows
+  `cursor − visualDelay × speed`. "Highway timing" in the panel defaults to 60 ms.
 * **Audio events** from the worklet carry an `AudioContext` timestamp,
   converted to `performance.now()` with `getOutputTimestamp()` /
   `currentTime` pairs. This keeps the main thread's frame timing out of the judgment.
@@ -219,8 +225,10 @@ expected    = note.t (chart seconds) mapped to wall clock through the adapter's 
    `page-bridge.js` with a version check, a diagnostics panel, and a degraded
    fallback (read the timeline + watch the visual cursor) so a Songsterr
    update means "the highway may be a little less tight", not "broken".
-2. **Units of `getCurrentTime()` and how it maps to the playback timeline** with
-   repeats, tempo changes, count-in, and speed. To be verified in Phase 2 on your 3 songs.
+2. ~~Units of the player clock and the playback timeline~~. **Resolved in Phase 2:**
+   `getCursor()` is in tab ms, the same unit as `part.timestamps`. Repeats are handled
+   and checked against Songsterr's timeline. None of the 3 test songs (and none of
+   9 popular bass tabs checked) actually uses repeat signs.
 3. **Two audio clocks.** Songsterr's AudioContext and ours run on the same output
    device but are separate objects. Calibration captures the combined
    offset, but if Songsterr's context has a different buffer size than ours

@@ -5,9 +5,9 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: Phase 1.** Cable input, tuner, monitoring and latency
-calibration. The note highway, scoring and Songsterr integration come in the
-next phases (see [Roadmap](#roadmap)).
+**Current version: Phase 2 (0.2.0).** Rocksmith-style note highway in sync with
+Songsterr's player, tuner that follows the tab's tuning, latency calibration and
+monitoring. Scoring comes in Phase 3 (see [Roadmap](#roadmap)).
 
 It only uses what your Songsterr account already shows you in the browser.
 It does not unlock anything.
@@ -92,6 +92,41 @@ Notes:
 
 ## 4. Using it
 
+### The note highway
+Open a song on Songsterr and pick its **bass track**. If another track is
+showing, the highway says so and offers a button for each bass track. Songs
+without an electric bass but with a bass-range part, such as the *Contrabass* in
+Good Riddance, can be played too.
+
+- Press play in Songsterr as usual. The highway follows Songsterr's player exactly,
+  including pause, seeking (clicking in the tab), loops and speed changes.
+- It works with both of Songsterr's sound sources (**ORIG.** recording and
+  **SYNTH**). To practise without the recorded bass, use Songsterr's mixer to
+  mute the bass track in SYNTH mode. (Phase 4 does this automatically.)
+- Layout, as in Rocksmith 2014:
+  - **Colour and row = string:** E red (top), A yellow, D blue, G orange.
+  - **Left–right = fret,** numbered under the strings.
+  - The lighter band on the floor shows where your hand should be (4 frets). A
+    yellow number in the distance tells you a hand move is coming.
+  - Notes fly toward the strings. Play each note when it reaches its string.
+  - Tails are held notes; a tail that bends sideways is a slide.
+  - **X** = dead note, **(n)** = ghost note, **H/P** = hammer-on/pull-off,
+    **PM** = palm mute.
+- **Highway / Both / Tab** (bottom left of the highway) switches between highway
+  only, highway under the tab, and tab only. In *Both* you can drag the top edge
+  of the highway to resize it.
+
+Settings in the panel, under **Song & highway**:
+- **Highway timing:** with a wireless headset the sound reaches you a bit after
+  the picture. Play a song and move this slider until notes cross the strings
+  exactly when you **hear** them. 40–120 ms is typical.
+- **Note speed:** how early notes appear.
+- **Tab order:** puts G on top, like a tab, instead of Rocksmith's E-on-top.
+- **Download chart (JSON):** saves the song in the trainer's chart format
+  ([`docs/CHART_FORMAT.md`](docs/CHART_FORMAT.md)) for use in other tools.
+
+### Starting the input
+
 1. Open any tab on songsterr.com.
 2. Click the yellow **BASS TRAINER** tab on the right edge of the page.
 3. Click **Start input**. The first time, Chrome asks to use your microphone for
@@ -114,7 +149,8 @@ off you are from the nearest string of the target tuning. It turns green within
 ±3 cents. If a string is noticeably off for a while, a ⚠ warning tells you which
 one and by how much (for example "about a half step down").
 
-From Phase 2 on, the target tuning comes from the song's tab automatically.
+When a bass track is open, the target tuning switches to **From tab** automatically.
+If your bass doesn't match it, the ⚠ warning says which string is off.
 
 ### Latency calibration (do this before scoring)
 Everything you play reaches the computer a little late: the wireless headset
@@ -185,11 +221,14 @@ for detection.
 | "This input does not look like the Real Tone Cable" | Pick the cable in the device list (its name contains *Rocksmith*). |
 | Calibration says "Only N of 16 notes were detected" | Play one clear note per click, and check the level meter. Very quiet or muted plucks are missed. |
 | Calibration number seems wrong (negative, or above 350 ms) | Run it again, playing to the clicks you hear, not ahead of them. |
+| Highway says "Looking for the Songsterr player…" for a long time | Reload the page. If it stays, Songsterr probably changed their site and the adapter (`extension/src/adapters/songsterr/`) needs an update. Please report it. |
+| Highway shows "not a bass part" | Click one of the offered bass tracks, or pick it in Songsterr's track list. |
+| Notes reach the strings before/after you hear them | Adjust **Highway timing** in the panel (Song & highway). |
 
 ## Roadmap
 
-- **Phase 1 (this version):** cable input, tuner, monitoring, latency calibration.
-- **Phase 2:** read the song from Songsterr, chart format, Rocksmith-2014-style
+- **Phase 1 (done):** cable input, tuner, monitoring, latency calibration.
+- **Phase 2 (this version):** read the song from Songsterr, chart format, Rocksmith-2014-style
   note highway synced to Songsterr playback (play, pause, seek, loop, speed).
 - **Phase 3:** scoring: hit/miss, early/on time/late, accuracy, streak, summary,
   edge cases (dead notes, ghost notes, slides, ringing notes, octave errors).
@@ -208,6 +247,7 @@ No build step: the `extension/` folder is loaded as-is. Tests use Node 20+:
 node --test tests/*.test.mjs                      # DSP, logic and updater unit tests
 node tests/make-wav.mjs /tmp/a.wav                # synthetic bass recording
 node tests/e2e-phase1.mjs /tmp/a.wav shot.png     # Chromium + fake mic (needs Playwright)
+node tests/e2e-phase2.mjs [tab-url] [shot-prefix] # real Songsterr: highway sync (needs network)
 ```
 
 ### Releasing an update
