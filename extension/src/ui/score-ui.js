@@ -1,6 +1,6 @@
-// Scoring UI inside the highway overlay: live accuracy/streak, hit/miss
-// labels on the highway, a short toast after each loop pass and a summary
-// card at the end of the song.
+// Scoring UI inside the highway overlay: a small live accuracy/streak
+// display, a short toast after each loop pass and a summary card at the end of
+// the song. Deliberately no per-note hit/miss markers.
 import { h } from './dom.js';
 import { getSettings, updateSettings } from '../core/settings.js';
 
@@ -10,7 +10,6 @@ export const SCORE_CSS = `
 .score[hidden] { display: none; }
 .score .acc { color: #fff; font-size: 22px; }
 .score .streak { color: #f2c418; }
-.score .last { color: #9aa0aa; font-size: 14px; font-weight: 600; min-width: 90px; }
 .hint { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3; color: #ffb347; font: 600 14px system-ui; text-shadow: 0 1px 3px #000; }
 .hint[hidden] { display: none; }
 .toast { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); z-index: 4; background: rgba(16,18,24,.94);
@@ -38,8 +37,7 @@ const pct = (x) => (x === null || x === undefined ? '–' : `${Math.round(x * 10
 export function createScoreUI(wrap, session, getHighway) {
   const acc = h('span', { class: 'acc' }, '–');
   const streak = h('span', { class: 'streak' }, '');
-  const last = h('span', { class: 'last' }, '');
-  const score = h('div', { class: 'score', hidden: true }, acc, streak, last);
+  const score = h('div', { class: 'score', hidden: true }, acc, streak);
   const hint = h('div', { class: 'hint', hidden: true }, 'Start the input in the BASS TRAINER panel to score your playing');
   const toast = h('div', { class: 'toast', hidden: true });
   const card = h('div', { class: 'card', hidden: true });
@@ -54,16 +52,6 @@ export function createScoreUI(wrap, session, getHighway) {
   }
 
   session.on('stats', renderStats);
-  session.on('result', (r) => {
-    const s = getSettings();
-    if (s.showFeedback) {
-      const hw = getHighway();
-      if (hw && hw.feedback) hw.feedback(r);
-    }
-    last.textContent = r.status === 'hit'
-      ? (r.rating === 'ontime' ? `on time` : `${r.rating} ${Math.abs(r.offsetMs)} ms`)
-      : r.playedName ? `played ${r.playedName}, not ${r.expectedName}` : 'missed';
-  });
   session.on('pass', () => { renderStats(session.stats()); });
 
   session.on('summary', (s) => {
@@ -85,7 +73,7 @@ export function createScoreUI(wrap, session, getHighway) {
   function showCard(s) {
     const timed = s.early + s.ontime + s.late;
     const off = s.avgOffsetMs;
-    const tip = timed >= 8 && Math.abs(off) >= 15
+    const tip = timed >= 8 && Math.abs(off) >= 15 && !getSettings().autoTiming
       ? h('div', { class: 'tip' },
         `Your hits were on average ${Math.abs(off)} ms ${off > 0 ? 'late' : 'early'}. If you felt in time, adjust the timing correction by ${off > 0 ? '+' : ''}${off} ms. `,
         h('button', { class: 'primary', onclick: (e) => {
@@ -103,7 +91,13 @@ export function createScoreUI(wrap, session, getHighway) {
         h('div', {}, h('b', {}, s.ontime), h('span', { class: 'muted' }, 'on time')),
         h('div', {}, h('b', {}, s.late), h('span', { class: 'muted' }, 'late')),
         h('div', {}, h('b', {}, s.misses), h('span', { class: 'muted' }, 'missed'))),
-      h('div', { class: 'muted' }, `Average timing: ${off > 0 ? '+' : ''}${off} ms (+ = late)${s.octave ? ` · ${s.octave} octave-ambiguous hits` : ''}`),
+      h('div', { class: 'muted' }, `Average timing: ${off > 0 ? '+' : ''}${off} ms (+ = late)${s.octave ? ` · ${s.octave} octave-ambiguous hits` : ''}${s.soft ? ` · ${s.soft} soft plucks recognised by pitch` : ''}`),
+      s.misses ? h('div', { class: 'muted' }, `Missed: ${[
+        s.missNotHeard ? `${s.missNotHeard} not heard` : null,
+        s.missTiming ? `${s.missTiming} right note but too early/late` : null,
+        s.wrongPitch ? `${s.wrongPitch} different note` : null,
+      ].filter(Boolean).join(' · ')}`) : null,
+      getSettings().autoTiming && getSettings().autoTimingMs ? h('div', { class: 'muted' }, `Automatic timing correction: ${getSettings().autoTimingMs > 0 ? '+' : ''}${getSettings().autoTimingMs} ms`) : null,
       tip,
       s.weakBars && s.weakBars.length ? h('div', {}, h('b', {}, 'Bars to practise'),
         h('ul', {}, ...s.weakBars.map((b) => h('li', {}, `Bar ${b.number}${b.section ? ` (${b.section})` : ''}: ${b.misses} missed`)))) : null,
@@ -119,7 +113,7 @@ export function createScoreUI(wrap, session, getHighway) {
   function update(chartLoaded) {
     const active = session.active;
     const s = getSettings();
-    score.hidden = !active || !s.scoring;
+    score.hidden = !active || !s.scoring || !s.showLiveScore;
     hint.hidden = active || !chartLoaded || !s.scoring || session.engine.running;
   }
 

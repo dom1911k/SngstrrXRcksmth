@@ -40,7 +40,9 @@ export const DEFAULTS = {
   hitWindowMs: 110,        // how early/late a note may be and still count
   onTimeMs: 40,            // within this it is "on time"
   deadNotes: 'attack',     // 'attack' = any muted attack counts | 'ignore'
-  showFeedback: true,      // hit/miss labels at the strings
+  showLiveScore: true,     // accuracy % and streak above the highway
+  autoTiming: true,        // learn a small timing correction while playing
+  autoTimingMs: 0,         // the learned correction (added to the latency)
   schema: SCHEMA,
 };
 
@@ -92,5 +94,5 @@ export function onSettingsChange(fn) {
 
 // Total offset applied to every timing judgment, in milliseconds.
 export function totalLatencyMs(s = getSettings()) {
-  return (s.calibrationMs || 0) + (s.fineTuneMs || 0);
+  return (s.calibrationMs || 0) + (s.fineTuneMs || 0) + (s.autoTiming ? s.autoTimingMs || 0 : 0);
 }

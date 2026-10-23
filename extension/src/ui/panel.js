@@ -95,6 +95,7 @@ export function createPanel(engine, { sections = [] } = {}) {
   } });
   const fineValue = h('span', { class: 'muted' });
   const chromeInfo = h('div', { class: 'muted' });
+  const autoInfo = h('div', { class: 'muted row' });
 
   const calSection = h('section', {},
     h('h2', {}, 'Latency calibration'),
@@ -106,6 +107,7 @@ export function createPanel(engine, { sections = [] } = {}) {
     h('div', { class: 'row' }, calBtn),
     calDots, calStatus, calResult,
     h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Fine-tune'), h('div', { class: 'grow' }, fineSlider), fineValue),
+    autoInfo,
     h('div', { class: 'muted' }, 'Fine-tune only changes how scoring judges your timing. It does not change what you hear. If notes you play in time are judged "late", move right; if "early", move left. The summary after a song suggests a value.'),
     chromeInfo,
   );
@@ -224,8 +226,13 @@ export function createPanel(engine, { sections = [] } = {}) {
       const total = totalLatencyMs(s);
       calResult.textContent = `Total latency: ${total} ms`;
       const when = s.calibratedAt ? new Date(s.calibratedAt).toLocaleString() : '';
-      monitorLatency.textContent = `Measured total latency: ${total} ms (calibrated ${s.calibrationMs} ms ±${s.calibrationSpreadMs} ms${s.fineTuneMs ? `, fine-tune ${s.fineTuneMs > 0 ? '+' : ''}${s.fineTuneMs} ms` : ''}; ${when}). What you hear while monitoring is delayed by part of this.`;
+      const sign = (v) => `${v > 0 ? '+' : ''}${v} ms`;
+      monitorLatency.textContent = `Measured total latency: ${total} ms (calibrated ${s.calibrationMs} ms ±${s.calibrationSpreadMs} ms${s.fineTuneMs ? `, fine-tune ${sign(s.fineTuneMs)}` : ''}${s.autoTiming && s.autoTimingMs ? `, learned ${sign(s.autoTimingMs)}` : ''}; ${when}). What you hear while monitoring is delayed by part of this.`;
     }
+    autoInfo.replaceChildren(...(s.autoTiming
+      ? [`Learned while playing: ${s.autoTimingMs > 0 ? '+' : ''}${s.autoTimingMs || 0} ms `,
+        s.autoTimingMs ? h('button', { class: 'btn', onclick: () => updateSettings({ autoTimingMs: 0 }) }, 'Reset') : null].filter(Boolean)
+      : ['Automatic timing correction is off (Song & highway → Scoring).']));
   }
 
   function toggleCalibration() {
@@ -249,7 +256,8 @@ export function createPanel(engine, { sections = [] } = {}) {
         calStatus.replaceChildren(h('span', { class: r.cancelled ? 'muted' : 'bad' }, r.reason));
         return;
       }
-      await updateSettings({ calibrationMs: r.offsetMs, calibrationSpreadMs: r.spreadMs, calibratedAt: Date.now() });
+      // A fresh calibration replaces what was learned while playing.
+      await updateSettings({ calibrationMs: r.offsetMs, calibrationSpreadMs: r.spreadMs, calibratedAt: Date.now(), autoTimingMs: 0 });
       const cls = r.quality === 'good' ? 'good' : r.quality === 'ok' ? 'warn' : 'bad';
       calStatus.replaceChildren(...[
         h('span', { class: cls }, `Saved. Consistency ±${r.spreadMs} ms (${r.quality}), ${r.used}/${r.total} notes used.`),

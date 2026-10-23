@@ -23,6 +23,7 @@ const LEGATO_MIN_JUMP = 0.75;// semitones: smaller changes are vibrato/bends, no
 const LEGATO_BLOCK = 0.09;   // s after an onset when pitch changes are part of that attack
 const LEGATO_DELAY = 0.025;  // s: a pitch change is detected about this long after it happened
 const SILENCE = 0.15;        // s without a clear pitch = the note has ended
+const LATE_PITCH = 0.35;     // s after an attack: a pitch that only settles now still belongs to it
 
 const median = (a) => {
   const s = [...a].sort((x, y) => x - y);
@@ -45,16 +46,19 @@ export class NoteEventDetector {
     this.lastGood = -Infinity;
     this.run = [];            // recent pitches (for legato detection)
     this.runStart = 0;
+    this.awaiting = null;     // attack whose pitch was unclear: { t }
   }
 
   reset() {
     this.pending = null;
+    this.awaiting = null;
     this.ref = null;
     this.run = [];
   }
 
   onOnset(o) {
     if (this.pending) this.finish(this.pending.t + MAX_WAIT);
+    this.awaiting = null;
     this.pending = { t: o.t, values: [], strength: o.strength };
     this.lastOnset = o.t;
   }
@@ -82,7 +86,16 @@ export class NoteEventDetector {
     if (this.run.length > 8) this.run.shift();
     const stable = stableRun(this.run);
     if (stable === null) return;
-    if (this.ref === null) { this.ref = stable; return; }
+    if (this.ref === null) {
+      this.ref = stable;
+      // A weak low note: the attack was heard but its pitch only became clear
+      // now. Report it with the attack's time.
+      if (this.awaiting && f.t - this.awaiting.t <= LATE_PITCH) {
+        this.onEvent({ t: this.awaiting.t, midi: stable, legato: false, late: true });
+      }
+      this.awaiting = null;
+      return;
+    }
     if (Math.abs(stable - this.ref) >= LEGATO_MIN_JUMP && f.t - this.lastOnset > LEGATO_BLOCK) {
       this.onEvent({ t: this.runStart - LEGATO_DELAY, midi: stable, legato: true, clarity: f.clarity });
       this.ref = stable;
@@ -103,6 +116,7 @@ export class NoteEventDetector {
     }
     this.ref = midi;
     this.run = [];
+    this.awaiting = midi === null ? { t: p.t } : null;
     this.onEvent({ t: p.t, midi, legato: false, decidedAt: now });
   }
 }

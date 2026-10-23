@@ -12,6 +12,8 @@
 
 import { noteName } from '../core/music.js';
 
+const NEAR_MS = 300; // right pitch this close to a note counts as a near miss (timing)
+
 export const SCORING_DEFAULTS = {
   hitWindowMs: 110,     // a note can be hit this early/late (real time)
   onTimeMs: 40,         // within this it counts as "on time"
@@ -82,6 +84,8 @@ export class Scorer {
     for (const it of this.scorable) {
       it.state = it.note.t >= from - 1e-6 && it.note.t < to ? 'pending' : 'out';
       it.attempt = null;
+      it.near = null;
+      it.soft = null;
       it.result = null;
     }
     while (this.cursor < this.scorable.length && this.scorable[this.cursor].state !== 'pending') this.cursor++;
@@ -102,6 +106,7 @@ export class Scorer {
 
   addEvent(ev, speed = 1) {
     let best = null, bestDt = Infinity, nearest = null, nearestDt = Infinity;
+    const nearRange = (NEAR_MS / 1000) * speed;
     for (let i = this.cursor; i < this.scorable.length; i++) {
       const it = this.scorable[i];
       const dt = ev.t - it.note.t;
@@ -109,11 +114,20 @@ export class Scorer {
       if (dt < -3) break;
       if (it.state !== 'pending') continue;
       const w = this.window(it, speed);
-      if (Math.abs(dt) > w) continue;
-      // Legato events (no attack) only count for hammer-on/pull-off notes.
-      if (ev.legato && !it.note.flags.hopo) continue;
+      const m = Math.abs(dt) <= nearRange ? this.pitchMatch(ev, it.note) : null;
+      if (Math.abs(dt) > w) {
+        // Right note, but outside the window: remember it (miss reason
+        // "timing", and input for the automatic timing correction).
+        if (m && !ev.legato && (!it.near || Math.abs(dt) < Math.abs(it.near.dt))) it.near = { dt };
+        continue;
+      }
+      if (ev.legato && !it.note.flags.hopo) {
+        // Right pitch without a detected attack (very soft pluck): keep as a
+        // fallback; it counts if no attack-based match comes along.
+        if (m && (!it.soft || Math.abs(dt) < Math.abs(it.soft.dt))) it.soft = { dt, midi: ev.midi, octave: m.octave };
+        continue;
+      }
       if (Math.abs(dt) < nearestDt) { nearest = it; nearestDt = Math.abs(dt); }
-      const m = this.pitchMatch(ev, it.note);
       if (m && Math.abs(dt) < bestDt) { best = { it, m, dt }; bestDt = Math.abs(dt); }
     }
     if (best) {
@@ -121,8 +135,9 @@ export class Scorer {
       return best.it.result;
     }
     if (nearest && !ev.legato) {
-      // Wrong note (or right note at the wrong time): remember what was played.
-      nearest.attempt = { midi: ev.midi, dt: ev.t - nearest.note.t };
+      // Wrong note (or an attack whose pitch is still unclear): remember it.
+      if (ev.midi !== null && ev.midi !== undefined) nearest.attempt = { midi: ev.midi, dt: ev.t - nearest.note.t };
+      else if (!nearest.attempt) nearest.attempt = { midi: null, dt: ev.t - nearest.note.t };
     } else if (!ev.legato) {
       this.pass.extras++;
     }
@@ -135,14 +150,19 @@ export class Scorer {
       const it = this.scorable[this.cursor];
       if (it.state === 'pending') {
         if (it.note.t + this.window(it, speed) >= songTime) break;
-        const a = it.attempt;
-        this.judge(it, 'miss', { dt: a ? a.dt : null, played: a ? a.midi : null, octave: false }, speed);
+        if (it.soft) {
+          this.judge(it, 'hit', { dt: it.soft.dt, played: it.soft.midi, octave: it.soft.octave, soft: true }, speed);
+        } else {
+          const a = it.attempt;
+          const reason = a && a.midi !== null ? 'wrong-note' : it.near ? 'timing' : 'not-heard';
+          this.judge(it, 'miss', { dt: a ? a.dt : it.near ? it.near.dt : null, played: a ? a.midi : null, octave: false, reason }, speed);
+        }
       }
       this.cursor++;
     }
   }
 
-  judge(it, status, { dt, played, octave }, speed) {
+  judge(it, status, { dt, played, octave, soft = false, reason = null }, speed) {
     it.state = status;
     const offsetMs = dt === null ? null : (dt / speed) * 1000;
     const rating = status !== 'hit' ? null
@@ -159,6 +179,8 @@ export class Scorer {
       expectedName: it.note.flags.dead ? 'x' : noteName(it.note.midi),
       octave: !!octave,
       wrongPitch,
+      soft,                      // hit by pitch alone (no attack detected)
+      reason: status === 'miss' ? reason : null, // 'wrong-note' | 'timing' | 'not-heard'
     };
     it.result = r;
     const p = this.pass;
@@ -185,7 +207,10 @@ export class Scorer {
       late: hits.filter((x) => x.rating === 'late').length,
       avgOffsetMs: Math.round(avgOffset),
       extras: this.pass.extras,
-      wrongPitch: misses.filter((x) => x.wrongPitch).length,
+      wrongPitch: misses.filter((x) => x.reason === 'wrong-note').length,
+      missTiming: misses.filter((x) => x.reason === 'timing').length,
+      missNotHeard: misses.filter((x) => x.reason === 'not-heard').length,
+      soft: hits.filter((x) => x.soft).length,
       octave: hits.filter((x) => x.octave).length,
     };
   }

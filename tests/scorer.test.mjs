@@ -76,10 +76,43 @@ test('a note that keeps ringing does not hit the next note of the same pitch', (
   assert.deepEqual(results.map((r) => r.status), ['hit', 'miss']);
 });
 
-test('hammer-on/pull-off notes accept a pitch change without attack; normal notes do not', () => {
-  const c = chart([[1, 0, 3], [1.25, 0, 5, { hopo: true }], [2, 0, 7]]);
-  const { results } = run(c, [{ t: 1.0, midi: 31 }, { t: 1.27, midi: 33, legato: true }, { t: 2.01, midi: 35, legato: true }]);
-  assert.deepEqual(results.map((r) => r.status), ['hit', 'hit', 'miss']);
+test('hammer-on/pull-off notes accept a pitch change without attack', () => {
+  const c = chart([[1, 0, 3], [1.25, 0, 5, { hopo: true }]]);
+  const { results } = run(c, [{ t: 1.0, midi: 31 }, { t: 1.27, midi: 33, legato: true }]);
+  assert.deepEqual(results.map((r) => [r.status, r.soft]), [['hit', false], ['hit', false]]);
+});
+
+test('soft pluck (right pitch, no attack detected) still counts; an attack wins if there is one', () => {
+  const c = chart([[1, 0, 3], [2, 0, 7], [3, 0, 5]]);
+  const { results } = run(c, [
+    { t: 1.0, midi: 31 },
+    { t: 2.02, midi: 35, legato: true },                 // soft pluck
+    { t: 2.98, midi: 33, legato: true }, { t: 3.01, midi: 33 }, // pitch change + attack
+  ]);
+  assert.deepEqual(results.map((r) => [r.status, r.soft]), [['hit', false], ['hit', true], ['hit', false]]);
+  assert.equal(results[2].offsetMs, 10);
+});
+
+test('wrong pitch without attack is not a hit', () => {
+  const c = chart([[1, 0, 3]]);
+  const { results } = run(c, [{ t: 1.0, midi: 36, legato: true }]);
+  assert.equal(results[0].status, 'miss');
+});
+
+test('miss reasons: different note, right note too early/late, nothing heard', () => {
+  const c = chart([[1, 0, 3], [2, 0, 5], [3, 0, 7]]);
+  const { results, sc } = run(c, [{ t: 1.0, midi: 33 }, { t: 2.2, midi: 33 }]);
+  assert.deepEqual(results.map((r) => r.reason), ['wrong-note', 'timing', 'not-heard']);
+  assert.equal(results[1].offsetMs, 200);
+  const st = sc.passStats();
+  assert.deepEqual([st.wrongPitch, st.missTiming, st.missNotHeard], [1, 1, 1]);
+});
+
+test('an attack whose pitch is unclear does not count as a wrong note', () => {
+  const c = chart([[1, 0, 3]]);
+  const { results } = run(c, [{ t: 1.0, midi: null }]);
+  assert.equal(results[0].reason, 'not-heard');
+  assert.equal(results[0].wrongPitch, false);
 });
 
 test('fast passage: each attack is used once and windows shrink', () => {

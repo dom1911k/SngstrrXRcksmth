@@ -80,3 +80,17 @@ test('21 Guns, notes ringing into each other (not muted): no false hits, still a
   console.log('ringing', stats);
   assert.ok(stats.accuracy >= 0.93, `accuracy ${stats.accuracy}`);
 });
+
+test('detector: weak low note whose pitch settles late is reported with the attack time', async () => {
+  const { NoteEventDetector } = await import('../extension/src/scoring/detector.js');
+  const events = [];
+  const d = new NoteEventDetector((e) => events.push(e));
+  d.onOnset({ t: 1.0 });
+  // Unclear for 150 ms, then a stable E1.
+  for (let t = 1.005; t < 1.15; t += 0.005) d.onFrame({ t, f0: 0, clarity: 0, rms: 0.01 });
+  for (let t = 1.15; t < 1.3; t += 0.005) d.onFrame({ t, f0: 41.2, clarity: 0.95, rms: 0.05 });
+  assert.equal(events.length, 2);
+  assert.equal(events[0].midi, null);
+  assert.equal(events[1].t, 1.0);
+  assert.ok(Math.abs(events[1].midi - 28) < 0.1);
+});

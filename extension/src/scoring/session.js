@@ -15,10 +15,17 @@
 
 import { NoteEventDetector } from './detector.js';
 import { Scorer } from './scorer.js';
-import { getSettings, totalLatencyMs, onSettingsChange } from '../core/settings.js';
+import { getSettings, updateSettings, totalLatencyMs, onSettingsChange } from '../core/settings.js';
 
 const CLOSE_GRACE_MS = 300;
 const DECISION_MS = 200;      // detector needs up to ~150 ms to decide a pitch
+// Automatic timing correction: after every AUTO_SAMPLES timing measurements
+// (hits + right notes just outside the window), move the correction a part of
+// the way towards their median. Small enough to never chase single notes.
+const AUTO_SAMPLES = 12;
+const AUTO_MIN_MS = 8;
+const AUTO_GAIN = 0.6;
+const AUTO_LIMIT_MS = 100;
 
 export class ScoringSession {
   constructor(engine, adapter) {
@@ -68,7 +75,7 @@ export class ScoringSession {
     this.chart = chart;
     this.scorer = chart ? new Scorer(chart, this.scorerOptions()) : null;
     if (this.scorer) {
-      this.scorer.on('result', (r) => { this.emit('result', r); this.emit('stats', this.stats()); });
+      this.scorer.on('result', (r) => { this.learnTiming(r); this.emit('result', r); this.emit('stats', this.stats()); });
       const last = this.scorer.scorable[this.scorer.scorable.length - 1];
       this.lastNoteTime = last ? last.note.t : 0;
     }
@@ -171,6 +178,24 @@ export class ScoringSession {
     const q = this.queue;
     this.queue = [];
     for (const ev of q) this.addAtPerf(ev, this.engine.ctxToPerf(ev.t) - this.latencyMs(), true);
+  }
+
+  learnTiming(r) {
+    const s = getSettings();
+    if (!s.autoTiming || r.offsetMs === null || r.soft) return;
+    if (!(r.status === 'hit' || r.reason === 'timing')) return;
+    this.timingSamples = this.timingSamples || [];
+    this.timingSamples.push(r.offsetMs);
+    if (this.timingSamples.length < AUTO_SAMPLES) return;
+    const sorted = [...this.timingSamples].sort((a, b) => a - b);
+    const median = sorted[sorted.length >> 1];
+    this.timingSamples = [];
+    if (Math.abs(median) < AUTO_MIN_MS) return;
+    const next = Math.max(-AUTO_LIMIT_MS, Math.min(AUTO_LIMIT_MS, Math.round((s.autoTimingMs || 0) + median * AUTO_GAIN)));
+    if (next !== s.autoTimingMs) {
+      updateSettings({ autoTimingMs: next });
+      this.emit('autotiming', { ms: next, median });
+    }
   }
 
   stats() {

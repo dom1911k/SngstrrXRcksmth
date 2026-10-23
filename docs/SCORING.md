@@ -16,6 +16,8 @@ The AudioWorklet reports **attacks** (onsets) and a **pitch** every ~5 ms
   dead/muted notes).
 * **Pitch change without an attack** (≥ 0.75 semitones, stable, not right after an
   attack) → a *legato* played note: hammer-on, pull-off, or slide arrival.
+* **Weak low notes:** if the attack was heard but its pitch only becomes clear
+  later (up to 0.35 s), the note is still reported with the attack's time.
 * A note that simply keeps ringing produces **nothing new**.
 
 ## 2. Timing
@@ -35,8 +37,15 @@ in the song. Windows are in **real time**, so 50% speed is not easier or harder 
 neighbours (never below 35 ms), so windows never overlap. Each played note is used
 for **at most one** expected note: the closest one with the right pitch.
 
-**Self-check:** the summary shows your average offset. If you felt in time but it
-says e.g. "+30 ms late", **Apply** adds that to the fine-tune.
+**Automatic timing correction** (on by default): after every 12 timing
+measurements (hits, plus right notes just outside the window), the session takes
+their median. If it's 8 ms or more off, it moves a learned correction 60% of the way
+towards it (limit ±100 ms). It is added to calibration + fine-tune and shown in the
+panel, with a Reset button. A new calibration resets it. This removes constant
+offsets, e.g. Songsterr's audio path being slightly slower than the calibration
+clicks, so correctly played notes aren't lost to a technicality. Single early/late
+notes don't move it. With it turned off, the summary offers a one-click **Apply**
+instead.
 
 ## 3. Edge cases
 
@@ -44,7 +53,9 @@ says e.g. "+30 ms late", **Apply** adds that to the fine-tune.
 |---|---|
 | Normal note | Hit if a played note with an attack is inside its window **and** within ±50 cents. |
 | Wrong note | Miss. The miss records **what you played** ("played D2, not C2"); the summary lists repeated differences so you can tell a tab error from your own mistake. |
-| Nothing played | Miss. |
+| Nothing played | Miss ("not heard"). |
+| Right note, no attack detected (very soft pluck) | **Hit** if the right pitch appears inside the window and no attack-based match exists. Counted as "soft pluck" in the summary. |
+| Right note, but just outside the window | Miss ("right note but too early/late"), and it feeds the automatic timing correction. |
 | Previous note still ringing | Never counts: a hit needs a **new attack** (or a pitch change for hammer-ons). Re-plucking the same note is detected as a new attack. |
 | Octave errors | A pitch exactly ±12 semitones from the expected note counts as a **hit**, flagged "octave-ambiguous" (the detector, not you, is the likely cause). |
 | Harmonics | ±12, +19, +24 semitones also count. |
@@ -57,11 +68,15 @@ says e.g. "+30 ms late", **Apply** adds that to the fine-tune.
 | Count-in, pause | Nothing is scored while paused or counting in; notes played then are ignored (tune freely). |
 | Seek | Starts a new pass from the new position. Notes before it aren't counted as misses. |
 | Loop | Each loop pass is scored separately. Notes you play right before the loop jumps back still count for the pass they belong to, because the old pass stays open for latency + 0.3 s. A short pop-up shows each pass's result. |
-| End of song | A summary card: accuracy, early/on time/late/missed, average timing, bars to practise, notes that differed from the tab. |
+| End of song | A summary card: accuracy, early/on time/late/missed, **why** notes were missed (not heard / timing / different note), average timing, bars to practise, notes that differed from the tab. |
+
+There are **no per-note hit/miss markers** on the highway (by design: a "miss" flash
+for a note you played right but that the detector misjudged is worse than no
+flash). Live feedback is only the small accuracy % and streak (can be hidden).
 
 ## 4. Known limitations
 
-* Very soft fingerstyle attacks with no finger noise at all may not be detected
-  as attacks (they still score via pitch change only on hammer-on/pull-off notes).
+* A soft pluck of the **same** pitch as the note still ringing has neither an
+  attack nor a pitch change, so it can't be detected.
 * String/fret position can't be verified: E string fret 5 = A string open.
 * Polyphony isn't scored (see chords).

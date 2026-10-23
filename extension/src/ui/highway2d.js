@@ -8,7 +8,6 @@
 import { stringColors } from '../core/music.js';
 import { computeAnchors, anchorAt, firstNoteAtOrAfter } from '../core/chart.js';
 import { CameraFollow, planCameraSegments } from '../core/camera-follow.js';
-import { feedbackLabel } from './feedback-label.js';
 
 const FAR_SCALE = 5;          // far plane is drawn at 1 / (1 + FAR_SCALE) size
 const MIN_FRETS_VISIBLE = 7;
@@ -68,11 +67,6 @@ export class Highway2D {
 
   setOptions(o) { Object.assign(this.options, o); }
 
-  feedback(r) {
-    if (!this.feedbackItems) this.feedbackItems = [];
-    this.feedbackItems.push({ r, born: performance.now() });
-    if (this.feedbackItems.length > 12) this.feedbackItems.shift();
-  }
 
   resize() {
     const dpr = window.devicePixelRatio || 1;
@@ -207,20 +201,6 @@ export class Highway2D {
       visible.push(n);
     }
     for (let j = visible.length - 1; j >= 0; j--) this.drawNote(visible[j], { t, depth, proj, stringY, fretX, wireX, floorY, fretW, s, look });
-
-    // ---- hit/miss labels at the strings ----
-    if (this.feedbackItems) {
-      const nowMs = performance.now();
-      this.feedbackItems = this.feedbackItems.filter((f) => nowMs - f.born < 900);
-      for (const f of this.feedbackItems) {
-        const age = (nowMs - f.born) / 900;
-        const { text, color } = feedbackLabel(f.r);
-        const x = f.r.note.fret > 0 ? fretX(f.r.note.fret) : W / 2;
-        ctx.globalAlpha = age < 0.6 ? 1 : 1 - (age - 0.6) / 0.4;
-        this.text(text, x, stringY(f.r.note.string) - 30 * s - age * 30 * s, 24 * s, color, 'center', true);
-        ctx.globalAlpha = 1;
-      }
-    }
 
     // ---- HUD ----
     const bar = this.barAt(t);

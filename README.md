@@ -141,26 +141,29 @@ Settings in the panel, under **Song & highway**:
 ### Scoring
 1. Open the BASS TRAINER panel and click **Start input** (the cable must be
    running). Calibrate once if you haven't.
-2. Press play and play along. Every note is judged when it reaches the strings:
-   - **✓** on time, **Early** / **Late** (outside ±40 ms), **✗** missed. If you
-     played a different note, the note you played is shown, e.g. **D?**.
-   - At the top: accuracy %, current streak and the last judgement.
+2. Press play and play along. Above the highway you see a small accuracy % and your
+   streak (can be hidden). There are no hit/miss markers on the notes.
 3. **End of the song:** a summary with accuracy, early/on time/late/missed counts,
-   your average timing, the bars to practise, and notes you played differently
-   from the tab ("played D2 instead of C2 ×3 in bar 15"). If it's the same every
-   time and you're sure, the tab may be wrong there.
+   **why** notes were missed (not heard / right note but too early or late /
+   different note), your average timing, the bars to practise, and notes you
+   played differently from the tab ("played D2 instead of C2 ×3 in bar 15"). If
+   it's the same every time and you're sure, the tab may be wrong there.
 4. **Loops:** each pass through a loop is scored separately, with a short pop-up
    after each pass (**Details** opens the full summary).
-5. **Timing check:** if the summary says your hits were on average e.g. "32 ms late"
-   while you felt in time, click **Apply**. This adjusts the timing correction.
+5. **Timing:** the trainer learns small, constant early/late offsets while you
+   play (*automatic timing correction*), so correctly played notes aren't
+   lost to latency. The learned value is shown in the panel's calibration section,
+   with a Reset button. It resets when you calibrate again.
 
-Settings (panel, **Song & highway → Scoring**): turn scoring on/off, timing window
-(Strict ±70 / Normal ±110 / Relaxed ±160 ms), dead notes (any muted attack counts,
-or not scored), labels at the strings on/off, and "Show summary of the current pass".
+Settings (panel, **Song & highway → Scoring**): scoring on/off, live accuracy on/off,
+automatic timing correction on/off, timing window (Strict ±70 / Normal ±110 /
+Relaxed ±160 ms), dead notes (any muted attack counts, or not scored), and
+"Show summary of the current pass".
 
 Not scored by design: ghost notes; slide destinations that aren't picked again;
 upper notes of chords. A note that keeps ringing never counts twice; you have to
-play it again. Details: [`docs/SCORING.md`](docs/SCORING.md).
+play it again. Soft plucks with hardly any attack still count if the pitch is
+right. Details: [`docs/SCORING.md`](docs/SCORING.md).
 
 ### Standalone player (your own audio)
 Click the extension's icon in Chrome's toolbar, or **Open standalone player** in the

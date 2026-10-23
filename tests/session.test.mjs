@@ -90,3 +90,33 @@ test('notes played while paused are ignored; no misses while paused', async () =
   }
   assert.equal(results.length, 0);
 });
+
+test('automatic timing correction learns a constant offset (45 ms late) and settles', async () => {
+  await loadSettings();
+  await updateSettings({ calibrationMs: 150, fineTuneMs: 0, scoring: true, autoTiming: true, autoTimingMs: 0 });
+  const { engine, adapter } = setup({});
+  const chart = normalizeChart({
+    format: 'bass-chart', version: 1, instrument: { strings: 4, tuning: [28, 33, 38, 43] },
+    notes: Array.from({ length: 60 }, (_, i) => ({ t: 1 + i * 0.5, dur: 0.2, string: 0, fret: 3 + (i % 5), flags: {} })),
+  });
+  const session = new ScoringSession(engine, adapter);
+  const results = [];
+  session.on('result', (r) => results.push(r));
+  adapter.emit('chart', { chart, isBassLike: true });
+  const base = 20000;
+  const pending = chart.notes.map((n) => {
+    const playPerf = base + n.t * 1000 + 45; // always 45 ms late
+    return { at: playPerf + 150 + 80, ev: { t: (playPerf + 150) / 1000, midi: n.midi, legato: false } };
+  });
+  for (fakeNow = base; fakeNow < base + 33000; fakeNow += 16) {
+    adapter.clock.update({ perf: fakeNow, time: (fakeNow - base) / 1000, playing: true, speed: 1 });
+    while (pending.length && pending[0].at <= fakeNow) session.onEvent(pending.shift().ev);
+    session.tick();
+  }
+  const { getSettings } = await import('../extension/src/core/settings.js');
+  const learned = getSettings().autoTimingMs;
+  assert.ok(learned >= 35 && learned <= 50, `learned ${learned} ms`);
+  const lastOnes = results.slice(-15);
+  assert.ok(lastOnes.every((r) => r.status === 'hit' && r.rating === 'ontime'), JSON.stringify(lastOnes.map((r) => r.offsetMs)));
+  await updateSettings({ autoTimingMs: 0 });
+});
