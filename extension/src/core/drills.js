@@ -46,6 +46,16 @@ export const DRILLS = [
     defaults: {},
   },
   {
+    id: 'hammer-pull', name: 'Hammer-ons & pull-offs',
+    description: 'Pluck, then hammer on two frets higher without plucking again; next bar pull off back down. Only the first note of each pair is plucked.',
+    defaults: { bpm: 70, bars: 8, position: 5 },
+  },
+  {
+    id: 'muted-groove', name: 'Muted notes (funk groove)',
+    description: 'Root, muted note, root, muted note: lay the fretting fingers on the string without pressing for the muted notes (X). Keep a steady groove.',
+    defaults: { bpm: 80, bars: 8, position: 5 },
+  },
+  {
     id: 'sixteenths', name: 'Sixteenth-note endurance',
     description: 'Even sixteenths alternating plucking fingers, one bar per string. Watch that every note is equally loud.',
     defaults: { bpm: 70, bars: 8, position: 5 },
@@ -89,6 +99,16 @@ function patternBars(id, { bars, position: p }) {
     } else if (id === 'lock-in') {
       const s = [E, A, D, A][Math.floor(b / 2) % 4];
       for (let i = 0; i < 8; i++) ev.push([i * 0.5, s, 0, 0.4]);
+    } else if (id === 'hammer-pull') {
+      const s = [E, A, D, A][Math.floor(b / 2) % 4];
+      const up = b % 2 === 0;
+      for (let i = 0; i < 4; i++) {
+        ev.push([i, s, up ? p : p + 2, 0.45]);
+        ev.push([i + 0.5, s, up ? p + 2 : p, 0.45, { hopo: true }]);
+      }
+    } else if (id === 'muted-groove') {
+      const r = p + prog[b % 4];
+      for (let i = 0; i < 8; i++) ev.push(i % 2 ? [i * 0.5, E, r, 0.2, { dead: true }] : [i * 0.5, E, r, 0.4]);
     } else if (id === 'sixteenths') {
       const s = [E, A, D, G][b % 4];
       for (let i = 0; i < 16; i++) ev.push([i * 0.25, s, p + (i % 4 === 0 ? 0 : 2), 0.22]);
@@ -115,9 +135,9 @@ export function makeDrill(id, opts = {}) {
     bars.push({ i, t: +t.toFixed(4), end: +(t + 4 * q).toFixed(4), measure: i, sig: [4, 4], bpm: tempo, section: i === 0 ? 'Get ready' : d.name });
     for (let k = 0; k < 4; k++) beats.push({ t: +(t + k * q).toFixed(4), downbeat: k === 0 });
     if (i > 0) {
-      for (const [pos, string, fret, dur] of pattern[i - 1]) {
+      for (const [pos, string, fret, dur, flags = {}] of pattern[i - 1]) {
         if (string >= tuning.length) continue;
-        notes.push({ t: +(t + pos * q).toFixed(4), string, fret, dur: +(dur * q).toFixed(4), bar: i, flags: {} });
+        notes.push({ t: +(t + pos * q).toFixed(4), string, fret, dur: +(dur * q).toFixed(4), bar: i, flags: { ...flags } });
       }
     }
     t += 4 * q;

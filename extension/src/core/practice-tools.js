@@ -11,6 +11,8 @@ import { Takes } from './takes.js';
 import { InputMonitor } from './input-monitor.js';
 import { SessionReport } from './session-report.js';
 import { SetlistRunner } from './setlist-runner.js';
+import { DetectionLog } from './detection.js';
+import { loopCurrentPhrase } from './phrases.js';
 
 export function createPracticeTools(engine, adapter, session, notify) {
   const history = new HistoryRecorder(session);
@@ -18,6 +20,7 @@ export function createPracticeTools(engine, adapter, session, notify) {
   const wait = new WaitMode(adapter, session, { notify });
   const takes = new Takes(engine, adapter, session, { notify });
   const monitor = new InputMonitor(engine, session);
+  const detection = new DetectionLog(session);
   // "Practise bars 12–14" chosen on the Library page: loop them once the song is open.
   const library = new LibraryTracker(adapter, {
     onPending: (p) => {
@@ -27,6 +30,7 @@ export function createPracticeTools(engine, adapter, session, notify) {
   });
   const actions = {
     loopSection: () => loopCurrentSection(adapter, notify),
+    loopPhrase: () => loopCurrentPhrase(adapter, notify),
     riffRepeater: () => {
       const on = !getSettings().riffRepeater;
       updateSettings({ riffRepeater: on });
@@ -41,5 +45,5 @@ export function createPracticeTools(engine, adapter, session, notify) {
   });
   const report = new SessionReport(engine, history);
   const setlist = new SetlistRunner(library);
-  return { history, riff, wait, takes, monitor, library, report, setlist, actions };
+  return { history, riff, wait, takes, monitor, detection, library, report, setlist, actions };
 }

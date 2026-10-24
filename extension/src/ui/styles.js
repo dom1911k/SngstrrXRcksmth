@@ -78,6 +78,8 @@ input[type=range] { width: 100%; accent-color: #f2c418; }
 ol { margin: 4px 0 8px 18px; padding: 0; }
 .sc { margin: 3px 0; font-size: 12px; flex-wrap: nowrap; }
 .sc .keys { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+.sub { margin: 10px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #8b93a3; }
+.detlist { max-height: 170px; overflow: auto; }
 kbd { background: #0e1014; border: 1px solid #3a3f49; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font: 11px/1.6 system-ui; color: #e8e8ea; }
 button.btn.small { padding: 2px 7px; font-size: 11px; }
 `;

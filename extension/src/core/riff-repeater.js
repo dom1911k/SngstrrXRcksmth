@@ -5,6 +5,7 @@
 
 import { getSettings, updateSettings, onSettingsChange } from './settings.js';
 import { sectionsOf } from './history.js';
+import { nextPracticeRange } from './phrases.js';
 
 // Pure decision for one finished loop pass (exported for tests).
 // Speeds in percent. Returns { speed, action: 'up' | 'stay' | 'mastered' }.
@@ -59,7 +60,7 @@ export class RiffRepeater {
   begin() {
     const st = this.adapter.getState();
     if (!st.ready || !st.loop) {
-      this.setStatus('Set a loop (A/B, or "Loop this section") and the riff repeater starts.');
+      this.setStatus('Set a loop ("Loop this phrase", "Loop this section" or A/B) and the riff repeater starts.');
       return false;
     }
     const { start } = this.opts();
@@ -93,6 +94,14 @@ export class RiffRepeater {
       this.notify(`${acc} · speeding up to ${r.speed}%`);
       this.setStatus(`Riff repeater: ${r.speed}% (last pass ${acc}).`);
     } else if (r.action === 'mastered') {
+      const next = getSettings().rrAdvance ? nextPracticeRange(this.adapter.getChart(), st.loop) : null;
+      if (next) {
+        // Phrase ladder: on to the next phrase (or the whole section), from the start speed.
+        this.notify(`${acc} at ${speedPct}% · mastered! Next: ${next.label}`);
+        this.adapter.setLoop(next.t, next.end);
+        this.adapter.seek(next.t);
+        return;
+      }
       this.notify(`${acc} at ${speedPct}% · mastered!`);
       this.setStatus(`Mastered at ${speedPct}%. Pick the next section, or keep polishing.`);
     } else {

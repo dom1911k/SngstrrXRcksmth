@@ -355,7 +355,7 @@ export class Highway3D {
   // Hit indicator: a soft spot on the string at the note's fret. It brightens
   // as the note approaches (last ~0.6 s), flashes briefly at the exact moment
   // to play, then fades. Purely a timing cue, not a judgement.
-  updateTargets(t, speed, heard) {
+  updateTargets(t, speed, heard, listening = false, dt = 0.016) {
     if (!this.targetPool) {
       this.targetPool = Array.from({ length: 14 }, () => {
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
@@ -409,24 +409,51 @@ export class Highway3D {
     for (let k = slots; k < this.slotPool.length; k++) this.slotPool[k].visible = false;
     // Held notes: while you hold the right pitch, a bright flare stays on the
     // string at the note's fret (Rocksmith's sustain feedback).
+    // The tail is eaten at the strings as it passes; while you hold it right,
+    // it glows and sparks fly where it meets the string. With the input on and
+    // nothing (or the wrong note) sounding, the tail dims.
     this.sustainLit.fill(0);
-    if (heard) {
-      for (let i = Math.max(0, firstNoteAtOrAfter(notes, t - 8)); i < notes.length && notes[i].t <= t && used < this.targetPool.length; i++) {
-        const n = notes[i];
-        if (n.dur < 0.3 || t > n.t + n.dur || n.flags.dead || n.flags.ghost) continue;
-        const d = heard - n.midi;
-        if (!(Math.abs(d) < 0.6 || Math.abs(Math.abs(d) - 12) < 0.6)) continue;
-        const o = this.noteObjs[i];
-        const sp = this.targetPool[used++];
-        sp.material.color.set(this.colors[n.string] || '#ffffff');
-        sp.material.opacity = 0.75 + 0.15 * Math.sin(performance.now() / 60);
-        sp.scale.set(n.fret === 0 ? 4.4 : 1.25, 0.5, 1);
-        sp.position.set(o.obj.position.x, o.obj.position.y, 0.03);
-        sp.visible = true;
-        this.sustainLit[n.string] = 1;
+    const sounding = this.sustainSounding || (this.sustainSounding = new Uint8Array(6));
+    sounding.fill(0);
+    for (let i = Math.max(0, firstNoteAtOrAfter(notes, t - 8)); i < notes.length && notes[i].t <= t; i++) {
+      const n = notes[i];
+      const o = this.noteObjs[i];
+      if (o.x1 === null || n.dur < 0.3 || t > n.t + n.dur || n.flags.dead || n.flags.ghost) continue;
+      sounding[n.string] = 1;
+      if (heard === null || heard === undefined || used >= this.targetPool.length) continue;
+      // Slides: any pitch between the start and the target note counts.
+      const span = (o.x1 - o.x) || 0;
+      const lo = n.midi + Math.min(0, span), hi = n.midi + Math.max(0, span);
+      const near = (m) => m >= lo - 0.6 && m <= hi + 0.6;
+      if (!(near(heard) || near(heard - 12) || near(heard + 12))) continue;
+      const u = Math.max(0, Math.min(1, (t - n.t) / n.dur));
+      const cx = o.x + (o.x1 - o.x) * u, cy = o.obj.position.y;
+      const sp = this.targetPool[used++];
+      const color = this.colors[n.string] || '#ffffff';
+      sp.material.color.set(color);
+      sp.material.opacity = 0.75 + 0.15 * Math.sin(performance.now() / 60);
+      sp.scale.set(n.fret === 0 ? 4.4 : 1.25, 0.5, 1);
+      sp.position.set(cx, cy, 0.03);
+      sp.visible = true;
+      this.sustainLit[n.string] = 1;
+      if (this.options.sparks) {
+        this.sparkAcc = (this.sparkAcc || 0) + dt * 45;
+        for (; this.sparkAcc >= 1; this.sparkAcc--) {
+          const a = Math.random() * Math.PI;
+          this.particles.spawn({ x: cx + (n.fret === 0 ? (Math.random() - 0.5) * 3 : (Math.random() - 0.5) * 0.3), y: cy, z: 0.05,
+            color: Math.random() < 0.3 ? '#fff6d0' : color, vx: Math.cos(a) * 1.2, vy: 0.8 + Math.random() * 1.6, vz: (Math.random() - 0.2) * 0.6,
+            life: 0.25 + Math.random() * 0.2, size: 0.1 + Math.random() * 0.07, gravity: -6 });
+        }
       }
     }
     for (let k = used; k < this.targetPool.length; k++) this.targetPool[k].visible = false;
+    if (this.tailMats) {
+      this.tailMats.forEach((m, s) => {
+        const held = this.sustainLit[s] > 0, dim = listening && sounding[s] && !held;
+        m.opacity = held ? 0.85 : dim ? 0.28 : 0.55;
+        this.tailCoreMats[s].opacity = held ? 1 : dim ? 0.4 : 0.9;
+      });
+    }
   }
 
   setOptions(o) {
@@ -682,11 +709,13 @@ export class Highway3D {
       this.noteGroup.add(obj);
 
       // Sustain / slide tail in seconds (timeGroup), a ribbon at string height.
+      let tailX1 = null;   // where a held note's tail ends (slides move the hand)
       const sustain = (note.dur >= 0.5 || (note.flags.slide && note.dur > 0.15) || (note.flags.bend && note.dur > 0.2)) && !note.flags.dead && !note.flags.staccato;
       if (sustain) {
         const toFret = note.flags.slide && note.flags.slide.toFret !== null && note.flags.slide.toFret !== undefined ? note.flags.slide.toFret : null;
         const x1 = open ? x : toFret !== null ? Math.max(0.5, toFret - 0.5) : x;
         const hw = open ? 0.35 : 0.16;
+        tailX1 = x1;
         if (note.flags.vibrato && toFret === null) {
           // Vibrato: a wavy tail, as in Rocksmith.
           const step = 0.07, amp = 0.09;
@@ -699,7 +728,7 @@ export class Highway3D {
           tailQuads[s].push([x - hw, x + hw, note.t, note.t + note.dur, y, x1 - hw, x1 + hw]);
         }
       }
-      this.noteObjs.push({ note, obj, gem, body });
+      this.noteObjs.push({ note, obj, gem, body, x, x1: tailX1 });
       prevOnString[s] = note;
     }
     tailQuads.forEach((q, s) => {
@@ -869,7 +898,7 @@ export class Highway3D {
       }
       this.visibleFrom = from;
       this.visibleTo = to;
-      this.updateTargets(t, speed, state.heard);
+      this.updateTargets(t, speed, state.heard, !!state.listening, dt);
 
       // Strings light up while a note on them is sounding.
       const lit = this.lit;

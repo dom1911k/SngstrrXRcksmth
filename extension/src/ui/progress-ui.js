@@ -7,6 +7,7 @@ import { h } from './dom.js';
 import { getSettings, updateSettings } from '../core/settings.js';
 import { sectionsOf } from '../core/history.js';
 import { loopBars } from '../core/riff-repeater.js';
+import { phrasesOf } from '../core/phrases.js';
 
 export const PROGRESS_CSS = `
 .secbar { position: absolute; top: 0; left: 0; right: 0; height: 18px; z-index: 3; cursor: pointer; }
@@ -38,7 +39,7 @@ export function accuracyColor(acc, alpha = 1) {
 export function createProgressUI(wrap, { adapter, history, notify = () => {}, riff = null }) {
   const card = h('div', { class: 'card', hidden: true });
   const canvas = h('canvas');
-  const strip = h('div', { class: 'secbar', title: 'Sections. Click: jump there · double-click: loop it' }, canvas);
+  const strip = h('div', { class: 'secbar', title: 'Sections (ticks = phrases). Click: jump there · double-click: loop the section · Shift+click: loop the phrase' }, canvas);
   wrap.append(strip, card);
   let chart = null;
   let sections = [];
@@ -69,6 +70,12 @@ export function createProgressUI(wrap, { adapter, history, notify = () => {}, ri
   }
   let clickTimer = null;
   strip.addEventListener('click', (e) => {
+    if (e.shiftKey && chart) {
+      const r = canvas.getBoundingClientRect();
+      const t = tOf(e.clientX - r.left, r.width);
+      const p = phrasesOf(chart).find((x) => t >= x.t && t < x.end);
+      if (p) { loopBars(adapter, p.firstBar, p.lastBar, notify); return; }
+    }
     const sec = sectionAtX(e);
     if (!sec) return;
     clearTimeout(clickTimer);
@@ -108,6 +115,14 @@ export function createProgressUI(wrap, { adapter, history, notify = () => {}, ri
         g.fillStyle = playing ? '#ffffff' : '#c3c8d2';
         g.fillText(sec.name, x0 + 4, (hgt - 4) / 2 + 1);
         g.restore();
+      }
+    }
+    // Phrase boundaries inside sections: short ticks at the top.
+    if (chart) {
+      g.fillStyle = 'rgba(255,255,255,.35)';
+      for (const p of phrasesOf(chart)) {
+        if (p.firstBar === p.sectionFirst) continue;
+        g.fillRect(Math.round(xOf(p.t, w)), 1, 1, 5);
       }
     }
     // Weak bars: small red marks along the bottom.

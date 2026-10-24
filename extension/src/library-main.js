@@ -7,6 +7,7 @@ import { STATUSES, songStats, overallStats, setPending, dueInfo, goalProgress, g
 import { drillById } from './core/drills.js';
 import { accuracyColor } from './ui/progress-ui.js';
 import * as hub from './library-hub.js';
+import { LESSONS, lessonState, nextLesson, loadLessonProgress } from './core/lessons.js';
 
 const $ = (id) => document.getElementById(id);
 const pct = (x) => (x === null || x === undefined ? '–' : `${Math.round(x * 100)}%`);
@@ -32,12 +33,21 @@ let records = [];
 let filter = 'all';
 let selected = null;
 let settingsNow = null;
+let lessonTile = null;     // { text, href, done } for the Lessons tile
 let view = 'list', groupBy = 'none';
 try { view = localStorage.getItem('btLibView') || 'list'; groupBy = localStorage.getItem('btLibGroup') || 'none'; } catch { /* ignore */ }
 
 async function load() {
   const [lib, recs, sessions] = await Promise.all([idbLibrary.all(), idbHistory.all(), idbSessions.recent(30), hub.loadAllSetlists()]);
   hub.renderSetupCheck($('setup')).then((r) => { settingsNow = r.settings; renderHubTiles(); });
+  loadLessonProgress().then((p) => {
+    const l = nextLesson(p);
+    const done = LESSONS.filter((x) => lessonState(x, p).done).length;
+    lessonTile = l
+      ? { text: `${done ? `${done}/${LESSONS.length} done · ` : ''}next: ${l.title}`, href: lessonState(l, p).next < l.steps.length ? `../player/player.html?lesson=${l.id}&step=${lessonState(l, p).next}` : '../player/player.html#lessons' }
+      : { text: `${LESSONS.length}/${LESSONS.length} lessons`, done: true };
+    renderHubTiles();
+  }).catch(() => {});
   renderSessions(sessions.slice(0, 3), $('sessionsBox'), $('sessions'));
   renderSessions(sessions, $('sessionsAllBox'), $('sessionsAll'));
   records = recs.sort((a, b) => a.at - b.at);
@@ -280,7 +290,7 @@ async function patch(e, fields) {
 }
 
 function renderHubTiles() {
-  hub.renderTiles($('tiles'), { entries, settings: settingsNow, openSong, setFilter: (f) => { filter = f; location.hash = '#songs'; render(); } });
+  hub.renderTiles($('tiles'), { entries, settings: settingsNow, openSong, lesson: lessonTile, setFilter: (f) => { filter = f; location.hash = '#songs'; render(); } });
 }
 
 // ---------- pages (Home / Songs / Setlists / Progress) ----------

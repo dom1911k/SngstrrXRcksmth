@@ -8,6 +8,7 @@ import { createScoreUI, SCORE_CSS } from './score-ui.js';
 import { createProgressUI, PROGRESS_CSS } from './progress-ui.js';
 import { createEndScreen, END_CSS } from './end-screen.js';
 import { loopBars as loopBarsOf, loopCurrentSection, sectionAt } from '../core/riff-repeater.js';
+import { loopCurrentPhrase } from '../core/phrases.js';
 import { tuningName } from '../core/music.js';
 
 const CSS = (controlsGap) => `
@@ -104,6 +105,7 @@ export function createOverlay(adapter, {
       h('div', {},
         h('button', { class: 'primary', onclick: () => adapter.play() }, '▶ Resume'),
         h('button', { onclick: () => { const sec = sectionNow(); adapter.seek(sec ? sec.t : 0); adapter.play(); } }, '⏮ Section start'),
+        h('button', { onclick: () => loopCurrentPhrase(adapter, (t) => notify(t)) }, '⟲ Loop this phrase'),
         h('button', { onclick: () => loopCurrentSection(adapter, (t) => notify(t)) }, '⟲ Loop this section'),
         riffBtn)));
   const highway2d = new Highway2D(canvas2d);
@@ -295,6 +297,7 @@ export function createOverlay(adapter, {
     }
     active.render({ time, speed, playing, loop, message: active === highway2d ? message || waitMsg : message,
       heard: monitor && playing ? monitor.heardMidi() : null,
+      listening: !!(monitor && playing && monitor.engine.running && session && session.active),
       streak: session && playing && session.active ? ((session.stats() || {}).streak || 0) : 0,
       topInset: progressUI && progressUI.visible ? 18 : 0,
       debug: `sync err ${(adapter.clock.lastError * 1000).toFixed(1)} ms · snaps ${adapter.clock.snaps} · t ${time.toFixed(2)}s · ${st.playerType || ''}` });

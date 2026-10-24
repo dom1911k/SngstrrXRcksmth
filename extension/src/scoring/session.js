@@ -20,6 +20,7 @@
 import { NoteEventDetector } from './detector.js';
 import { Scorer } from './scorer.js';
 import { getSettings, updateSettings, totalLatencyMs, onSettingsChange } from '../core/settings.js';
+import { sensitivityOf } from '../core/detection.js';
 
 const CLOSE_GRACE_MS = 300;
 
@@ -56,9 +57,11 @@ export class ScoringSession {
     engine.on('state', () => { this.detector.reset(); this.emit('stats', this.stats()); });
     adapter.on('chart', (info) => this.setChart(info.isBassLike ? info.chart : null));
     adapter.on('loop', () => this.restartPass('loop-changed'));
+    this.applySensitivity(getSettings());
     onSettingsChange((s) => {
+      this.applySensitivity(s);
       const o = this.scorerOptions(s);
-      if (this.scorer && (o.hitWindowMs !== this.scorer.opts.hitWindowMs || o.onTimeMs !== this.scorer.opts.onTimeMs || o.deadNotes !== this.scorer.opts.deadNotes)) this.setChart(this.chart);
+      if (this.scorer && (o.hitWindowMs !== this.scorer.opts.hitWindowMs || o.onTimeMs !== this.scorer.opts.onTimeMs || o.deadNotes !== this.scorer.opts.deadNotes || o.pitchTolerance !== this.scorer.opts.pitchTolerance)) this.setChart(this.chart);
     });
     const tick = () => { requestAnimationFrame(tick); this.tick(); };
     requestAnimationFrame(tick);
@@ -76,7 +79,13 @@ export class ScoringSession {
   }
 
   scorerOptions(s = getSettings()) {
-    return { hitWindowMs: s.hitWindowMs, onTimeMs: s.onTimeMs, deadNotes: s.deadNotes };
+    return { hitWindowMs: s.hitWindowMs, onTimeMs: s.onTimeMs, deadNotes: s.deadNotes, pitchTolerance: (s.pitchToleranceCents || 50) / 100 };
+  }
+
+  applySensitivity(s) {
+    const sens = sensitivityOf(s);
+    this.detector.minClarity = sens.clarity;
+    if (this.engine.setOnsetRise && this.engine.onsetRiseDb !== sens.onsetDb) this.engine.setOnsetRise(sens.onsetDb);
   }
 
   get active() {

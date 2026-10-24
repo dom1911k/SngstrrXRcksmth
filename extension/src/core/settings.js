@@ -63,7 +63,10 @@ export const DEFAULTS = {
   scoring: true,
   hitWindowMs: 140,        // how early/late a note may be and still count
   onTimeMs: 50,            // within this it is "on time"
-  deadNotes: 'attack',     // 'attack' = any muted attack counts | 'ignore'
+  deadNotes: 'attack',
+  detectSensitivity: 'normal', // note detection: 'low' | 'normal' | 'high' | 'max' (core/detection.js)
+  pitchToleranceCents: 50, // how far off a note may be and still count
+     // 'attack' = any muted attack counts | 'ignore'
   showLiveScore: true,     // accuracy % and streak above the highway
   // Practice
   autoMuteBass: true,      // mute the song's bass track while the input is on
@@ -75,6 +78,7 @@ export const DEFAULTS = {
   rrStep: 5,               // % per successful pass
   rrTarget: 90,            // accuracy % needed for the next step
   rrMaxSpeed: 100,         // %
+  rrAdvance: true,         // phrase ladder: when a loop is mastered, move on to the next phrase
   showSectionBar: true,    // section strip with your weak spots above the highway
   shortcuts: {},           // action -> [bindings]; empty = defaults
   panelCollapsed: ['Shortcuts (keyboard or foot pedal)', 'Record & listen back'], // folded panel sections

@@ -12,6 +12,7 @@ import { createPracticeSection } from './ui/practice-section.js';
 import { createShortcutActions, installShortcuts } from './core/shortcuts.js';
 import { createPracticeTools } from './core/practice-tools.js';
 import { DRILLS, drillById, makeDrill } from './core/drills.js';
+import { createLessonsUI } from './ui/lessons-ui.js';
 import { songStats } from './core/library.js';
 import { historyStore } from './core/history.js';
 import { getSettings } from './core/settings.js';
@@ -194,6 +195,10 @@ function startDrill(id, opts) {
   status(`${drillById(id).name}: press play (Space). The click counts you in.`, true);
 }
 $('drillsBtn').addEventListener('click', openDrills);
+
+// ---- Lessons ----
+const lessons = createLessonsUI({ session, adapter, startDrill, notify: (t) => { status(t, true); notify(t); } });
+$('lessonsBtn').addEventListener('click', () => lessons.open(lessons.current && lessons.current.lesson));
 $('drillCancel').addEventListener('click', () => { $('drills').hidden = true; });
 $('drillStart').addEventListener('click', () => {
   if (!drillSel) return;
@@ -202,7 +207,9 @@ $('drillStart').addEventListener('click', () => {
 
 // ---- Opened from the Library: ?song=<key> (saved chart + audio) or ?drill=<id> ----
 const params = new URLSearchParams(location.search);
-if (params.get('drill') && drillById(params.get('drill'))) {
+if (params.get('lesson')) {
+  lessons.begin(params.get('lesson'), Number(params.get('step') || 0));
+} else if (params.get('drill') && drillById(params.get('drill'))) {
   const d = drillById(params.get('drill'));
   const num = (k) => (params.get(k) ? { [k === 'pos' ? 'position' : k]: Number(params.get(k)) } : {});
   startDrill(d.id, { ...d.defaults, ...num('bpm'), ...num('bars'), ...num('pos') });
@@ -220,6 +227,7 @@ if (params.get('drill') && drillById(params.get('drill'))) {
   })();
 }
 if (location.hash === '#drills') openDrills();
+if (location.hash === '#lessons') lessons.open();
 // Library tiles: open the panel at a section.
 const PANEL_LINKS = { '#tuner': 'Tuner', '#calibrate': 'Latency calibration', '#input': 'Input' };
 if (PANEL_LINKS[location.hash]) setTimeout(() => panel.showSection(PANEL_LINKS[location.hash]), 300);

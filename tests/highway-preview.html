@@ -30,6 +30,8 @@ hw.setChart(chart);
 const t0 = Number(q.get('t') || 0);
 window.__hw = hw;
 let frames = 0;
-function loop() { hw.render({ time: t0 + (q.has('play') ? frames / 60 : 0), speed: 1, playing: true, streak: Number(q.get('streak') || 0) }); frames++; if (frames < 120) requestAnimationFrame(loop); else window.__done = true; }
+// ?held: pretend you hold every sustained note right (input on).
+const heldAt = (time) => { const n = chart.notes.find((x) => x.t <= time && time <= x.t + x.dur && x.dur >= 0.3); return n ? n.midi : null; };
+function loop() { const time = t0 + (q.has('play') ? frames / 60 : 0); hw.render({ time, speed: 1, playing: true, streak: Number(q.get('streak') || 0), heard: q.has('held') ? heldAt(time) : null, listening: q.has('held') || q.has('listen') }); frames++; if (frames < 120) requestAnimationFrame(loop); else window.__done = true; }
 loop();
 </script></body></html>

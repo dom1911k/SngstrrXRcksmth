@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **0.12.1**: Rocksmith 2014 note look (§18). **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
+Status: **0.13.0**: sustain feel, phrases, detection tuning, lessons (§19). **0.12.1**: Rocksmith 2014 note look (§18). **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -638,3 +638,40 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
   < 1.2 s, no section start in between) hides its gems, stems and shadows and keeps
   only a brighter frame (`o.repeat`). Scoring is unchanged. The 0.12.0 slide
   chevrons, palm-mute hatching and rising bend tails were removed (not in the game).
+
+## 19. Sustain feel, phrases, detection tuning, lessons (0.13.0)
+
+* **Sustain** (`highway3d.updateTargets`): each note object keeps its tail start
+  and end x (`o.x`, `o.x1`; `x1 = null` = no tail). For tails sounding now: if the
+  heard pitch (`InputMonitor.heardMidi`) is within ±0.6 st of the note, or of any
+  pitch along a slide (or an octave off), the flare sits at the contact point
+  (x interpolated along the slide), sparks are emitted at ~45/s, and the string's
+  tail materials brighten (0.85 / 1). With `state.listening` (input on, scoring
+  active, playing) and nothing matching, they dim (0.28 / 0.4). The tail itself is
+  already clipped at the strike plane, so it is "eaten" as it passes.
+* **Phrases** (`core/phrases.js`): per section `barsPerPhrase(count, barSeconds)`
+  = round(8 s / bar) clamped to 1, 2 or 4 (4 only if 4 bars ≤ 11 s); a short
+  leftover joins the previous phrase. A phrase whose notes (time relative to its
+  start in 20 ms steps, string, fret) equal an earlier one gets `same` = that
+  index. `nextPracticeRange(chart, loop)`: phrase → next phrase of the section
+  with notes and `same === null || same > cur.index`; none left → the whole
+  section (if it has several phrases); section → first phrase with notes after it.
+  `RiffRepeater.onLoopPass` calls it on *mastered* when `rrAdvance` is on and moves
+  the loop (the loop change restarts the riff repeater at the start speed).
+  Shortcut `loopPhrase` (P), panel button, pause screen, Shift+click in the strip.
+* **Detection tuning** (`core/detection.js`): `SENSITIVITY` maps
+  `detectSensitivity` to the worklet's onset threshold (dB rise: 8 / 6 / 4.5 / 3.5,
+  sent with `engine.setOnsetRise` → `{type:'config', onsetRiseDb}` and in
+  `processorOptions`) and the detector's `minClarity` (0.88 / 0.85 / 0.8 / 0.75).
+  `pitchToleranceCents` becomes the scorer's `pitchTolerance`. `DetectionLog`
+  listens to the session's `played` and `result` events (last 12 detected notes,
+  last 12 misses with `describeMiss` text, last 40 results); `detectionAdvice` picks
+  the main miss reason (not heard / wrong note near the pitch / timing) once ≥ 20%
+  of ≥ 10 results are misses. The panel section re-renders once per frame at most.
+* **Lessons** (`core/lessons.js`, `ui/lessons-ui.js`): 9 lessons × 2–3 drill steps
+  + "apply it". `passesStep`: accuracy ≥ target, speed 100%, ≥ 50% of the drill's
+  notes judged (a stopped run doesn't count). Progress in `chrome.storage.local`
+  `lessonProgress` `{id: {passed, best, at}}`. The player listens to the session's
+  `summary` (kind `song`) while a step is active; `?lesson=<id>&step=<n>` and
+  `#lessons` open it from the Library (tile shows the next lesson). New drills
+  `hammer-pull` (second note of each pair `hopo`) and `muted-groove` (`dead`).

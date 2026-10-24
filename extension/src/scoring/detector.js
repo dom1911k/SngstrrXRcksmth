@@ -14,7 +14,7 @@
 
 import { freqToMidi } from '../core/music.js';
 
-const MIN_CLARITY = 0.85;
+const MIN_CLARITY = 0.85;   // default; DetectionLog's sensitivity setting changes detector.minClarity
 const SETTLE = 0.012;        // s after the onset before pitch frames count (pick noise)
 const MAX_WAIT = 0.14;       // s: give up waiting for a stable pitch (-> midi null)
 const STABLE_FRAMES = 4;     // frames that must agree for a pitch decision
@@ -47,6 +47,7 @@ export class NoteEventDetector {
     this.run = [];            // recent pitches (for legato detection)
     this.runStart = 0;
     this.awaiting = null;     // attack whose pitch was unclear: { t }
+    this.minClarity = MIN_CLARITY;
   }
 
   reset() {
@@ -64,7 +65,7 @@ export class NoteEventDetector {
   }
 
   onFrame(f) {
-    const good = f.f0 > 0 && f.clarity >= MIN_CLARITY;
+    const good = f.f0 > 0 && f.clarity >= this.minClarity;
     const m = good ? freqToMidi(f.f0) : null;
     if (good) this.lastGood = f.t;
 

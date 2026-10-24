@@ -24,6 +24,7 @@ export class AudioEngine {
     this.minFreq = 36;
     this.monitorLevel = 0;
     this.lowLatency = true;
+    this.onsetRiseDb = 6;
   }
 
   on(type, fn) {
@@ -102,7 +103,7 @@ export class AudioEngine {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       outputChannelCount: [1],
-      processorOptions: { minFreq: this.minFreq },
+      processorOptions: { minFreq: this.minFreq, onsetRiseDb: this.onsetRiseDb },
     });
     this.perfOffset = null;
     this.node.port.onmessage = (e) => {
@@ -190,6 +191,12 @@ export class AudioEngine {
       this.running = false;
       this.emit('state', this.describe());
     }
+  }
+
+  // Note detection sensitivity: dB rise that counts as a new pluck (lower = more sensitive).
+  setOnsetRise(db) {
+    this.onsetRiseDb = db;
+    if (this.node) this.node.port.postMessage({ type: 'config', onsetRiseDb: db });
   }
 
   setMinFreq(minFreq) {

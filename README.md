@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.12.1.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.13.0.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -129,8 +129,12 @@ Good Riddance, can be played too.
     first beat of a bar).
   - When you hit a note, the note flashes and sinks into the string, the string
     ripples around that fret, and it **sparks**, as in Rocksmith (only hits;
-    nothing is shown for misses). While you hold a long note at the right pitch, a
-    bright flare stays on the string.
+    nothing is shown for misses).
+  - **Held notes:** the tail is eaten up at the strings as it passes. While you
+    hold the note at the right pitch, the tail glows brighter, a flare sits on the
+    string and sparks fly where the tail meets the string (along a slide, they
+    follow your hand). With the input on and the note not (or wrongly) sounding,
+    the tail dims.
   - As a note arrives, its fret lights up on the fretboard in the string's colour.
     The fretboard has inlay dots, the lane flashes briefly when a new section
     starts, and slow light beams move behind the horizon.
@@ -231,8 +235,18 @@ Panel sections can be folded by clicking their heading; the panel remembers it.
 ### Riff repeater, wait mode, weak spots, takes (panel → **Riff repeater & wait mode**)
 These need the input to be running (*Start input*).
 
+- **Phrases** (as in Rocksmith 2014): every section is cut into short phrases of
+  1, 2 or 4 bars (about 4–10 seconds). Small ticks in the section strip show
+  where they start. **Loop this phrase** loops the phrase you are in (also: key
+  **P**, **Shift+click** in the section strip, or the pause screen).
 - **Loop this section** loops the section you are in (also: key **L**, or
   double-click it in the section strip).
+- **Phrase by phrase** (on by default, with the riff repeater): when a loop is
+  mastered (target accuracy at the maximum speed), the riff repeater moves on by
+  itself: to the next phrase with new notes (phrases that repeat one you already
+  mastered are skipped), after the last phrase to the **whole section**, and then
+  to the first phrase of the next section, each time from the start speed. So you
+  can learn a whole song piece by piece without touching anything.
 - **Riff repeater:** tick *speed up automatically on a loop*. When you set a loop,
   the song drops to the start speed (default 70%). Each time you play a whole
   loop pass with at least the target accuracy (default 90%), the speed goes up by
@@ -263,6 +277,21 @@ These need the input to be running (*Start input*).
   The Songsterr bass stays muted if auto-muting is on, so you hear yourself instead
   of the tab. **Save** downloads the take as a WAV file. Takes disappear when the
   page is reloaded. *Take volume* sets how loud the take plays.
+
+### Note detection (panel → **Note detection**)
+- **Sensitivity:** *Normal* suits most players. If notes you play are often
+  "nothing heard" (soft fingerstyle, a quiet bass), choose *High* or *Very high*. If
+  the trainer picks up notes you didn't play (string noise, a noisy room), choose
+  *Low*.
+- **Pitch tolerance:** how far off a note may be and still count (*Strict* ±40,
+  *Normal* ±50, *Relaxed* ±70 cents). Relaxed helps if your bass doesn't stay in
+  tune well; better is to tune up with the tuner.
+- **What I heard:** every note the trainer recognises, newest first (name, and
+  whether it was plucked, legato or muted). Play a few notes to check the input.
+- **Missed notes and why:** for each missed note, the bar and the reason: "E2:
+  heard F2 instead (a semitone off)", "A1: nothing heard", "D2: right note, but
+  170 ms late". After enough notes a yellow tip says what to change (sensitivity,
+  tuning, volume or calibration).
 
 ### Scoring
 1. Open the BASS TRAINER panel and click **Start input** (the cable must be
@@ -419,6 +448,18 @@ artists, tracks with tuning, difficulty and views), nothing more.
 - Few results after filtering? It searches further pages automatically, or press
   *Search further*. Your last search and filters are remembered.
 
+### Lessons
+**Lessons** (player toolbar, the Library menu or its Home tile) are short courses,
+one technique each: Find the beat, One finger per fret, Roots and fifths, Octaves,
+String crossing, The major scale, Hammer-ons & pull-offs, Muted notes & groove,
+Sixteenth notes. Each lesson explains the technique with a few tips, then has two
+or three **steps**: a drill at a set tempo. Press **Start**, start the input and
+play. A step is **passed** when a full run at 100% speed reaches the target
+(80–85%). A bar above the highway shows the step and your best score, and **Next
+step ▶** appears when you pass. The last step, **Apply it**, suggests how to use the
+technique in a song from your Library (tick *Done* yourself). Progress is saved;
+the Library's Lessons tile shows the next lesson and opens it at the right step.
+
 ### Warm-up & technique drills
 **Drills** (player toolbar, the Library, or the panel on Songsterr) opens a list
 of exercises. They are played in the player with a metronome click and scored like
@@ -432,6 +473,8 @@ a song:
 | Root–fifth–octave | the classic R–5–8–5 pattern |
 | Major scale (one octave) | the major scale shape, a new key every two bars |
 | Metronome lock-in | steady eighths on open strings, tempo rising 4 BPM every two bars |
+| Hammer-ons & pull-offs | two notes with one pluck (legato), up and down |
+| Muted notes (funk groove) | root and muted note (X) in eighths |
 | Sixteenth-note endurance | even sixteenths, alternating fingers |
 
 **Fretboard trainer** (also in the Drills list): learn where the notes are.
@@ -580,6 +623,11 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.13.0:** held notes glow and spark while you hold them (and dim when you
+  don't); phrases (1–4 bars) with *Loop this phrase* (key P) and a phrase-by-phrase
+  riff repeater; note detection settings (sensitivity, pitch tolerance) with a
+  "what I heard" and "missed notes and why" log; Lessons (9 courses built from the
+  drills); two new drills (hammer-ons & pull-offs, muted notes).
 - **0.12.1:** notes as in Rocksmith 2014: no fret numbers on the notes, repeated
   chords as an empty frame, ▲/▼ for hammer-on/pull-off; approach rings off by
   default; removed the invented slide chevrons, palm-mute hatching and bend curve.
@@ -622,6 +670,7 @@ node tests/e2e-scoring.mjs [shot.png]             # scoring in the browser with 
 node tests/e2e-phase4.mjs /tmp/a.wav [shot.png]   # real Songsterr: count-in, shortcuts, mute status
 node tests/e2e-v2.mjs [shot-prefix]               # takes, history + progress card, wait mode, riff repeater
 node tests/e2e-search.mjs [shot-prefix]           # Find songs against Songsterr's real search (needs network)
+node tests/e2e-v3.mjs [shot-prefix]               # lesson step played and passed, detection log, phrase loop
 node tests/e2e-library.mjs [shot-prefix]          # drill scored + saved, ☆ Save, Library page, "practise these bars"
 npx http-server -p 8123                           # then open /tests/highway-preview.html?t=78&style=3d
 ```

@@ -55,3 +55,30 @@ code { background: #0e1014; padding: 1px 5px; border-radius: 4px; }
 .tfb.no { color: #ffb347; }
 .warnline { color: #ffb347; }
 .drill-opts[hidden] { display: none; }
+
+/* Lessons */
+.dialog-box.wide { width: min(980px, 96vw); }
+.lesson-grid { display: grid; grid-template-columns: 250px 1fr; gap: 16px; margin: 12px 0; }
+.lesson-list { display: flex; flex-direction: column; gap: 6px; }
+.lesson { text-align: left; background: #0e1014; border: 1px solid #2c2f36; border-radius: 10px; padding: 8px 10px; color: #e8e8ea; cursor: pointer; font: inherit; }
+.lesson:hover { border-color: #5a6170; }
+.lesson.on { border-color: #f2c418; box-shadow: 0 0 0 1px #f2c418 inset; }
+.lesson.done b { color: #5fd38d; }
+.lesson b { display: block; margin: 1px 0 6px; }
+.lvl { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #8b919c; }
+.lesson .prog { display: block; height: 4px; background: #23262c; border-radius: 2px; overflow: hidden; }
+.lesson .prog i { display: block; height: 100%; background: #5fd38d; }
+.lesson-detail h3 { margin: 2px 0 6px; font-size: 20px; }
+.lesson-detail p { line-height: 1.5; color: #c9cdd4; margin: 0 0 8px; }
+.lesson-detail .tips { margin: 0 0 12px 18px; padding: 0; color: #9aa0aa; font-size: 13px; }
+.lstep { display: flex; gap: 10px; align-items: center; background: #0e1014; border: 1px solid #2c2f36; border-radius: 10px; padding: 8px 10px; margin: 6px 0; }
+.lstep.nextup { border-color: #f2c418; }
+.lstep.passed .n { background: #1f4d33; color: #5fd38d; }
+.lstep .n { width: 26px; height: 26px; flex: none; border-radius: 50%; background: #23262c; display: grid; place-items: center; font-weight: 700; }
+.lstep .grow { flex: 1; }
+.lesson-bar { position: fixed; top: 104px; left: 50%; transform: translateX(-50%); z-index: 2147482996; width: min(900px, 92vw); box-sizing: border-box;
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 14px; background: rgba(29,26,12,.94); border: 1px solid #4a3f12; border-radius: 10px; color: #f2e6b0; font-size: 13px; }
+.lesson-bar[hidden] { display: none; }
+.lesson-bar .grow { flex: 1; }
+@media (max-width: 700px) { .lesson-grid { grid-template-columns: 1fr; } }
+.lesson-bar [hidden] { display: none; }
