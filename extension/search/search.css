@@ -35,9 +35,17 @@
 .srow .acts .on { background: #2b2140; border-color: #5a3d8f; color: #d3a6ff; }
 .more { text-align: center; margin-top: 14px; }
 .loading { text-align: center; color: var(--muted); padding: 24px; }
+.layout > main { min-width: 0; }
+/* Narrower windows: drop the track and views columns, then the sidebar, then difficulty. */
+@media (max-width: 1300px) {
+  .srow { grid-template-columns: 40px minmax(0, 1fr) 96px 84px 150px; }
+  .srow .track, .srow .views { display: none; }
+}
 @media (max-width: 1000px) {
   .layout { grid-template-columns: 1fr; }
   .filters { position: static; max-height: none; }
-  .srow { grid-template-columns: 40px 1fr 90px 120px; }
-  .srow .track, .srow .views { display: none; }
+}
+@media (max-width: 640px) {
+  .srow { grid-template-columns: 40px minmax(0, 1fr) 92px 150px; }
+  .srow .diff { display: none; }
 }

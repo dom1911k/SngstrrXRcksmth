@@ -38,7 +38,7 @@ page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 page.on('console', (m) => { if (m.type() === 'error') console.log('[console]', m.text()); });
 await page.goto(`chrome-extension://${new URL(sw.url()).host}/player/player.html`);
 await page.waitForTimeout(800);
-await page.setInputFiles('#chartFile', chartPath);
+await page.setInputFiles('#openFiles', chartPath);
 await page.waitForTimeout(300);
 // No latency in this setup: calibration 0. When the sync click is detected,
 // start the song so that the click lands on its place in the song.

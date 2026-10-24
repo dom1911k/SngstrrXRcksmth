@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **0.13.0**: sustain feel, phrases, detection tuning, lessons (§19). **0.12.1**: Rocksmith 2014 note look (§18). **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
+Status: **0.13.1**: tidy-up (§20). **0.13.0**: sustain feel, phrases, detection tuning, lessons (§19). **0.12.1**: Rocksmith 2014 note look (§18). **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -675,3 +675,26 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
   `summary` (kind `song`) while a step is active; `?lesson=<id>&step=<n>` and
   `#lessons` open it from the Library (tile shows the next lesson). New drills
   `hammer-pull` (second note of each pair `hopo`) and `muted-groove` (`dead`).
+
+## 20. Tidy-up (0.13.1)
+
+* **Panel order:** `createPanel(engine, { sections })` takes the sections in order,
+  with the strings `'input'`, `'tuner'`, `'monitor'`, `'calibration'` placing the
+  built-in ones; `panelOrder()` (ui/training-section.js) is the order used on
+  Songsterr and in the player. Settings schema 6 resets `panelCollapsed` to the new
+  defaults once (headings were renamed: Practice → Playback, Riff repeater & wait
+  mode → Loops & riff repeater).
+* **Start input from anywhere:** `core/input-request.js` (`requestInputStart` /
+  `onInputStartRequest`); the panel registers the handler. Used by the highway hint
+  (score-ui), the fretboard trainer and lesson steps (only from a click: Chrome
+  needs a user gesture for audio, so `?lesson=` links don't start it).
+* `ScoringSession.streak` (no per-frame `stats()` object for the stage effects).
+* Lessons: a chart that is not the active step's drill (`meta.source` type/id/bpm)
+  ends the lesson, so another run can't pass the step.
+* Player: one `#openFiles` input (multiple; chart before audio), ⋯ menu
+  (`#morePop`: offset, metronome, updates), start screen with actions, the speed
+  `<select>` follows `adapter.speed` (adds e.g. 65% when needed).
+* Pitfall found: `replaceChildren(a, null)` inserts the text "null" (unlike `h()`),
+  so conditional children there use `''`.
+* Checks: `node --check` did not flag a syntax error in an ES module here; use
+  `node --input-type=module --check < file.js`.

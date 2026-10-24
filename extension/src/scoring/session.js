@@ -262,6 +262,11 @@ export class ScoringSession {
     }
   }
 
+  // Current note streak (cheap; read every frame by the highway).
+  get streak() {
+    return this.scorer ? this.scorer.pass.streak : 0;
+  }
+
   stats() {
     if (!this.scorer) return null;
     return { ...this.scorer.passStats(), active: this.active, kind: this.passKind };

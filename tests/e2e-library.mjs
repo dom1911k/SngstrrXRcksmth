@@ -237,7 +237,7 @@ const ok = out.loaded && /Octaves/.test(out.loaded)
   && out.library.rows.includes('21 Guns') && out.library.rows.some((r) => /Octaves/.test(r)) && out.library.cards.length === 9
   && out.detail.open && out.detail.sections === 2 && out.detail.weak.some((w) => /Bar 9/.test(w)) && out.detail.chart
   && out.pending && out.pending.songKey === 'songsterr:23557:5' && out.pending.loopBars[0] === 7 && /songsterr/.test(out.popupUrl)
-  && out.hub.tiles.length === 7 && !out.hub.tiles.includes("Continue") && out.hub.setup.some((t) => /input/i.test(t)) && out.hub.shelf.includes('Hysteria')
+  && out.hub.tiles.length === 5 && !out.hub.tiles.includes("Continue") && out.hub.setup.some((t) => /input/i.test(t)) && out.hub.shelf.includes('Hysteria')
   && /Rehearsal/.test(out.hub.setlist) && /2 songs/.test(out.hub.setlist) && /songsterr/.test(out.hub.setlistOpened)
   && out.hub.run && out.hub.run.songKeys.length === 2 && out.hub.grid >= 4 && out.hub.groups.includes('E Standard')
   && out.hub.board.some((b) => b.startsWith('want:1')) && out.hub.afterDrop === 'learning' && out.hub.weekly === 12

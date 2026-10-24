@@ -10,7 +10,7 @@ import { AutoMute } from './core/auto-mute.js';
 import { createPracticeSection } from './ui/practice-section.js';
 import { createShortcutActions, installShortcuts } from './core/shortcuts.js';
 import { createPracticeTools } from './core/practice-tools.js';
-import { createTrainingSections } from './ui/training-section.js';
+import { createTrainingSections, panelOrder } from './ui/training-section.js';
 
 export async function start() {
   if (document.getElementById('bass-trainer-root')) return; // already running
@@ -25,7 +25,7 @@ export async function start() {
   const notify = (t) => overlay && overlay.notify(t);
   const tools = createPracticeTools(engine, adapter, session, notify);
   const training = createTrainingSections({ adapter, ...tools, notify, showProgress: () => overlay.showProgress() });
-  panel = createPanel(engine, { sections: [practiceSection[0], ...training, practiceSection[1], ...songSection] });
+  panel = createPanel(engine, { sections: panelOrder(practiceSection, training, songSection) });
   overlay = createOverlay(adapter, { session, ...tools });
   document.documentElement.append(overlay.host, panel.host);
   installShortcuts(createShortcutActions(adapter, { notify, onToggleView: () => overlay.toggleView(), extra: tools.actions }));

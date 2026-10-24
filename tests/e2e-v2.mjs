@@ -38,7 +38,7 @@ page.on('pageerror', (e) => { errors.push(e.message); console.log('[pageerror]',
 page.on('console', (m) => { if (m.type() === 'error') console.log('[console]', m.text()); });
 await page.goto(`chrome-extension://${new URL(sw.url()).host}/player/player.html`);
 await page.waitForTimeout(800);
-await page.setInputFiles('#chartFile', chartPath);
+await page.setInputFiles('#openFiles', chartPath);
 await page.waitForTimeout(300);
 
 const out = {};

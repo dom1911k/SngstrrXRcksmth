@@ -2,6 +2,7 @@
 // display, a short toast after each loop pass and a summary card at the end of
 // the song. Deliberately no per-note hit/miss markers.
 import { h } from './dom.js';
+import { requestInputStart } from '../core/input-request.js';
 import { getSettings, updateSettings } from '../core/settings.js';
 
 export const SCORE_CSS = `
@@ -12,6 +13,7 @@ export const SCORE_CSS = `
 .score .streak { color: #f2c418; }
 .hint { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3; color: #ffb347; font: 600 14px system-ui; text-shadow: 0 1px 3px #000; }
 .hint[hidden] { display: none; }
+.hint .hintbtn { font: 700 13px system-ui; background: #e8202a; color: #fff; border: 0; border-radius: 6px; padding: 4px 10px; margin: 0 4px; cursor: pointer; }
 .milestone { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); z-index: 4; pointer-events: none; text-align: center;
   font-family: system-ui, "Segoe UI", sans-serif; color: #fff; text-shadow: 0 0 18px rgba(242,196,24,.8), 0 2px 4px #000; }
 .milestone[hidden] { display: none; }
@@ -46,7 +48,8 @@ export function createScoreUI(wrap, session, getHighway, { onSongEnd = null } = 
   const acc = h('span', { class: 'acc' }, '–');
   const streak = h('span', { class: 'streak' }, '');
   const score = h('div', { class: 'score', hidden: true }, acc, streak);
-  const hint = h('div', { class: 'hint', hidden: true }, 'Start the input in the BASS TRAINER panel to score your playing');
+  const hint = h('div', { class: 'hint', hidden: true }, 'The input is off: ',
+    h('button', { class: 'hintbtn', onclick: () => requestInputStart() }, '🎙 Start input'), ' to score your playing');
   const toast = h('div', { class: 'toast', hidden: true });
   const card = h('div', { class: 'card', hidden: true });
   wrap.append(score, hint, toast, card);

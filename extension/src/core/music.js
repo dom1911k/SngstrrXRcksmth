@@ -21,10 +21,6 @@ export function noteNameNoOctave(midi) {
   return NOTE_NAMES[((m % 12) + 12) % 12];
 }
 
-export function centsBetween(freq, targetMidi, refA = 440) {
-  return (freqToMidi(freq, refA) - targetMidi) * 100;
-}
-
 export const TUNINGS = {
   'E Standard': [28, 33, 38, 43],
   'Drop D': [26, 33, 38, 43],

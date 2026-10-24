@@ -2,7 +2,8 @@
 // survives clearing Songsterr's site data) and localStorage elsewhere (tests).
 
 const KEY = 'bassTrainerSettings';
-const SCHEMA = 5;
+const SCHEMA = 6;
+const PANEL_FOLDED = ['Scoring', 'Note detection', 'Playback', 'Hear yourself (monitoring)', 'Record & listen back', 'Shortcuts (keyboard or foot pedal)'];
 
 // Adjust settings saved by older versions.
 function migrate(stored) {
@@ -26,6 +27,10 @@ function migrate(stored) {
     // approach rings (both can be switched back on).
     stored.gemFretNumbers = false;
     stored.approachRings = false;
+  }
+  if (v < 6) {
+    // 0.13.1: panel reordered and renamed; fold the less used sections.
+    stored.panelCollapsed = [...PANEL_FOLDED];
   }
   stored.schema = SCHEMA;
   return stored;
@@ -81,7 +86,7 @@ export const DEFAULTS = {
   rrAdvance: true,         // phrase ladder: when a loop is mastered, move on to the next phrase
   showSectionBar: true,    // section strip with your weak spots above the highway
   shortcuts: {},           // action -> [bindings]; empty = defaults
-  panelCollapsed: ['Shortcuts (keyboard or foot pedal)', 'Record & listen back'], // folded panel sections
+  panelCollapsed: [...PANEL_FOLDED], // folded panel sections (by heading)
   autoTiming: true,        // learn a small timing correction while playing
   autoTimingMs: 0,         // the learned correction (added to the latency)
   autoTimingBySource: {},  // learned correction per sound source (Songsterr ORIG / SYNTH, audio file)

@@ -4,8 +4,6 @@
 
 import { NOTE_NAMES } from './music.js';
 
-export const NATURALS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
-
 // Pure: one random question. rnd() in [0, 1).
 export function makeQuestion({ tuning, maxFret = 12, naturalsOnly = true, strings = null, avoid = null }, rnd = Math.random) {
   const pool = [];

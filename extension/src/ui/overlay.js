@@ -298,7 +298,7 @@ export function createOverlay(adapter, {
     active.render({ time, speed, playing, loop, message: active === highway2d ? message || waitMsg : message,
       heard: monitor && playing ? monitor.heardMidi() : null,
       listening: !!(monitor && playing && monitor.engine.running && session && session.active),
-      streak: session && playing && session.active ? ((session.stats() || {}).streak || 0) : 0,
+      streak: session && playing && session.active ? session.streak : 0,
       topInset: progressUI && progressUI.visible ? 18 : 0,
       debug: `sync err ${(adapter.clock.lastError * 1000).toFixed(1)} ms · snaps ${adapter.clock.snaps} · t ${time.toFixed(2)}s · ${st.playerType || ''}` });
     if (active === highway3d) {
@@ -311,11 +311,12 @@ export function createOverlay(adapter, {
       if (riff && riff.enabled && loop) right.push('RIFF');
       if (Math.abs(speed - 1) > 0.001) right.push(`${Math.round(speed * 100)}%`);
       if (loop) right.push('LOOP');
-      if (!playing) right.push('PAUSED');
+      if (!playing && lastChart) right.push('PAUSED');
       hudRight.textContent = right.join('   ');
       const waiting = !message && wait && wait.enabled && wait.message;
       hudCenter.classList.toggle('wait', !!waiting);
-      hudCenter.textContent = message || (waiting ? wait.message : '') || (!lastChart && msg.hidden ? 'Waiting for the song…' : '');
+      // (The standalone player shows its own start screen while nothing is loaded.)
+      hudCenter.textContent = message || (waiting ? wait.message : '') || (!lastChart && msg.hidden && !fixedMode ? 'Waiting for the song…' : '');
       debugEl.textContent = s.showDebug ? `sync err ${(adapter.clock.lastError * 1000).toFixed(1)} ms · ${Math.round(active.fps)} fps` : '';
     } else {
       debugEl.textContent = '';
@@ -330,7 +331,7 @@ export function createOverlay(adapter, {
     if (!lastChart || wrap.hidden || !lastChart.notes.length) return;
     if (adapter.getTime() > lastChart.notes[0].t - 0.5) return;
     const m = lastChart.meta || {};
-    titleCard.replaceChildren(h('div', { class: 't' }, m.title || ''), m.artist ? h('div', { class: 'a' }, m.artist) : null,
+    titleCard.replaceChildren(h('div', { class: 't' }, m.title || ''), m.artist ? h('div', { class: 'a' }, m.artist) : '',
       h('div', { class: 'm' }, [m.track && !/drill/i.test(m.track) ? 'Bass' : m.track, tuningName(lastChart.instrument.tuning)].filter(Boolean).join(' · ')));
     titleCard.hidden = false;
     titleCard.classList.remove('go');

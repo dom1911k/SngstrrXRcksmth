@@ -46,7 +46,7 @@ export function createPracticeSection(adapter, autoMute) {
   }
 
   const section = h('section', {},
-    h('h2', {}, 'Practice'),
+    h('h2', {}, 'Playback'),
     h('label', { class: 'row muted' }, muteBox, 'Mute the song\'s bass track while the input is on (restored when you stop)'),
     muteStatus,
     h('label', { class: 'row muted' }, ciBefore, 'Count-in before playback'),

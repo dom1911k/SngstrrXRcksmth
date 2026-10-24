@@ -45,9 +45,6 @@ export function renderTiles(el, { entries, settings, openSong, setFilter, lesson
   const fret = entries.find((e) => e.songKey === 'drill:fretboard');
   const due = entries.filter((e) => e.due && e.due.due).length;
   const want = entries.filter((e) => e.status === 'want').length;
-  const cal = settings && settings.calibrationMs !== null && settings.calibrationMs !== undefined
-    ? `${Math.round(settings.calibrationMs + (settings.fineTuneMs || 0))} ms · ${settings.calibratedAt ? `${Math.max(0, Math.floor((Date.now() - settings.calibratedAt) / DAY))} days ago` : 'calibrated'}`
-    : 'not calibrated yet';
   const tile = (icon, title, sub, action, cls = '') => h(action.href ? 'a' : 'button', { class: `tile ${cls}`, href: action.href, onclick: action.onclick },
     h('span', { class: 'ico' }, icon), h('b', {}, title), h('span', { class: 'sub' }, sub));
   el.replaceChildren(...[
@@ -58,8 +55,6 @@ export function renderTiles(el, { entries, settings, openSong, setFilter, lesson
     tile('🎓', 'Lessons', lesson ? `${lesson.done ? 'all done! ' : ''}${lesson.text}` : 'step-by-step technique', { href: lesson && lesson.href ? lesson.href : '../player/player.html#lessons' }),
     tile('🥁', 'Drills', bestDrill ? `${bestDrill.title.replace(/^Drill: /, '')}${bestDrill.stats.bestBpm ? ` · ${bestDrill.stats.bestBpm} BPM` : ''}` : 'warm-up & technique', { href: '../player/player.html#drills' }),
     tile('🎯', 'Fretboard trainer', fret && fret.stats.passes ? `last round ${pct(fret.stats.last)}` : 'learn the notes on the neck', { href: '../player/player.html?drill=fretboard' }),
-    tile('🎚', 'Tuner', settings ? settings.tuningName : '', { href: '../player/player.html#tuner' }),
-    tile('⏱', 'Calibrate', cal, { href: '../player/player.html#calibrate' }),
   ].filter(Boolean));
 }
 
@@ -135,7 +130,6 @@ export function setlistChips(e, rerender) {
 
 // ---------- song views ----------
 export const VIEWS = [['list', '☰ List'], ['grid', '▦ Grid'], ['board', '▥ Board']];
-export const GROUPS = [['none', 'No grouping'], ['tuning', 'By tuning'], ['artist', 'By artist'], ['status', 'By status']];
 
 export function groupKey(e, by) {
   if (by === 'tuning') return e.kind === 'drill' ? 'Drills' : e.tuning || 'Unknown tuning';

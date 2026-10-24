@@ -19,7 +19,7 @@ import { getSettings } from './core/settings.js';
 import { TUNINGS } from './core/music.js';
 import { NoteTrainer } from './core/note-trainer.js';
 import { createNoteTrainerUI } from './ui/note-trainer-ui.js';
-import { createTrainingSections } from './ui/training-section.js';
+import { createTrainingSections, panelOrder } from './ui/training-section.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (t) => {
@@ -38,7 +38,7 @@ const practiceSection = createPracticeSection(adapter, autoMute);
 const notify = (t) => overlay && overlay.notify(t);
 const tools = createPracticeTools(engine, adapter, session, notify);
 const training = createTrainingSections({ adapter, ...tools, notify, showProgress: () => overlay.showProgress() });
-panel = createPanel(engine, { sections: [practiceSection[0], ...training, practiceSection[1], ...songSection] });
+panel = createPanel(engine, { sections: panelOrder(practiceSection, training, songSection) });
 overlay = createOverlay(adapter, { controlsGap: 0, headerGap: 78, fixedMode: 'highway', session, ...tools });
 document.body.append(overlay.host, panel.host);
 installShortcuts(createShortcutActions(adapter, { notify, extra: tools.actions }));
@@ -70,11 +70,20 @@ async function openFile(file) {
   } else {
     status(`${file.name}: not a chart (.json) or audio file.`);
   }
-  $('empty').hidden = !!adapter.chart;
 }
 
-$('chartFile').addEventListener('change', (e) => { openFile(e.target.files[0]); e.target.value = ''; });
-$('audioFile').addEventListener('change', (e) => { openFile(e.target.files[0]); e.target.value = ''; });
+adapter.on('chart', () => { $('empty').hidden = !!adapter.chart; });
+for (const b of document.querySelectorAll('#empty [data-open]')) {
+  b.addEventListener('click', () => (b.dataset.open === 'lessons' ? lessons.open() : openDrills()));
+}
+$('openFiles').addEventListener('change', async (e) => {
+  const files = [...e.target.files].sort((a) => (/\.json$/i.test(a.name) ? -1 : 1)); // chart first
+  e.target.value = '';
+  for (const f of files) await openFile(f);
+});
+// "⋯" menu: audio offset, metronome, updates.
+$('moreBtn').addEventListener('click', (e) => { e.stopPropagation(); $('morePop').hidden = !$('morePop').hidden; });
+document.addEventListener('click', (e) => { if (!$('morePop').contains(e.target)) $('morePop').hidden = true; });
 
 // Drag & drop
 let dragDepth = 0;
@@ -132,6 +141,17 @@ function ui() {
   $('time').textContent = `${fmt(t)} / ${fmt(d)}`;
   if (!seeking && d > 0) $('seek').value = Math.round((Math.max(0, t) / d) * 1000);
   $('play').textContent = adapter.isPlaying() ? '❚❚' : '▶';
+  // Keep the speed menu in step with the riff repeater and the − + keys.
+  const pct = String(Math.round(adapter.speed * 100));
+  const sel = $('speed');
+  if (sel.value !== pct && document.activeElement !== sel) {
+    if (![...sel.options].some((o) => o.value === pct)) {
+      const opt = new Option(`${pct}%`, pct);
+      const after = [...sel.options].find((o) => Number(o.value) > Number(pct));
+      sel.insertBefore(opt, after || null);
+    }
+    sel.value = pct;
+  }
   $('loopA').classList.toggle('on', !!adapter.loop || pendingA !== null);
   $('loopB').classList.toggle('on', !!adapter.loop);
 }

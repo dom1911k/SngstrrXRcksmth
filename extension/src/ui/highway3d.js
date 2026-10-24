@@ -110,13 +110,12 @@ function studioEnvironment(renderer) {
 
 // One mesh for many flat quads lying on (or parallel to) the floor, in the
 // time group's coordinates (z in seconds). quads: [x0, x1, t0, t1, y, x0b?, x1b?]
-// where x0b/x1b are the x edges at t1 (for slides); defaults to x0/x1, and
-// yb is the height at t1 (bends rise); defaults to y.
+// where x0b/x1b are the x edges at t1 (for slides); defaults to x0/x1.
 function mergedQuads(quads, material) {
   const pos = new Float32Array(quads.length * 18);
   let o = 0;
-  for (const [x0, x1, t0, t1, y, x0b = x0, x1b = x1, yb = y] of quads) {
-    pos.set([x0, y, -t0, x1, y, -t0, x1b, yb, -t1, x0, y, -t0, x1b, yb, -t1, x0b, yb, -t1], o);
+  for (const [x0, x1, t0, t1, y, x0b = x0, x1b = x1] of quads) {
+    pos.set([x0, y, -t0, x1, y, -t0, x1b, y, -t1, x0, y, -t0, x1b, y, -t1, x0b, y, -t1], o);
     o += 18;
   }
   const geo = new THREE.BufferGeometry();
@@ -622,7 +621,7 @@ export class Highway3D {
       const mat = new THREE.SpriteMaterial({ map: wideLabelTexture(sec.name.toUpperCase()), transparent: true, opacity: 0.85, depthWrite: false, clippingPlanes: this.clipStrike });
       const sp = new THREE.Sprite(mat);
       sp.scale.set(3.6, 0.9, 1);
-      sp.position.set(a ? a.fret + 1 : 3, STRING_BASE + (n - 1) * STRING_GAP + 1.1, -sec.t);
+      sp.position.set(a ? a.fret + 1 : 3, STRING_BASE + (n - 1) * STRING_GAP + 1.9, -sec.t);   // well above the notes
       sp.userData.ownMaterial = true;
       sp.userData.t = sec.t;
       this.timeGroup.add(sp);
@@ -735,9 +734,9 @@ export class Highway3D {
       if (!q.length) return;
       this.timeGroup.add(mergedQuads(q, this.tailMats[s]));
       // A bright core line inside each tail, as on Rocksmith's sustains.
-      const core = q.map(([x0, x1, t0, t1, y, x0b = x0, x1b = x1, yb = y]) => {
+      const core = q.map(([x0, x1, t0, t1, y, x0b = x0, x1b = x1]) => {
         const c = (x0 + x1) / 2, cb = (x0b + x1b) / 2, w = 0.03;
-        return [c - w, c + w, t0, t1, y + 0.004, cb - w, cb + w, yb + 0.004];
+        return [c - w, c + w, t0, t1, y + 0.004, cb - w, cb + w];
       });
       this.timeGroup.add(mergedQuads(core, this.tailCoreMats[s]));
     });
@@ -918,8 +917,9 @@ export class Highway3D {
       // Section names: clear in the distance, fading out as they come close.
       for (const sp of this.sectionLabels) {
         const frac = (sp.userData.t - t) / look;      // 1 = far end, 0 = strings
-        sp.visible = frac > 0.12 && frac < 1.05;
-        sp.material.opacity = 0.9 * Math.max(0, Math.min(1, (frac - 0.12) / 0.25));
+        // Shown in the middle of the highway: at the far end it would sit on the notes.
+        sp.visible = frac > 0.12 && frac < 0.85;
+        sp.material.opacity = 0.9 * Math.max(0, Math.min(1, (frac - 0.12) / 0.25, (0.85 - frac) / 0.12));
       }
       // ...and flashes briefly when a new section starts.
       const flash = this.sectionFlash(t, speed);

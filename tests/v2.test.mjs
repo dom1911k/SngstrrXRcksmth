@@ -258,3 +258,32 @@ test('timing correction is remembered per sound source', async () => {
   fakeNow += 1500; session.tick();
   assert.equal(getSettings().autoTimingMs, 30);
 });
+
+test('riff repeater: phrase by phrase moves on when a loop is mastered', async () => {
+  await loadSettings();
+  await updateSettings({ riffRepeater: false, rrStartSpeed: 90, rrStep: 10, rrTarget: 90, rrMaxSpeed: 100, rrAdvance: true });
+  // 16 bars of 2 s: Verse = the same 4 bars twice, Chorus = 8 different bars.
+  const bars = Array.from({ length: 16 }, (_, i) => ({ i, t: i * 2, end: i * 2 + 2, measure: i }));
+  const notes = bars.map((b) => ({ t: b.t, dur: 0.5, string: 1, fret: b.i < 8 ? 2 + (b.i % 4) : b.i, bar: b.i, flags: {} }));
+  const chart = normalizeChart({ format: 'bass-chart', version: 1, meta: { title: 'Ladder' }, instrument: { strings: 4, tuning: [28, 33, 38, 43] },
+    bars, notes, sections: [{ name: 'Verse', t: 0 }, { name: 'Chorus', t: 16 }] });
+  const adapter = fakeAdapter(chart);
+  const session = new Emitter();
+  const rr = new RiffRepeater(adapter, session, { notify: () => {} });
+  const master = () => {
+    const loop = adapter.state.loop;
+    adapter.state.speed = 1;
+    session.emit('summary', { kind: 'loop', accuracy: 1, from: loop.start });
+    return adapter.state.loop;
+  };
+  adapter.setLoop(0, 8);                         // Verse · 1/2
+  await updateSettings({ riffRepeater: true });
+  // Verse · 2/2 repeats 1/2 -> straight to the whole Verse, then Chorus · 1/2, Chorus · 2/2, the whole Chorus.
+  assert.deepEqual(master(), { start: 0, end: 16 });
+  assert.deepEqual(master(), { start: 16, end: 24 });
+  assert.deepEqual(master(), { start: 24, end: 32 });
+  assert.deepEqual(master(), { start: 16, end: 32 });
+  // Nothing after the last section: it stays.
+  assert.deepEqual(master(), { start: 16, end: 32 });
+  await updateSettings({ riffRepeater: false, rrStartSpeed: 70, rrStep: 5 });
+});

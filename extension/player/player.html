@@ -9,50 +9,54 @@
 <header id="top">
   <div class="brand">Bass Trainer <span>player</span></div>
   <div class="group">
-    <label class="btn">Open chart… <input id="chartFile" type="file" accept=".json,application/json" hidden></label>
-    <label class="btn">Open audio… <input id="audioFile" type="file" accept="audio/*,.mp3,.ogg,.wav,.m4a,.flac,.opus" hidden></label>
-    <button id="lessonsBtn" class="btn" title="Step-by-step lessons, one technique each">Lessons</button>
-    <button id="drillsBtn" class="btn" title="Warm-up and technique drills">Drills</button>
-    <a class="btn" href="../library/library.html" title="Your songs, favourites and statistics">Library</a>
+    <button id="lessonsBtn" class="btn" title="Step-by-step lessons, one technique each">🎓<span class="lbl"> Lessons</span></button>
+    <button id="drillsBtn" class="btn" title="Warm-up and technique drills">🥁<span class="lbl"> Drills</span></button>
+    <a class="btn" href="../library/library.html" title="Your songs, favourites and statistics">♫<span class="lbl"> Library</span></a>
+    <label class="btn" title="Open a chart (.json) and/or its audio file (you can pick both at once, or drag them onto the page)">Open…
+      <input id="openFiles" type="file" multiple accept=".json,application/json,audio/*,.mp3,.ogg,.wav,.m4a,.flac,.opus" hidden></label>
   </div>
   <div class="group transport">
     <button id="restart" class="btn" title="Back to start (R / Home)">⏮</button>
     <button id="play" class="btn primary" title="Play / pause (Space)">▶</button>
     <span id="time" class="time">0:00 / 0:00</span>
-  </div>
-  <div class="group">
-    <label class="small">Speed
-      <select id="speed">
-        <option value="50">50%</option><option value="60">60%</option><option value="70">70%</option>
-        <option value="75">75%</option><option value="80">80%</option><option value="85">85%</option>
-        <option value="90">90%</option><option value="95">95%</option><option value="100" selected>100%</option>
-        <option value="110">110%</option>
-      </select>
-    </label>
+    <select id="speed" title="Speed (− / + keys)">
+      <option value="50">50%</option><option value="60">60%</option><option value="70">70%</option>
+      <option value="75">75%</option><option value="80">80%</option><option value="85">85%</option>
+      <option value="90">90%</option><option value="95">95%</option><option value="100" selected>100%</option>
+      <option value="110">110%</option>
+    </select>
   </div>
   <div class="group">
     <span class="small">Loop</span>
-    <button id="loopA" class="btn" title="Loop start at current position">A</button>
-    <button id="loopB" class="btn" title="Loop end at current position">B</button>
+    <button id="loopA" class="btn" title="Loop start at the current bar (A)">A</button>
+    <button id="loopB" class="btn" title="Loop end at the current bar (B)">B</button>
     <button id="loopClear" class="btn" title="Clear loop (C)">✕</button>
   </div>
-  <div class="group">
-    <label class="small" title="Shift the chart against the audio if notes are early/late compared to the recording">Audio offset
-      <input id="offset" type="number" value="0" step="10"> ms</label>
-    <label class="small" title="Metronome click on every beat (always on for drills)"><input id="metro" type="checkbox"> Click</label>
-  </div>
   <div class="spacer"></div>
-  <a class="small link" href="../updater/updater.html" target="_blank">Updates</a>
+  <div class="group more">
+    <button id="moreBtn" class="btn" title="More: audio offset, metronome, updates">⋯</button>
+    <div id="morePop" class="pop" hidden>
+      <label title="Shift the chart against the audio if notes are early/late compared to the recording">Audio offset
+        <input id="offset" type="number" value="0" step="10"> ms</label>
+      <label title="Metronome click on every beat (always on for drills)"><input id="metro" type="checkbox"> Metronome click</label>
+      <a class="link" href="../updater/updater.html" target="_blank">Updates…</a>
+    </div>
+  </div>
 </header>
 <div id="seekRow"><input id="seek" type="range" min="0" max="1000" value="0" step="1" title="Position"></div>
 <div id="status" class="status"></div>
 <div id="drop" class="drop" hidden>Drop a chart (.json) and/or an audio file</div>
 <div id="empty" class="empty">
-  <h1>Practise with your own audio</h1>
-  <p>Open a <b>bass chart</b> (.json, see <code>docs/CHART_FORMAT.md</code>, e.g. one downloaded from the
-    Songsterr panel or made by your own tool) and the matching <b>audio file</b> (MP3, OGG, WAV, M4A, FLAC).
-    You can also drag both files onto this page.</p>
-  <p class="small">Keys: Space play/pause · ← → 5 s back/forward · R restart · A / B loop start/end at the current bar · C clear loop · − + speed · all changeable in the BASS TRAINER panel (Practice)</p>
+  <h1>What do you want to play?</h1>
+  <div class="empty-actions">
+    <button class="btn primary" data-open="lessons">🎓<span class="lbl"> Lessons</span></button>
+    <button class="btn" data-open="drills">🥁<span class="lbl"> Drills</span></button>
+    <a class="btn" href="?drill=fretboard">🎯 Fretboard trainer</a>
+    <a class="btn" href="../library/library.html">♫ My songs</a>
+  </div>
+  <p><b>Your own song:</b> open a bass <b>chart</b> (.json, e.g. downloaded from the Songsterr panel) and its
+    <b>audio file</b> (MP3, OGG, WAV, M4A, FLAC) with the buttons at the top, or drag both onto this page.</p>
+  <p class="small">Keys: Space play/pause · ← → 5 s back/forward · R restart · A / B loop · C clear loop · − + speed · P loop phrase · L loop section</p>
 </div>
 <div id="drills" class="dialog" hidden>
   <div class="dialog-box">

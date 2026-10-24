@@ -5,6 +5,7 @@
 import { h } from './dom.js';
 import { LESSONS, lessonById, lessonState, passesStep, recordStep, stepCount, loadLessonProgress, saveLessonProgress } from '../core/lessons.js';
 import { drillById } from '../core/drills.js';
+import { requestInputStart } from '../core/input-request.js';
 
 const pct = (x) => `${Math.round(x * 100)}%`;
 
@@ -18,7 +19,7 @@ export function createLessonsUI({ session, adapter, startDrill, notify = () => {
   const dialog = h('div', { class: 'dialog', id: 'lessons', hidden: true },
     h('div', { class: 'dialog-box wide' },
       h('h2', {}, 'Lessons'),
-      h('p', { class: 'small' }, 'Short courses, one technique each: read the explanation, then pass each step (a drill at full speed with the target accuracy). Start the input in the BASS TRAINER panel first.'),
+      h('p', { class: 'small' }, 'Short courses, one technique each: read the explanation, then pass each step (a drill at full speed with the target accuracy).'),
       h('div', { class: 'lesson-grid' }, list, detail),
       h('div', { class: 'dialog-row' }, h('button', { class: 'btn', onclick: () => close() }, 'Close'))));
   const barText = h('span', { class: 'grow' });
@@ -88,8 +89,11 @@ export function createLessonsUI({ session, adapter, startDrill, notify = () => {
     renderBar();
   }
 
-  function begin(l, i) {
+  // fromClick: started by a button, so the input may start right away (Chrome
+  // only allows audio after a click on the page).
+  function begin(l, i, fromClick = true) {
     current = { lesson: l, step: i };
+    if (fromClick) requestInputStart();   // a lesson step is scored: make sure the trainer listens
     const s = l.steps[i];
     close();
     startDrill(s.drill, { ...drillById(s.drill).defaults, bpm: s.bpm, bars: s.bars || drillById(s.drill).defaults.bars, ...(s.position !== undefined ? { position: s.position } : {}) });
@@ -103,6 +107,14 @@ export function createLessonsUI({ session, adapter, startDrill, notify = () => {
     if (i + 1 < l.steps.length) begin(l, i + 1);
     else { selected = l; current = null; renderBar(); open(l); }
   }
+
+  // Opening another chart (a different drill, a song) leaves the lesson.
+  adapter.on('chart', () => {
+    if (!current) return;
+    const src = (adapter.getChart() && adapter.getChart().meta.source) || {};
+    const s = current.lesson.steps[current.step];
+    if (src.type !== 'drill' || src.id !== s.drill || src.bpm !== s.bpm) { current = null; renderBar(); }
+  });
 
   session.on('summary', async (sum) => {
     if (!current || sum.kind !== 'song') return;
@@ -126,5 +138,5 @@ export function createLessonsUI({ session, adapter, startDrill, notify = () => {
   function close() { dialog.hidden = true; }
 
   loadLessonProgress().then((p) => { progress = p; });
-  return { open, close, begin: (id, step) => { const l = lessonById(id); if (l) loadLessonProgress().then((p) => { progress = p; begin(l, Math.min(step || 0, l.steps.length - 1)); }); }, get current() { return current; } };
+  return { open, close, begin: (id, step) => { const l = lessonById(id); if (l) loadLessonProgress().then((p) => { progress = p; begin(l, Math.min(step || 0, l.steps.length - 1), false); }); }, get current() { return current; } };
 }

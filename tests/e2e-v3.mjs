@@ -87,10 +87,33 @@ out.dialog = await page.evaluate(() => ({
   selected: document.querySelector('.lesson.on b').textContent,
 }));
 if (shot) await page.screenshot({ path: `${shot}-lessons.png` });
+// 0.13.1 fixes: the speed menu follows speed changes; another drill leaves the lesson;
+// no "null" in the Library greeting.
+out.fixes = await page.evaluate(async () => {
+  const { adapter } = globalThis.bassTrainer;
+  document.getElementById('lessons').hidden = true;
+  adapter.setSpeed(65);
+  await new Promise((r) => setTimeout(r, 1000));   // software-rendered 3D: frames are slow here
+  const speed65 = document.getElementById('speed').value;
+  adapter.setSpeed(100);
+  const before = !document.getElementById('lessonBar').hidden;
+  document.getElementById('drillsBtn').click();
+  await new Promise((r) => setTimeout(r, 400));
+  document.getElementById('drillStart').click();
+  await new Promise((r) => setTimeout(r, 300));
+  return { speed65, lessonBarBefore: before, lessonBarAfterOtherDrill: !document.getElementById('lessonBar').hidden };
+});
+const lib = await ctx.newPage();
+await lib.goto(`chrome-extension://${id}/library/library.html`);
+await lib.waitForTimeout(1200);
+out.fixes.greeting = await lib.locator('#greeting').innerText();
+out.fixes.tiles = await lib.evaluate(() => [...document.querySelectorAll('.tile b')].map((x) => x.textContent));
 console.log(JSON.stringify(out, null, 1));
 const ok = /step 1\/3/.test(out.bar) && out.after.accuracy >= 0.85 && out.after.progress && out.after.progress.passed.includes(0)
   && out.after.nextVisible && out.after.heard > 0 && out.panel.detection && out.panel.loop && out.panel.loop[1] > out.panel.loop[0]
-  && /step 2\/3/.test(out.step2) && out.dialog.lessons === 9 && out.dialog.passedSteps >= 1;
+  && /step 2\/3/.test(out.step2) && out.dialog.lessons === 9 && out.dialog.passedSteps >= 1
+  && out.fixes.speed65 === '65' && out.fixes.lessonBarBefore && !out.fixes.lessonBarAfterOtherDrill
+  && !/null|undefined/.test(out.fixes.greeting) && out.fixes.tiles.includes('Lessons');
 console.log(ok ? 'PASS' : 'FAIL');
 await ctx.close();
 process.exit(ok ? 0 : 1);

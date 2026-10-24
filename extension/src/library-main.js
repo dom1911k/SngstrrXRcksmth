@@ -312,7 +312,7 @@ function greet() {
   if (due) bits.push(`${due} song${due === 1 ? ' is' : 's are'} due`);
   if (o.streak) bits.push(`${o.streak}-day streak${o.streak >= 3 ? ' 🔥' : ''}`);
   if (o.weekSeconds) bits.push(`${dur(o.weekSeconds)} this week`);
-  $('greeting').replaceChildren(h('b', {}, hello), bits.length ? h('span', {}, ` ${bits.join(' · ')}`) : null);
+  $('greeting').replaceChildren(h('b', {}, hello), bits.length ? h('span', {}, ` ${bits.join(' · ')}`) : '');
   $('navDue').hidden = !due;
   $('navDue').textContent = String(due);
   $('navSongs').textContent = String(entries.filter((e) => e.kind !== 'drill').length || '');
@@ -321,10 +321,11 @@ function greet() {
   const empty = !entries.length;
   $('homeEmpty').hidden = !empty;
   if (empty) {
-    $('homeEmpty').replaceChildren(h('b', {}, 'Welcome! Three steps to start:'),
-      h('ol', {}, h('li', {}, 'Plug in the Real Tone Cable, open the ', h('a', { class: 'link', href: '../player/player.html#input' }, 'panel → Input'), ' and press Start input.'),
-        h('li', {}, h('a', { class: 'link', href: '../player/player.html#calibrate' }, 'Calibrate'), ' the latency once (one minute).'),
-        h('li', {}, h('a', { class: 'link', href: '../search/search.html' }, 'Find a song'), ' or open any bass tab on Songsterr and press play.')));
+    $('homeEmpty').replaceChildren(h('b', {}, 'Welcome! Where do you want to start?'),
+      h('p', {}, 'Learn the basics step by step, or pick a song. Every bass tab you open on Songsterr shows up here with your progress.'),
+      h('div', { class: 'welcome-actions' },
+        h('a', { class: 'btn primary', href: '../player/player.html?lesson=beat&step=0' }, '🎓 First lesson: Find the beat'),
+        h('a', { class: 'btn', href: '../search/search.html' }, '🔍 Find a song')));
   }
 }
 

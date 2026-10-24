@@ -1,6 +1,7 @@
 // Fretboard trainer screen (standalone player): prompt, a fretboard diagram,
 // feedback and the round result.
 import { h } from './dom.js';
+import { requestInputStart } from '../core/input-request.js';
 import { NOTE_NAMES, stringColors } from '../core/music.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -60,7 +61,8 @@ export function createNoteTrainerUI(trainer, { engine, getTuning, onDone }) {
         h('label', {}, 'Questions ', h('select', { onchange: (e) => { opts.count = Number(e.target.value); } }, [10, 20, 30].map((n) => h('option', { value: n, selected: n === opts.count }, String(n))))),
         h('label', {}, 'Frets ', h('select', { onchange: (e) => { opts.maxFret = Number(e.target.value); } }, [[5, '0–5'], [7, '0–7'], [12, '0–12']].map(([n, l]) => h('option', { value: n, selected: n === opts.maxFret }, l)))),
         h('label', {}, h('input', { type: 'checkbox', checked: opts.naturalsOnly, onchange: (e) => { opts.naturalsOnly = e.target.checked; } }), ' Natural notes only (no sharps)')),
-      engine.running ? null : h('p', { class: 'warnline' }, 'Start the input in the BASS TRAINER panel first, so the trainer can hear you.'),
+      engine.running ? null : h('p', { class: 'warnline' }, 'The trainer needs to hear you: ',
+        h('button', { class: 'btn primary', onclick: () => requestInputStart() }, '🎙 Start input')),
       h('div', { class: 'dialog-row' },
         h('button', { class: 'btn', onclick: close }, 'Close'),
         h('button', { class: 'btn primary', onclick: () => { trainer.start({ ...opts, tuning: getTuning() }); } }, 'Start')));

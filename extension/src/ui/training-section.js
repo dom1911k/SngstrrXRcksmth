@@ -6,6 +6,11 @@ import { loopCurrentSection } from '../core/riff-repeater.js';
 import { SENSITIVITY } from '../core/detection.js';
 import { loopCurrentPhrase } from '../core/phrases.js';
 
+// Panel order: most used first; the rest is folded by default (settings.panelCollapsed).
+export function panelOrder([playback, shortcuts], [loops, takes, detection], [songHighway, scoring]) {
+  return ['input', 'tuner', loops, songHighway, scoring, detection, 'calibration', playback, 'monitor', takes, shortcuts];
+}
+
 export function createTrainingSections({ adapter, riff, wait, takes, detection = null, notify = () => {}, showProgress = null }) {
   const s = getSettings();
 
@@ -30,7 +35,7 @@ export function createTrainingSections({ adapter, riff, wait, takes, detection =
   });
 
   const section = h('section', {},
-    h('h2', {}, 'Riff repeater & wait mode'),
+    h('h2', {}, 'Loops & riff repeater'),
     h('div', { class: 'row' }, h('button', { class: 'btn', title: 'Loop the phrase (2–4 bars) that is playing now', onclick: () => loopCurrentPhrase(adapter, notify) }, 'Loop this phrase'),
       h('button', { class: 'btn', title: 'Loop the section that is playing now', onclick: () => loopCurrentSection(adapter, notify) }, 'Loop this section'),
       showProgress ? h('button', { class: 'btn', onclick: () => showProgress() }, 'Weak spots') : null),

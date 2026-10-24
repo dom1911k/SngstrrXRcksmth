@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.13.0.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.13.1.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -198,7 +198,15 @@ Settings in the panel, under **Song & highway**:
 - **Download chart (JSON):** saves the song in the trainer's chart format
   ([`docs/CHART_FORMAT.md`](docs/CHART_FORMAT.md)) for use in other tools.
 
-### Practice tools (panel → **Practice**)
+### The BASS TRAINER panel
+The panel (button on the right edge) lists the most used parts first: **Input**,
+**Tuner**, **Loops & riff repeater**, **Song & highway**, then **Scoring**, **Note
+detection**, **Latency calibration**, **Playback**, **Hear yourself**, **Record &
+listen back** and **Shortcuts**. Click a heading to fold or unfold it (remembered);
+the less used ones start folded. When the input is off, the highway shows a red
+**🎙 Start input** button, so you don't need to open the panel for that.
+
+### Playback (panel → **Playback**)
 - **Mute the song's bass track while the input is on:** when you click *Start
   input*, the trainer mutes Songsterr's bass track so you only hear your own bass,
   and turns it back on when you stop (or leave the page). This uses Songsterr's own
@@ -232,7 +240,7 @@ Settings in the panel, under **Song & highway**:
 
 Panel sections can be folded by clicking their heading; the panel remembers it.
 
-### Riff repeater, wait mode, weak spots, takes (panel → **Riff repeater & wait mode**)
+### Loops, riff repeater, wait mode, weak spots, takes (panel → **Loops & riff repeater**)
 These need the input to be running (*Start input*).
 
 - **Phrases** (as in Rocksmith 2014): every section is cut into short phrases of
@@ -356,10 +364,10 @@ to jump to it); *Find new songs* searches Songsterr.
 - **Setup check** (only when needed): a yellow bar if no input is chosen, the input
   isn't the Real Tone Cable, you never calibrated or the calibration is over a month
   old, or an update is available, each with a one-click fix (× hides it for now).
-- **Quick-start tiles:** Continue (last song), Due today, Find songs, Drills,
-  Fretboard trainer, Tuner and Calibrate, each with a one-line status (e.g. your
-  latency and when you calibrated). Tuner and Calibrate open the player with the
-  panel at that section.
+- **Quick-start tiles:** Due today, Find songs, Lessons (your next lesson), Drills
+  and Fretboard trainer, each with a one-line status. (Tuner and Calibrate are in
+  the menu on the left; the setup check reminds you when calibrating is due.)
+- **First visit:** a welcome card with the first lesson and *Find a song*.
 - **Want to learn** shelf: the songs you saved from Find songs as covers. Click one
   to open it; it moves to *Learning*.
 - **Setlists:** your own lists (e.g. "Band rehearsal"). *+ New setlist*, then add
@@ -486,20 +494,25 @@ out). The share right the first time is saved in the Library.
 
 Choose the tempo (BPM), number of bars and start fret. Your best clean tempo (90%+)
 is saved per drill. Next time the tempo is set **5 BPM higher** automatically.
-The player's **Click** box adds the metronome to any chart.
+The player's **⋯** menu → *Metronome click* adds the metronome to any chart.
 
 ### Standalone player (your own audio)
 Click the extension's icon in Chrome's toolbar, or **Open standalone player** in the
 panel. A page opens where you can practise without Songsterr:
 
-1. **Open chart…** loads a bass chart (.json in the [chart format](docs/CHART_FORMAT.md)).
-   It can come from your own tool, or from **Download chart (JSON)** on Songsterr.
-2. **Open audio…** loads the song (MP3, OGG, WAV, M4A, FLAC). You can also drag
-   both files onto the page.
+The start screen offers **Lessons**, **Drills**, the **Fretboard trainer** and **My
+songs** (the Library). To play your own song:
+
+1. **Open…** loads a bass chart (.json in the [chart format](docs/CHART_FORMAT.md),
+   from your own tool or from **Download chart (JSON)** on Songsterr) and/or the
+   song's audio (MP3, OGG, WAV, M4A, FLAC); pick both at once, or drag both files
+   onto the page.
+2. The speed menu next to the time follows speed changes from the riff repeater
+   and the − + keys.
 3. Press **▶** (or Space). Speed changes keep the pitch. **A** / **B** set a loop
    (or `[` and `]`), **✕** clears it, and ← / → jump 5 seconds.
 4. If the notes are consistently early or late compared with the recording, change
-   **Audio offset** (in ms) until they line up. This happens when the chart's bar 1
+   **Audio offset** (in ms, in the **⋯** menu top right) until they line up. This happens when the chart's bar 1
    doesn't start exactly where the audio file starts.
 
 The tuner, calibration and highway settings are the same as on Songsterr (open
@@ -623,6 +636,13 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.13.1:** tidy-up: panel reordered (most used first, the rest folded), one-click
+  *Start input* on the highway, in lessons and the fretboard trainer; player header
+  simplified (one *Open…*, a ⋯ menu) with a start screen, and a speed menu that
+  follows the riff repeater; Library Home with fewer tiles and a welcome card;
+  layouts fixed for narrow windows; fixes: "null" in the greeting and title card,
+  "Connecting to Songsterr…" in the player, another drill counting for a lesson
+  step, section names over far notes.
 - **0.13.0:** held notes glow and spark while you hold them (and dim when you
   don't); phrases (1–4 bars) with *Loop this phrase* (key P) and a phrase-by-phrase
   riff repeater; note detection settings (sensitivity, pitch tolerance) with a

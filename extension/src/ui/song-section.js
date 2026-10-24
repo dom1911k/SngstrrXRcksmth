@@ -77,10 +77,14 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
 
   let lastInfo = null;
 
-  adapter.on('status', (st) => {
+  const showStatus = (st) => {
     statusEl.className = st.state === 'ok' ? 'good' : st.state === 'error' ? 'bad' : 'muted';
     statusEl.textContent = st.state === 'ok' ? `Connected to the ${adapter.name || 'player'}.` : st.detail;
-  });
+  };
+  // Only Songsterr needs a connection status; the standalone player is always ready.
+  if (adapter.name !== 'Songsterr player') statusEl.hidden = true;
+  else if (adapter.status) showStatus(adapter.status);
+  adapter.on('status', showStatus);
 
   adapter.on('chart', (info) => {
     lastInfo = info;

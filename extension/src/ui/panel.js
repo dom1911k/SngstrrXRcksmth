@@ -5,9 +5,12 @@ import { TUNINGS, noteName, stringColors, detectorMinFreq, tuningName } from '..
 import { TunerModel } from '../core/tuner.js';
 import { getSettings, updateSettings, totalLatencyMs, onSettingsChange } from '../core/settings.js';
 import { runCalibration, CALIBRATION_DEFAULTS } from '../audio/calibration.js';
+import { onInputStartRequest } from '../core/input-request.js';
 
 const dbfs = (v) => (v > 0 ? 20 * Math.log10(v) : -Infinity);
 
+// sections: the panel's sections in order; the strings 'input', 'tuner',
+// 'monitor' and 'calibration' place the built-in ones.
 export function createPanel(engine, { sections = [] } = {}) {
   const settings = getSettings();
   const host = h('div', { id: 'bass-trainer-root' });
@@ -115,6 +118,12 @@ export function createPanel(engine, { sections = [] } = {}) {
     chromeInfo,
   );
 
+  function placeSections() {
+    const builtIn = { input: inputSection, tuner: tunerSection, monitor: monitorSection, calibration: calSection };
+    if (!sections.some((x) => typeof x === 'string')) return [inputSection, ...sections, tunerSection, monitorSection, calSection];
+    return sections.map((x) => (typeof x === 'string' ? builtIn[x] : x)).filter(Boolean);
+  }
+
   // ---------- Updates ----------
   const updateBanner = h('div', { class: 'update', hidden: true });
   const launcherDot = h('span', { class: 'launcher-dot', hidden: true });
@@ -122,7 +131,7 @@ export function createPanel(engine, { sections = [] } = {}) {
   const panel = h('div', { class: 'panel', hidden: true },
     h('header', {}, h('h1', {}, 'Bass Trainer'),
       h('button', { class: 'close', title: 'Close', onclick: () => { panel.hidden = true; } }, '×')),
-    updateBanner, inputSection, ...sections, tunerSection, monitorSection, calSection);
+    updateBanner, ...placeSections());
 
   // Collapsible sections: click a heading to fold it; remembered.
   for (const sec of panel.querySelectorAll('section')) {
@@ -167,6 +176,8 @@ export function createPanel(engine, { sections = [] } = {}) {
     tuningSelect.value = TAB;
     changeTuning(TAB);
   }
+
+  onInputStartRequest(() => { if (!engine.running) toggleInput(); });
 
   async function toggleInput(restart = false) {
     if (engine.running && !restart) {

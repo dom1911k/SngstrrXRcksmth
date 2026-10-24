@@ -3,7 +3,7 @@
 // (e.g. start 70%, +5% at 90%+), up to the maximum. Uses the loop-pass
 // summaries of the ScoringSession, so the input has to be on.
 
-import { getSettings, updateSettings, onSettingsChange } from './settings.js';
+import { getSettings, onSettingsChange } from './settings.js';
 import { sectionsOf } from './history.js';
 import { nextPracticeRange } from './phrases.js';
 
