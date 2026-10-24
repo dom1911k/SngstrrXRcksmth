@@ -2,7 +2,7 @@
 // survives clearing Songsterr's site data) and localStorage elsewhere (tests).
 
 const KEY = 'bassTrainerSettings';
-const SCHEMA = 4;
+const SCHEMA = 5;
 
 // Adjust settings saved by older versions.
 function migrate(stored) {
@@ -20,6 +20,12 @@ function migrate(stored) {
     const map = { 70: 80, 110: 140, 160: 190 };
     if (stored.hitWindowMs === undefined || map[stored.hitWindowMs]) stored.hitWindowMs = map[stored.hitWindowMs] || 140;
     if (stored.onTimeMs === undefined || stored.onTimeMs === 40) stored.onTimeMs = 50;
+  }
+  if (v < 5) {
+    // 0.12.1: notes as in Rocksmith 2014: no fret numbers on the notes, no
+    // approach rings (both can be switched back on).
+    stored.gemFretNumbers = false;
+    stored.approachRings = false;
   }
   stored.schema = SCHEMA;
   return stored;
@@ -42,12 +48,12 @@ export const DEFAULTS = {
   visualDelayMs: 60,       // shift the highway so notes cross the line when you HEAR them
   lookahead: 4.5,          // seconds a note is visible before it must be played
   highwayStyle: '3d',      // '3d' (Rocksmith-style, WebGL) | '2d'
-  gemFretNumbers: true,    // fret numbers on the 3D note gems
+  gemFretNumbers: false,   // fret numbers on the 3D note gems (Rocksmith 2014 has none)
   invertStrings: false,    // false = Rocksmith (low E on top); true = tab order
   showDebug: false,
   hitSparks: true,         // sparks on the strings when you hit a note (3D)
   timingMarks: false,      // small early/late dot after each hit (3D)
-  approachRings: true,     // a ring closes in on each note's target (3D)
+  approachRings: false,    // a ring closes in on each note's target (3D; not in Rocksmith)
   stageEffects: true,      // stage lights react to your streak, floating dust, vignette (3D)
   glowEffects: true,       // soft glow (bloom) on strings and notes (3D)
   theme: 'classic',        // 3D look: 'classic' | 'stage' | 'minimal' | 'contrast'

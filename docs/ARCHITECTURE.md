@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
+Status: **0.12.1**: Rocksmith 2014 note look (§18). **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -628,9 +628,13 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
   * *Section sweep* (`sectionSweep`): a floor band running from the strings to the
     far end in 0.9 s after a section start (with glow on).
   * *Vignette*: CSS radial gradient in the overlay (z-index 0, no pointer events).
-  * *Note types*: harmonics are diamonds (square gem rotated 45°), palm mutes get a
-    hatch plane on the front face, accents a brighter material, double outline and
-    bigger halo, bend tails rise (`mergedQuads` takes an end height `yb`), slide
-    tails carry chevron sprites (clipped at the strike line).
-  * Settings `approachRings`, `stageEffects` (defaults on; no schema bump needed:
-    new keys take their defaults).
+  * *Note types*: harmonics are diamonds (square gem rotated 45°), accents a
+    brighter material and bigger halo, hammer-on/pull-off ▲/▼ above the gem.
+    `mergedQuads` takes an optional end height `yb`.
+  * Settings `approachRings` (default off), `stageEffects` (default on).
+* **0.12.1, Rocksmith 2014 notes:** settings schema 5 turns `gemFretNumbers` and
+  `approachRings` off once. *Chord repeats* (`addChordFrames`): a chord with the
+  same strings/frets as the chord right before it (no single note between, gap
+  < 1.2 s, no section start in between) hides its gems, stems and shadows and keeps
+  only a brighter frame (`o.repeat`). Scoring is unchanged. The 0.12.0 slide
+  chevrons, palm-mute hatching and rising bend tails were removed (not in the game).

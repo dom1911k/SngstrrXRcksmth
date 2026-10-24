@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.12.0.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.12.1.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -138,15 +138,20 @@ Good Riddance, can be played too.
     Section names (VERSE, CHORUS…) float above the highway where a section starts.
     The lit hand lane slides over to the next hand position, and the fret numbers
     of the next position light up softly just before you have to move.
-  - Coloured ribbons are held notes. A ribbon that bends sideways is a slide (with
-    » chevrons pointing where your hand goes); a wavy ribbon is vibrato; a ribbon
-    that curves upwards is a bend.
+  - Notes look as in Rocksmith 2014: no number on the note; its stem points down
+    to the fret, and the fret numbers are on the fretboard. (You can switch fret
+    numbers on the notes back on under *Song & highway*.)
+  - Coloured ribbons are held notes. A ribbon that bends sideways is a slide; a
+    wavy ribbon is vibrato.
   - Wide bars are open strings. **X** = dead note; faded small notes = ghost notes;
-    **H**/**P** = hammer-on/pull-off; **PM** = palm mute (the note is also
-    hatched); a **diamond** = harmonic; a brighter note with a double outline =
-    accent. Notes played together (chords, double stops) have a white frame around them.
-  - **Approach rings:** in the last moment before a note, a ring in the string's
-    colour closes in on the spot where you play it: when it reaches the note, play.
+    **▲**/**▼** = hammer-on/pull-off; **PM** = palm mute; **⤴** = bend; a
+    **diamond** = harmonic; a slightly brighter note = accent. Notes played
+    together (chords, double stops) have a white frame around them. When the same
+    chord comes again straight away, only its **frame** is shown (as in
+    Rocksmith 2014); the full chord returns after other notes, a pause or at a new
+    section.
+  - **Approach rings** (off by default, not in Rocksmith): a ring closes in on the
+    spot where you play each note.
   - **The stage reacts to your playing:** the stage lights get brighter and livelier
     the longer your note streak, flash at 10, 25, 50, 100… notes in a row, and dip
     briefly when a long streak breaks. Dust floats in the lights, the edges of the
@@ -575,6 +580,9 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.12.1:** notes as in Rocksmith 2014: no fret numbers on the notes, repeated
+  chords as an empty frame, ▲/▼ for hammer-on/pull-off; approach rings off by
+  default; removed the invented slide chevrons, palm-mute hatching and bend curve.
 - **0.12.0:** Library redesign (menu with Home / Songs / Setlists / Progress pages,
   weekly progress chart); highway: approach rings, stage lights that react to your
   streak, floating dust, vignette, section light sweep, diamond harmonics, hatched

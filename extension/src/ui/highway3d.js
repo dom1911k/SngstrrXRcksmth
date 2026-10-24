@@ -12,7 +12,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { stringColors } from '../core/music.js';
 import { computeAnchors, anchorAt, firstNoteAtOrAfter } from '../core/chart.js';
 import { CameraFollow, planCameraSegments } from '../core/camera-follow.js';
-import { roundedGemGeometry, shadowTexture, wideLabelTexture, slotTexture, beamTexture, ringTexture, chevronTexture, hatchTexture, dustTexture, sweepTexture, Particles, Bloom } from './highway3d-fx.js';
+import { roundedGemGeometry, shadowTexture, wideLabelTexture, slotTexture, beamTexture, ringTexture, dustTexture, sweepTexture, Particles, Bloom } from './highway3d-fx.js';
 
 const DEPTH = 40;            // world units from the strike line to the far end
 const MAX_FRET = 24;
@@ -151,7 +151,7 @@ export class Highway3D {
 
   constructor(canvas) {
     this.canvas = canvas;
-    this.options = { lookahead: 4.5, invertStrings: false, showDebug: false, showFretNumbers: true, glow: true, sparks: true, timingMarks: false, approachRings: true, stageFx: true };
+    this.options = { lookahead: 4.5, invertStrings: false, showDebug: false, showFretNumbers: true, glow: true, sparks: true, timingMarks: false, approachRings: false, stageFx: true, showFretNumbers: false };
     this.stage = { excite: 0, streak: 0, burst: 0, dim: 0 };   // the stage reacts to your streak
     this.chart = null;
     this.fps = 60;
@@ -208,8 +208,6 @@ export class Highway3D {
     this.slotTex = slotTexture();
     this.particles = new Particles(this.scene);
     this.ringTex = ringTexture();
-    this.chevronTex = { 1: chevronTexture(1), '-1': chevronTexture(-1) };
-    this.hatchTex = hatchTexture();
     this.buildStatic();
     this.buildAtmosphere();
     this.timeGroup = new THREE.Group();   // children in seconds along -z; scaled per frame
@@ -542,7 +540,6 @@ export class Highway3D {
     // Accents: brighter gems with a stronger halo.
     this.accentMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).lerp(new THREE.Color(0xffffff), 0.25), emissive: c, emissiveIntensity: 0.8, roughness: 0.25, metalness: 0.05 }));
     this.accentGlowMats = colors.map((c) => new THREE.SpriteMaterial({ map: this.glowTex, color: c, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }));
-    this.chevronMats = new Map();   // `${string}|${dir}` -> sprite material for slide tails
     // Rounded gems with a bright outline and a soft shadow on the floor.
     const { geo: gemGeo, outline: edgeGeo } = roundedGemGeometry(GEM_W, GEM_H, GEM_D);
     this.gemGeo = gemGeo;
@@ -552,9 +549,6 @@ export class Highway3D {
     shadowGeo.rotateX(-Math.PI / 2);
     const shadowMat = new THREE.MeshBasicMaterial({ map: this.shadowTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
     const accentEdgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
-    // Palm mutes: dark hatching across the front of the gem.
-    const hatchGeo = new THREE.PlaneGeometry(GEM_W * 0.86, GEM_H * 0.72); hatchGeo.userData.shared = true;
-    const hatchMat = new THREE.MeshBasicMaterial({ map: this.hatchTex, transparent: true, depthWrite: false });
 
     // Beat lines and anchor lanes live in seconds (timeGroup is scaled by k).
     // Merged into a few meshes: one draw call per kind instead of hundreds.
@@ -643,18 +637,7 @@ export class Highway3D {
         edges.scale.copy(gem.scale);
         edges.rotation.copy(gem.rotation);
         body.add(edges);
-        if (accent) {
-          const outer = new THREE.LineLoop(edgeGeo, accentEdgeMat);
-          outer.scale.set(gem.scale.x * 1.14, gem.scale.y * 1.3, 1);
-          outer.rotation.copy(gem.rotation);
-          body.add(outer);
-        }
-        if (f.palmMute && !f.dead && !open) {
-          const hatch = new THREE.Mesh(hatchGeo, hatchMat);
-          hatch.position.z = GEM_D / 2 + 0.012;
-          hatch.renderOrder = 1;
-          body.add(hatch);
-        }
+
         const shadow = new THREE.Mesh(shadowGeo, shadowMat);
         shadow.scale.set(open ? 4.2 : GEM_W * 1.5, 1, 0.7);
         shadow.position.y = -y + 0.02;
@@ -684,11 +667,12 @@ export class Highway3D {
       }
       // Technique tag above the gem.
       const tags = [];
-      if (note.flags.hopo) tags.push(prevOnString[s] && note.fret < prevOnString[s].fret ? 'P' : 'H');
+      // Hammer-on ▲ / pull-off ▼, as Rocksmith marks them.
+      if (note.flags.hopo) tags.push(prevOnString[s] && note.fret < prevOnString[s].fret ? '▼' : '▲');
       if (note.flags.palmMute) tags.push('PM');
       if (note.flags.bend) tags.push('⤴');
       if (tags.length) {
-        const sp = new THREE.Sprite(this.label(tags.join(' '), '#8b93a3'));
+        const sp = new THREE.Sprite(this.label(tags.join(' '), '#c9d0dc'));
         sp.scale.set(0.36, 0.36, 1);
         sp.position.set(0, GEM_H / 2 + 0.16, 0);
         body.add(sp);
@@ -711,31 +695,8 @@ export class Highway3D {
             const a = k === 0 ? 0 : (k % 2 ? amp : -amp), b = k % 2 ? -amp : amp;
             tailQuads[s].push([x - hw + a, x + hw + a, t0, t1, y, x - hw + b, x + hw + b]);
           }
-        } else if (note.flags.bend && toFret === null) {
-          // Bend: the tail rises like the pitch (flat, then curving up).
-          const N = 10, rise = 0.34;
-          const lift = (u) => { const v = Math.max(0, Math.min(1, (u - 0.15) / 0.55)); return rise * v * v * (3 - 2 * v); };
-          for (let j = 0; j < N; j++) {
-            const t0 = note.t + note.dur * j / N, t1 = note.t + note.dur * (j + 1) / N;
-            tailQuads[s].push([x - hw, x + hw, t0, t1, y + lift(j / N), x - hw, x + hw, y + lift((j + 1) / N)]);
-          }
         } else {
           tailQuads[s].push([x - hw, x + hw, note.t, note.t + note.dur, y, x1 - hw, x1 + hw]);
-          // Slides: chevrons along the tail pointing where the hand goes.
-          if (toFret !== null && x1 !== x) {
-            const dir = x1 > x ? 1 : -1;
-            const key = `${s}|${dir}`;
-            if (!this.chevronMats.has(key)) {
-              this.chevronMats.set(key, new THREE.SpriteMaterial({ map: this.chevronTex[dir], color: new THREE.Color(colors[s]).lerp(new THREE.Color(0xffffff), 0.4), transparent: true, depthWrite: false, clippingPlanes: this.clipStrike }));
-            }
-            for (const u of note.dur > 0.6 ? [0.3, 0.65] : [0.5]) {
-              const sp = new THREE.Sprite(this.chevronMats.get(key));
-              sp.scale.set(0.72, 0.36, 1);
-              sp.position.set(x + (x1 - x) * u, y + 0.06, -(note.t + note.dur * u));
-              sp.renderOrder = 1;
-              this.timeGroup.add(sp);
-            }
-          }
         }
       }
       this.noteObjs.push({ note, obj, gem, body });
@@ -758,32 +719,50 @@ export class Highway3D {
 
   // Chords (two or more notes at once): a frame around them, as Rocksmith
   // draws chord boxes. Attached to the chord's first gem so it moves with it.
+  // As in Rocksmith 2014, a chord played again right after itself shows only
+  // its frame (no gems); the full chord comes back after other notes, a pause
+  // or at the start of a section.
   addChordFrames() {
     const objs = this.noteObjs;
     const mat = this.chordMat || (this.chordMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, depthWrite: false }));
+    const repeatMat = this.chordRepeatMat || (this.chordRepeatMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false }));
     const bar = this.chordBarGeo || (this.chordBarGeo = new THREE.BoxGeometry(1, 1, 0.03));
     bar.userData.shared = true;
+    const sectionStarts = (this.chart.sections || []).map((sec) => sec.t);
+    let prev = null;   // { key, end } of the chord just before (null after a single note)
     for (let i = 0; i < objs.length;) {
       let j = i + 1;
       while (j < objs.length && Math.abs(objs[j].note.t - objs[i].note.t) < 0.002) j++;
       const group = objs.slice(i, j).filter((o) => !o.note.flags.ghost);
-      if (group.length >= 2 && new Set(group.map((o) => o.note.string)).size >= 2) {
-        const ys = group.map((o) => o.obj.position.y);
-        const halfW = (o) => (o.note.fret === 0 ? 2 : GEM_W / 2);
-        const x0 = Math.min(...group.map((o) => o.obj.position.x - halfW(o))) - 0.1;
-        const x1 = Math.max(...group.map((o) => o.obj.position.x + halfW(o))) + 0.1;
-        const y0 = 0.03, y1 = Math.max(...ys) + GEM_H / 2 + 0.1;
-        const host = group[0].obj;
-        const frame = new THREE.Group();
-        const t = 0.035;
-        for (const [cx, cy, w, hgt] of [[(x0 + x1) / 2, y1, x1 - x0, t], [(x0 + x1) / 2, y0, x1 - x0, t], [x0, (y0 + y1) / 2, t, y1 - y0], [x1, (y0 + y1) / 2, t, y1 - y0]]) {
-          const m = new THREE.Mesh(bar, mat);
-          m.scale.set(w, hgt, 1);
-          m.position.set(cx - host.position.x, cy - host.position.y, -GEM_D / 2);
-          frame.add(m);
+      const isChord = group.length >= 2 && new Set(group.map((o) => o.note.string)).size >= 2;
+      if (!isChord) { if (group.length) prev = null; i = j; continue; }
+      const t0 = group[0].note.t;
+      const key = group.map((o) => `${o.note.string}:${o.note.fret}:${o.note.flags.dead ? 'x' : ''}`).sort().join(',');
+      const newSection = prev && sectionStarts.some((st) => st > prev.t + 0.01 && st <= t0 + 0.01);
+      const repeat = prev && prev.key === key && t0 - prev.end < 1.2 && !newSection;
+      prev = { key, t: t0, end: Math.max(...group.map((o) => o.note.t + o.note.dur)) };
+      if (repeat) {
+        for (const o of group) {
+          o.repeat = true;
+          o.body.visible = false;
+          for (const c of o.obj.children) if (c !== o.body) c.visible = false;   // stem, shadow
         }
-        host.add(frame);
       }
+      const ys = group.map((o) => o.obj.position.y);
+      const halfW = (o) => (o.note.fret === 0 ? 2 : GEM_W / 2);
+      const x0 = Math.min(...group.map((o) => o.obj.position.x - halfW(o))) - 0.1;
+      const x1 = Math.max(...group.map((o) => o.obj.position.x + halfW(o))) + 0.1;
+      const y0 = 0.03, y1 = Math.max(...ys) + GEM_H / 2 + 0.1;
+      const host = group[0].obj;
+      const frame = new THREE.Group();
+      const t = 0.035;
+      for (const [cx, cy, w, hgt] of [[(x0 + x1) / 2, y1, x1 - x0, t], [(x0 + x1) / 2, y0, x1 - x0, t], [x0, (y0 + y1) / 2, t, y1 - y0], [x1, (y0 + y1) / 2, t, y1 - y0]]) {
+        const m = new THREE.Mesh(bar, repeat ? repeatMat : mat);
+        m.scale.set(w, hgt, 1);
+        m.position.set(cx - host.position.x, cy - host.position.y, -GEM_D / 2);
+        frame.add(m);
+      }
+      host.add(frame);
       i = j;
     }
   }
