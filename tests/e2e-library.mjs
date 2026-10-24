@@ -128,7 +128,7 @@ await page.evaluate(async () => {
 });
 
 // Library page.
-await page.goto(`chrome-extension://${id}/library/library.html`);
+await page.goto(`chrome-extension://${id}/library/library.html#songs`);
 await page.waitForTimeout(1200);
 out.library = await page.evaluate(() => ({
   due: [...document.querySelectorAll('.duecard b')].map((b) => b.textContent),
@@ -171,7 +171,11 @@ await page.waitForTimeout(1200);
 out.hub.shelf = await page.evaluate(() => [...document.querySelectorAll('.shelf-card b')].map((x) => x.textContent));
 // New setlist (name via the prompt), add two songs from their details, play it.
 page.once('dialog', (d) => d.accept('Rehearsal'));
+await page.evaluate(() => { location.hash = '#setlists'; });
+await page.waitForTimeout(200);
 await page.locator('.setlist-card.new').click();
+await page.evaluate(() => { location.hash = '#songs'; });
+await page.waitForTimeout(200);
 await page.waitForTimeout(500);
 for (const t of ['21 Guns', 'Hysteria']) {
   await page.locator(`.row:has-text("${t}")`).first().click();
@@ -180,6 +184,8 @@ for (const t of ['21 Guns', 'Hysteria']) {
   await page.waitForTimeout(300);
 }
 await page.keyboard.press('Escape');
+await page.evaluate(() => { location.hash = '#setlists'; });
+await page.waitForTimeout(200);
 out.hub.setlist = await page.evaluate(() => document.querySelector('.setlist-card:not(.new) .sl-title').innerText.replace(/\n/g, ' | '));
 const slPopup = ctx.waitForEvent('page');
 await page.locator('.setlist-card:not(.new) button:has-text("Play")').click();
@@ -188,6 +194,8 @@ out.hub.setlistOpened = p2.url();
 await p2.close();
 out.hub.run = await page.evaluate(async () => (await chrome.storage.local.get('setlistRun')).setlistRun);
 // Views.
+await page.evaluate(() => { location.hash = '#songs'; });
+await page.waitForTimeout(200);
 await page.locator('#viewToggle .chip:has-text("Grid")').click();
 await page.waitForTimeout(300);
 out.hub.grid = await page.evaluate(() => document.querySelectorAll('.gcard').length);
@@ -208,8 +216,13 @@ await page.waitForTimeout(800);
 out.hub.afterDrop = await page.evaluate(async () => { const { idbLibrary } = await import('../src/core/history-db.js'); return (await idbLibrary.get('songsterr:99:1')).status; });
 await page.locator('#viewToggle .chip:has-text("List")').click();
 await page.selectOption('#group', 'none');
-await page.evaluate(() => window.scrollTo(0, 0));
+await page.evaluate(() => { location.hash = '#home'; });
+await page.waitForTimeout(400);
 if (shot) await page.screenshot({ path: `${shot}-hub.png` });
+await page.evaluate(() => { location.hash = '#progress'; });
+await page.waitForTimeout(400);
+out.hub.weekly = await page.evaluate(() => document.querySelectorAll('.weekchart rect').length);
+if (shot) await page.screenshot({ path: `${shot}-progress.png` });
 
 console.log(JSON.stringify(out, null, 1));
 await ctx.close();
@@ -221,13 +234,13 @@ const ok = out.loaded && /Octaves/.test(out.loaded)
   && out.session && /SESSION REPORT/.test(out.session)
   && out.library.due.includes('21 Guns') && out.library.sessions >= 1 && /95% at 100% speed/.test(out.library.goal || '')
   && out.library.rows.some((r) => /Fretboard trainer/.test(r))
-  && out.library.rows.includes('21 Guns') && out.library.rows.some((r) => /Octaves/.test(r)) && out.library.cards.length === 5
+  && out.library.rows.includes('21 Guns') && out.library.rows.some((r) => /Octaves/.test(r)) && out.library.cards.length === 9
   && out.detail.open && out.detail.sections === 2 && out.detail.weak.some((w) => /Bar 9/.test(w)) && out.detail.chart
   && out.pending && out.pending.songKey === 'songsterr:23557:5' && out.pending.loopBars[0] === 7 && /songsterr/.test(out.popupUrl)
-  && out.hub.tiles.length === 7 && out.hub.setup.some((t) => /input/i.test(t)) && out.hub.shelf.includes('Hysteria')
+  && out.hub.tiles.length === 6 && !out.hub.tiles.includes("Continue") && out.hub.setup.some((t) => /input/i.test(t)) && out.hub.shelf.includes('Hysteria')
   && /Rehearsal/.test(out.hub.setlist) && /2 songs/.test(out.hub.setlist) && /songsterr/.test(out.hub.setlistOpened)
   && out.hub.run && out.hub.run.songKeys.length === 2 && out.hub.grid >= 4 && out.hub.groups.includes('E Standard')
-  && out.hub.board.some((b) => b.startsWith('want:1')) && out.hub.afterDrop === 'learning'
+  && out.hub.board.some((b) => b.startsWith('want:1')) && out.hub.afterDrop === 'learning' && out.hub.weekly === 12
   && !errors.length;
-if (!ok) { console.error('FAIL', JSON.stringify({ errors, rows: out.library.rows, trainer: out.trainer, detail: out.detail })); process.exit(1); }
+if (!ok) { console.error('FAIL', JSON.stringify({ errors, hub: out.hub, lib: out.library, drill: out.drill, session: out.session })); process.exit(1); }
 console.log('PASS');

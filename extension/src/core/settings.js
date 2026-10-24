@@ -47,6 +47,8 @@ export const DEFAULTS = {
   showDebug: false,
   hitSparks: true,         // sparks on the strings when you hit a note (3D)
   timingMarks: false,      // small early/late dot after each hit (3D)
+  approachRings: true,     // a ring closes in on each note's target (3D)
+  stageEffects: true,      // stage lights react to your streak, floating dust, vignette (3D)
   glowEffects: true,       // soft glow (bloom) on strings and notes (3D)
   theme: 'classic',        // 3D look: 'classic' | 'stage' | 'minimal' | 'contrast'
   largeNotes: false,       // 30% bigger notes (3D)

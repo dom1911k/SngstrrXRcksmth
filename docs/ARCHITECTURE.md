@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
+Status: **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -605,3 +605,32 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
   floor colour. `graphicsQuality`: high (no auto-lowering), auto, low (pixel ratio 1,
   no bloom, no environment, standard gem material).
 
+## 18. Library redesign and stage effects (0.12.0)
+
+* **Library layout** (`library/library.html`, `src/library-main.js`): a sidebar nav
+  and hash-routed pages (`#home`, `#songs`, `#setlists`, `#progress`; `route()` on
+  `hashchange` toggles `.view[data-view]`). Home = greeting (due count, streak,
+  week time), setup check, hero, tiles, Due / Want shelves, *This week* mini
+  overview and the last 3 sessions. Progress = full overview, heat map, a 12-week
+  SVG chart (`renderWeekly`: minutes as bars, accuracy as a line) and 30 sessions.
+  Searching or setting a filter switches to `#songs`; "/" focuses the search.
+* **Highway effects** (`ui/highway3d.js`, textures in `ui/highway3d-fx.js`):
+  * *Approach rings* (`updateRings`): pool of 10 additive ring sprites at the strike
+    line for notes within 0.45 s (song time × speed), scale 2.3× → 1×, opacity rising.
+  * *Stage* (`updateStage`): `state.streak` (overlay passes `session.stats().streak`
+    only while scoring is active) → smoothed `excite = min(1, streak/40)` scales
+    beam opacity / sway speed, horizon size and brightness, lane base opacity and
+    dust; `burst` at 10/25/50/100/…, `dim` when a streak ≥ 10 breaks. Only with
+    `stageFx` and a theme that has beams (not minimal/contrast). The camera is not
+    affected.
+  * *Dust*: 320 additive points behind the highway, drifting in real time, following
+    the camera x; off on Low quality.
+  * *Section sweep* (`sectionSweep`): a floor band running from the strings to the
+    far end in 0.9 s after a section start (with glow on).
+  * *Vignette*: CSS radial gradient in the overlay (z-index 0, no pointer events).
+  * *Note types*: harmonics are diamonds (square gem rotated 45°), palm mutes get a
+    hatch plane on the front face, accents a brighter material, double outline and
+    bigger halo, bend tails rise (`mergedQuads` takes an end height `yb`), slide
+    tails carry chevron sprites (clipped at the strike line).
+  * Settings `approachRings`, `stageEffects` (defaults on; no schema bump needed:
+    new keys take their defaults).

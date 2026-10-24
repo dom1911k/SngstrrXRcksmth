@@ -36,9 +36,10 @@ let view = 'list', groupBy = 'none';
 try { view = localStorage.getItem('btLibView') || 'list'; groupBy = localStorage.getItem('btLibGroup') || 'none'; } catch { /* ignore */ }
 
 async function load() {
-  const [lib, recs, sessions] = await Promise.all([idbLibrary.all(), idbHistory.all(), idbSessions.recent(6), hub.loadAllSetlists()]);
+  const [lib, recs, sessions] = await Promise.all([idbLibrary.all(), idbHistory.all(), idbSessions.recent(30), hub.loadAllSetlists()]);
   hub.renderSetupCheck($('setup')).then((r) => { settingsNow = r.settings; renderHubTiles(); });
-  renderSessions(sessions);
+  renderSessions(sessions.slice(0, 3), $('sessionsBox'), $('sessions'));
+  renderSessions(sessions, $('sessionsAllBox'), $('sessionsAll'));
   records = recs.sort((a, b) => a.at - b.at);
   const byKey = new Map();
   for (const r of records) {
@@ -69,15 +70,58 @@ async function load() {
 function renderOverview() {
   const o = overallStats(records);
   const card = (v, l, cls = '') => h('div', { class: 'card' }, h('div', { class: `v ${cls}` }, v), h('div', { class: 'l' }, l));
+  const nSongs = entries.filter((e) => e.kind !== 'drill').length;
   $('overview').replaceChildren(
-    card(dur(o.weekSeconds), `practised this week · ${o.weekPasses} passes`),
-    card(o.weekSongs, o.weekSongs === 1 ? 'song this week' : 'songs this week'),
+    card(dur(o.weekSeconds), `practised · ${o.weekPasses} passes`),
+    card(pct(o.weekAccuracy), 'accuracy'),
+    card(o.streak ? `${o.streak} 🔥` : '0', o.streak === 1 ? 'day in a row' : 'days in a row', 'flame'),
+    card(o.weekSongs, o.weekSongs === 1 ? 'song played' : 'songs played'),
+  );
+  const mastered = entries.filter((e) => e.status === 'mastered').length;
+  $('overviewFull').replaceChildren(
+    card(dur(o.weekSeconds), `this week · ${o.weekPasses} passes`),
     card(pct(o.weekAccuracy), 'accuracy this week'),
     card(o.streak ? `${o.streak} 🔥` : '0', o.streak === 1 ? 'day in a row' : 'days in a row', 'flame'),
-    card(dur(o.totalSeconds), (() => { const n = entries.filter((e) => e.kind !== 'drill').length; return `total · ${n} song${n === 1 ? '' : 's'}`; })()),
+    card(dur(o.totalSeconds), `total · ${o.totalPasses} passes`),
+    card(nSongs, `song${nSongs === 1 ? '' : 's'} · ${mastered} mastered`),
   );
   renderHeatmap();
+  renderWeekly();
   $('practiceNote').textContent = o.streak >= 2 ? `${o.streak} days in a row. Keep it going!` : o.weekSeconds ? '' : 'Nothing practised this week yet.';
+}
+
+// Last 12 weeks: practice minutes (bars) and accuracy (line).
+function renderWeekly() {
+  const DAY = 86400000, W = 12;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const monday = today.getTime() - ((today.getDay() + 6) % 7) * DAY;
+  const weeks = Array.from({ length: W }, (_, i) => ({ start: monday - (W - 1 - i) * 7 * DAY, sec: 0, judged: 0, hits: 0 }));
+  for (const r of records) {
+    const w = weeks.find((x) => r.at >= x.start && r.at < x.start + 7 * DAY);
+    if (!w) continue;
+    w.sec += r.seconds > 0 ? r.seconds : r.judged * 0.5; w.judged += r.judged; w.hits += r.hits;
+  }
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs) => { const x = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) x.setAttribute(k, v); return x; };
+  const wd = 1080, ht = 190, pad = 28, bw = (wd - pad * 2) / W;
+  const svg = el('svg', { viewBox: `0 0 ${wd} ${ht}`, class: 'weekchart' });
+  const maxSec = Math.max(1800, ...weeks.map((w) => w.sec));
+  const pts = [];
+  weeks.forEach((w, i) => {
+    const x = pad + i * bw;
+    const bh = (w.sec / maxSec) * (ht - 50);
+    const bar = el('rect', { x: x + 6, y: ht - 24 - bh, width: bw - 12, height: Math.max(1, bh), rx: 4, fill: '#2b3550' });
+    const tip = el('title', {}); tip.textContent = `Week of ${new Date(w.start).toLocaleDateString([], { day: 'numeric', month: 'short' })}: ${dur(w.sec)}${w.judged ? `, ${pct(w.hits / w.judged)}` : ''}`;
+    bar.append(tip);
+    svg.append(bar);
+    const lab = el('text', { x: x + bw / 2, y: ht - 8, fill: '#6f7685', 'font-size': 10, 'text-anchor': 'middle' });
+    lab.textContent = new Date(w.start).toLocaleDateString([], { day: 'numeric', month: 'short' });
+    svg.append(lab);
+    if (w.judged) pts.push([x + bw / 2, ht - 24 - (w.hits / w.judged) * (ht - 50)]);
+  });
+  if (pts.length > 1) svg.append(el('polyline', { points: pts.map((p) => p.join(',')).join(' '), fill: 'none', stroke: '#f2c418', 'stroke-width': 2.5, 'stroke-linejoin': 'round' }));
+  for (const [x, y] of pts) svg.append(el('circle', { cx: x, cy: y, r: 3.5, fill: '#f2c418' }));
+  $('weekly').replaceChildren(svg, h('div', { class: 'legend2' }, h('span', { class: 'sw bar' }), 'practice time', h('span', { class: 'sw line' }), 'accuracy'));
 }
 
 // Practice heat map: the last 52 weeks, one square per day (like GitHub).
@@ -236,11 +280,47 @@ async function patch(e, fields) {
 }
 
 function renderHubTiles() {
-  hub.renderTiles($('tiles'), { entries, settings: settingsNow, openSong, setFilter: (f) => { filter = f; render(); $('songs').scrollIntoView({ behavior: 'smooth' }); } });
+  hub.renderTiles($('tiles'), { entries, settings: settingsNow, openSong, setFilter: (f) => { filter = f; location.hash = '#songs'; render(); } });
+}
+
+// ---------- pages (Home / Songs / Setlists / Progress) ----------
+function route() {
+  const v = (location.hash || '#home').slice(1);
+  const view = ['home', 'songs', 'setlists', 'progress'].includes(v) ? v : 'home';
+  for (const el of document.querySelectorAll('.view')) el.hidden = el.dataset.view !== view;
+  for (const a of document.querySelectorAll('#nav a[data-view]')) a.classList.toggle('on', a.dataset.view === view);
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', route);
+
+function greet() {
+  const hr = new Date().getHours();
+  const hello = hr < 5 ? 'Late session?' : hr < 12 ? 'Good morning!' : hr < 18 ? 'Good afternoon!' : 'Good evening!';
+  const o = overallStats(records);
+  const due = entries.filter((e) => e.due && e.due.due).length;
+  const bits = [];
+  if (due) bits.push(`${due} song${due === 1 ? ' is' : 's are'} due`);
+  if (o.streak) bits.push(`${o.streak}-day streak${o.streak >= 3 ? ' 🔥' : ''}`);
+  if (o.weekSeconds) bits.push(`${dur(o.weekSeconds)} this week`);
+  $('greeting').replaceChildren(h('b', {}, hello), bits.length ? h('span', {}, ` ${bits.join(' · ')}`) : null);
+  $('navDue').hidden = !due;
+  $('navDue').textContent = String(due);
+  $('navSongs').textContent = String(entries.filter((e) => e.kind !== 'drill').length || '');
+  $('navSetlists').textContent = String(hub.getSetlists().length || '');
+  // First visit: a short "how to start".
+  const empty = !entries.length;
+  $('homeEmpty').hidden = !empty;
+  if (empty) {
+    $('homeEmpty').replaceChildren(h('b', {}, 'Welcome! Three steps to start:'),
+      h('ol', {}, h('li', {}, 'Plug in the Real Tone Cable, open the ', h('a', { class: 'link', href: '../player/player.html#input' }, 'panel → Input'), ' and press Start input.'),
+        h('li', {}, h('a', { class: 'link', href: '../player/player.html#calibrate' }, 'Calibrate'), ' the latency once (one minute).'),
+        h('li', {}, h('a', { class: 'link', href: '../search/search.html' }, 'Find a song'), ' or open any bass tab on Songsterr and press play.')));
+  }
 }
 
 function render() {
   renderOverview();
+  greet();
   renderHubTiles();
   hub.renderWantShelf($('wantBox'), $('wantShelf'), { entries, cover, openSong, patch });
   hub.renderSetlists($('setlists'), { entries, cover, openSong, rerender: render });
@@ -292,9 +372,9 @@ function songRow(e, i) {
 }
 
 // Recent sessions (session reports saved when you stopped the input).
-function renderSessions(list) {
-  $('sessionsBox').hidden = !list.length;
-  $('sessions').replaceChildren(...list.map((r) => h('div', { class: 'sess' },
+function renderSessions(list, box, el) {
+  box.hidden = !list.length;
+  el.replaceChildren(...list.map((r) => h('div', { class: 'sess' },
     h('div', { class: 'when' }, new Date(r.start).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }),
       h('span', { class: 'small' }, ` ${new Date(r.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`)),
     h('div', { class: 'small' }, `${dur(r.wallSeconds)} · ${r.passes} pass${r.passes === 1 ? '' : 'es'} · ${pct(r.accuracy)}`),
@@ -434,7 +514,11 @@ function showDetail(e) {
   render();
 }
 
-$('search').addEventListener('input', render);
+$('search').addEventListener('input', () => { if (location.hash !== '#songs') location.hash = '#songs'; render(); });
+window.addEventListener('keydown', (e) => {
+  if (e.key === '/' && document.activeElement !== $('search') && !/input|textarea|select/i.test(document.activeElement.tagName)) { e.preventDefault(); $('search').focus(); }
+});
+route();
 $('sort').addEventListener('change', render);
 $('group').addEventListener('change', (ev) => { groupBy = ev.target.value; try { localStorage.setItem('btLibGroup', groupBy); } catch { /* ignore */ } render(); });
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('detail').hidden = true; selected = null; render(); } });

@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.11.0.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.12.0.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -138,11 +138,20 @@ Good Riddance, can be played too.
     Section names (VERSE, CHORUS…) float above the highway where a section starts.
     The lit hand lane slides over to the next hand position, and the fret numbers
     of the next position light up softly just before you have to move.
-  - Coloured ribbons are held notes. A ribbon that bends sideways is a slide; a
-    wavy ribbon is vibrato.
+  - Coloured ribbons are held notes. A ribbon that bends sideways is a slide (with
+    » chevrons pointing where your hand goes); a wavy ribbon is vibrato; a ribbon
+    that curves upwards is a bend.
   - Wide bars are open strings. **X** = dead note; faded small notes = ghost notes;
-    **H**/**P** = hammer-on/pull-off; **PM** = palm mute. Notes played together
-    (chords, double stops) have a white frame around them.
+    **H**/**P** = hammer-on/pull-off; **PM** = palm mute (the note is also
+    hatched); a **diamond** = harmonic; a brighter note with a double outline =
+    accent. Notes played together (chords, double stops) have a white frame around them.
+  - **Approach rings:** in the last moment before a note, a ring in the string's
+    colour closes in on the spot where you play it: when it reaches the note, play.
+  - **The stage reacts to your playing:** the stage lights get brighter and livelier
+    the longer your note streak, flash at 10, 25, 50, 100… notes in a row, and dip
+    briefly when a long streak breaks. Dust floats in the lights, the edges of the
+    picture are a little darker, and a band of light runs down the highway when a
+    new section starts. (The camera itself does not move more.)
 - **Section strip** (top edge of the highway, like Rocksmith's phrase bar): one
   block per section of the song (Intro, Verse 1, …) with a white line where you
   are. Once you have practised, each block is coloured by how well you play it
@@ -169,6 +178,9 @@ Settings in the panel, under **Song & highway**:
 - **Look (3D):** *Classic* (Rocksmith blue), *Stage* (warm stage lights), *Minimal*
   (calm, no effects) or *High contrast*. **Larger notes** makes the notes 30% bigger
   for playing further from the screen.
+- **Approach rings** and **stage effects** (lights reacting to your streak,
+  floating dust, darker edges) can be switched off here; the *Minimal* look has no
+  stage effects.
 - **Sparks when you hit a note**, **glow effects** (soft glow on strings and notes;
   turns itself off if your PC can't keep up) and **timing dots** (off by default:
   after each hit a small dot shows where the note was when you played it: blue =
@@ -289,6 +301,20 @@ right. Details: [`docs/SCORING.md`](docs/SCORING.md).
 ### Library (your songs, favourites and statistics)
 Click the **Bass Trainer icon** in Chrome's toolbar (or **Library** in the panel or
 the player) to open it.
+
+The Library is your start page. The menu on the left has four pages:
+- **Home:** a greeting with what's due today and your streak, the setup check, the
+  song you played last (*Continue*), quick-start tiles, *Due today*, *Want to learn*,
+  and on the right *This week* (time, songs, accuracy, streak) and your last sessions.
+- **Songs:** all your songs with filters, grouping, sorting and the list / grid /
+  board views (the number next to *Songs* is how many you have).
+- **Setlists:** your setlists.
+- **Progress:** your totals, the 12-month heat map, a 12-week chart (practice time
+  per week as bars, accuracy as a line) and all recent session reports.
+
+Below that are shortcuts to Find songs, Drills, Fretboard trainer, Player, Tuner,
+Calibrate and Updates. The search box at the top searches your songs (press **/**
+to jump to it); *Find new songs* searches Songsterr.
 
 - Every bass track you open is remembered automatically, with its Songsterr link.
   Press **☆ Save** (bottom left of the highway) to make the song a **favourite**.
@@ -549,6 +575,10 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.12.0:** Library redesign (menu with Home / Songs / Setlists / Progress pages,
+  weekly progress chart); highway: approach rings, stage lights that react to your
+  streak, floating dust, vignette, section light sweep, diamond harmonics, hatched
+  palm mutes, brighter accents, rising bend tails, slide chevrons.
 - **0.11.0:** Library hub (setup check, quick-start tiles, Want-to-learn shelf,
   setlists with Play, grid/board views, grouping by tuning/artist/status); graphics:
   glossy gems with reflections, metallic strings and frets, fretboard texture, crisper

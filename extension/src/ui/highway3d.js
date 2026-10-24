@@ -12,7 +12,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { stringColors } from '../core/music.js';
 import { computeAnchors, anchorAt, firstNoteAtOrAfter } from '../core/chart.js';
 import { CameraFollow, planCameraSegments } from '../core/camera-follow.js';
-import { roundedGemGeometry, shadowTexture, wideLabelTexture, slotTexture, beamTexture, Particles, Bloom } from './highway3d-fx.js';
+import { roundedGemGeometry, shadowTexture, wideLabelTexture, slotTexture, beamTexture, ringTexture, chevronTexture, hatchTexture, dustTexture, sweepTexture, Particles, Bloom } from './highway3d-fx.js';
 
 const DEPTH = 40;            // world units from the strike line to the far end
 const MAX_FRET = 24;
@@ -110,12 +110,13 @@ function studioEnvironment(renderer) {
 
 // One mesh for many flat quads lying on (or parallel to) the floor, in the
 // time group's coordinates (z in seconds). quads: [x0, x1, t0, t1, y, x0b?, x1b?]
-// where x0b/x1b are the x edges at t1 (for slides); defaults to x0/x1.
+// where x0b/x1b are the x edges at t1 (for slides); defaults to x0/x1, and
+// yb is the height at t1 (bends rise); defaults to y.
 function mergedQuads(quads, material) {
   const pos = new Float32Array(quads.length * 18);
   let o = 0;
-  for (const [x0, x1, t0, t1, y, x0b = x0, x1b = x1] of quads) {
-    pos.set([x0, y, -t0, x1, y, -t0, x1b, y, -t1, x0, y, -t0, x1b, y, -t1, x0b, y, -t1], o);
+  for (const [x0, x1, t0, t1, y, x0b = x0, x1b = x1, yb = y] of quads) {
+    pos.set([x0, y, -t0, x1, y, -t0, x1b, yb, -t1, x0, y, -t0, x1b, yb, -t1, x0b, yb, -t1], o);
     o += 18;
   }
   const geo = new THREE.BufferGeometry();
@@ -150,7 +151,8 @@ export class Highway3D {
 
   constructor(canvas) {
     this.canvas = canvas;
-    this.options = { lookahead: 4.5, invertStrings: false, showDebug: false, showFretNumbers: true, glow: true, sparks: true, timingMarks: false };
+    this.options = { lookahead: 4.5, invertStrings: false, showDebug: false, showFretNumbers: true, glow: true, sparks: true, timingMarks: false, approachRings: true, stageFx: true };
+    this.stage = { excite: 0, streak: 0, burst: 0, dim: 0 };   // the stage reacts to your streak
     this.chart = null;
     this.fps = 60;
     this.lastFrame = 0;
@@ -205,7 +207,11 @@ export class Highway3D {
     this.shadowTex = shadowTexture();
     this.slotTex = slotTexture();
     this.particles = new Particles(this.scene);
+    this.ringTex = ringTexture();
+    this.chevronTex = { 1: chevronTexture(1), '-1': chevronTexture(-1) };
+    this.hatchTex = hatchTexture();
     this.buildStatic();
+    this.buildAtmosphere();
     this.timeGroup = new THREE.Group();   // children in seconds along -z; scaled per frame
     this.noteGroup = new THREE.Group();   // gems, positioned per frame
     this.scene.add(this.timeGroup, this.noteGroup);
@@ -272,6 +278,80 @@ export class Highway3D {
       this.fretLabels.push(sp);
     }
     this.scene.add(S);
+  }
+
+  // Stage atmosphere: dust floating in the stage lights behind the highway,
+  // and a light sweep that runs down the lane when a new section starts.
+  buildAtmosphere() {
+    const N = 320;
+    const pos = new Float32Array(N * 3);
+    this.dustSeed = new Float32Array(N * 4);
+    for (let i = 0; i < N; i++) {
+      this.dustSeed.set([Math.random() * 70 - 35, 1 + Math.random() * 15, -6 - Math.random() * (DEPTH + 12), Math.random() * Math.PI * 2], i * 4);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.dustMat = new THREE.PointsMaterial({ map: dustTexture(), color: 0x9fb6ff, size: 0.34, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, sizeAttenuation: true });
+    this.dust = new THREE.Points(geo, this.dustMat);
+    this.dust.frustumCulled = false;
+    this.dust.renderOrder = -8;
+    this.scene.add(this.dust);
+
+    const sweepGeo = new THREE.PlaneGeometry(1, 1);
+    sweepGeo.rotateX(-Math.PI / 2);
+    this.sweep = new THREE.Mesh(sweepGeo, new THREE.MeshBasicMaterial({ map: sweepTexture(), color: 0xbcd2ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.sweep.scale.set(MAX_FRET + 6, 1, 2.4);
+    this.sweep.renderOrder = 3;
+    this.sweep.visible = false;
+    this.scene.add(this.sweep);
+  }
+
+  // Dust drifts slowly upwards and sideways (time in real seconds).
+  updateDust(nowS, camX) {
+    const arr = this.dust.geometry.attributes.position.array, seed = this.dustSeed;
+    for (let i = 0, n = arr.length / 3; i < n; i++) {
+      const [x, y, z, ph] = seed.subarray(i * 4, i * 4 + 4);
+      arr[i * 3] = camX + x + Math.sin(nowS * 0.13 + ph) * 1.6;
+      arr[i * 3 + 1] = 1 + ((y + nowS * (0.12 + 0.05 * Math.sin(ph))) % 15);
+      arr[i * 3 + 2] = z + Math.cos(nowS * 0.09 + ph) * 1.2;
+    }
+    this.dust.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // Approach rings: a ring closes in on the spot where each note will cross
+  // the strings during its last ~0.45 s, in the string's colour.
+  updateRings(t, speed) {
+    if (!this.ringPool) {
+      this.ringPool = Array.from({ length: 10 }, () => {
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.ringTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
+        sp.visible = false;
+        sp.renderOrder = 6;
+        this.scene.add(sp);
+        return sp;
+      });
+    }
+    let used = 0;
+    if (this.options.approachRings && this.chart) {
+      const notes = this.chart.notes;
+      const lead = 0.45 * speed;
+      const big = this.options.largeNotes ? 1.3 : 1;
+      for (let i = firstNoteAtOrAfter(notes, t); i < notes.length && notes[i].t <= t + lead && used < this.ringPool.length; i++) {
+        const n = notes[i];
+        if (n.flags.ghost) continue;
+        const k = (n.t - t) / lead;                 // 1 = just appeared, 0 = play now
+        const sp = this.ringPool[used++];
+        const o = this.noteObjs[i];
+        const grow = 1 + 1.3 * k;
+        const open = n.fret === 0;
+        sp.scale.set((open ? 4.3 : 0.95) * big * grow, (open ? 0.8 : 0.95) * big * grow, 1);
+        sp.position.set(o.obj.position.x, o.obj.position.y, 0.04);
+        sp.material.color.set(this.colors[n.string] || '#ffffff');
+        sp.material.opacity = 0.85 * (1 - k) ** 1.3;
+        sp.visible = true;
+      }
+    }
+    for (let k = used; k < this.ringPool.length; k++) this.ringPool[k].visible = false;
+    return used > 0;
   }
 
   // Hit indicator: a soft spot on the string at the note's fret. It brightens
@@ -459,6 +539,10 @@ export class Highway3D {
     this.tailMats = colors.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.55, side: THREE.DoubleSide, clippingPlanes: this.clipStrike, depthWrite: false }));
     this.tailCoreMats = colors.map((c) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).lerp(new THREE.Color(0xffffff), 0.55), transparent: true, opacity: 0.9, side: THREE.DoubleSide, clippingPlanes: this.clipStrike, depthWrite: false }));
     this.glowMats = colors.map((c) => new THREE.SpriteMaterial({ map: this.glowTex, color: c, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
+    // Accents: brighter gems with a stronger halo.
+    this.accentMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).lerp(new THREE.Color(0xffffff), 0.25), emissive: c, emissiveIntensity: 0.8, roughness: 0.25, metalness: 0.05 }));
+    this.accentGlowMats = colors.map((c) => new THREE.SpriteMaterial({ map: this.glowTex, color: c, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.chevronMats = new Map();   // `${string}|${dir}` -> sprite material for slide tails
     // Rounded gems with a bright outline and a soft shadow on the floor.
     const { geo: gemGeo, outline: edgeGeo } = roundedGemGeometry(GEM_W, GEM_H, GEM_D);
     this.gemGeo = gemGeo;
@@ -467,6 +551,10 @@ export class Highway3D {
     const shadowGeo = new THREE.PlaneGeometry(1, 1); shadowGeo.userData.shared = true;
     shadowGeo.rotateX(-Math.PI / 2);
     const shadowMat = new THREE.MeshBasicMaterial({ map: this.shadowTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    const accentEdgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
+    // Palm mutes: dark hatching across the front of the gem.
+    const hatchGeo = new THREE.PlaneGeometry(GEM_W * 0.86, GEM_H * 0.72); hatchGeo.userData.shared = true;
+    const hatchMat = new THREE.MeshBasicMaterial({ map: this.hatchTex, transparent: true, depthWrite: false });
 
     // Beat lines and anchor lanes live in seconds (timeGroup is scaled by k).
     // Merged into a few meshes: one draw call per kind instead of hundreds.
@@ -538,22 +626,42 @@ export class Highway3D {
       const obj = new THREE.Group();
       const body = new THREE.Group();   // the gem itself (grows with distance)
       obj.add(body);
-      const mat = note.flags.dead ? this.deadMats[s] : note.flags.ghost ? this.ghostMats[s] : this.gemMats[s];
+      const f = note.flags;
+      const accent = f.accent && !f.dead && !f.ghost;
+      const mat = f.dead ? this.deadMats[s] : f.ghost ? this.ghostMats[s] : accent ? this.accentMats[s] : this.gemMats[s];
       const gem = new THREE.Mesh(gemGeo, mat);
       if (open) gem.scale.set(4 / GEM_W * 0.96, 0.55, 1);
-      if (note.flags.ghost) gem.scale.multiplyScalar(0.8);
+      else if (f.harmonic && !f.dead) {
+        // Harmonics: a diamond, as in Rocksmith.
+        gem.scale.set(GEM_H / GEM_W * 1.45, 1.45, 1);
+        gem.rotation.z = Math.PI / 4;
+      }
+      if (f.ghost) gem.scale.multiplyScalar(0.8);
       body.add(gem);
-      if (!note.flags.ghost) {
-        const edges = new THREE.LineLoop(edgeGeo, edgeMat);
+      if (!f.ghost) {
+        const edges = new THREE.LineLoop(edgeGeo, accent ? accentEdgeMat : edgeMat);
         edges.scale.copy(gem.scale);
+        edges.rotation.copy(gem.rotation);
         body.add(edges);
+        if (accent) {
+          const outer = new THREE.LineLoop(edgeGeo, accentEdgeMat);
+          outer.scale.set(gem.scale.x * 1.14, gem.scale.y * 1.3, 1);
+          outer.rotation.copy(gem.rotation);
+          body.add(outer);
+        }
+        if (f.palmMute && !f.dead && !open) {
+          const hatch = new THREE.Mesh(hatchGeo, hatchMat);
+          hatch.position.z = GEM_D / 2 + 0.012;
+          hatch.renderOrder = 1;
+          body.add(hatch);
+        }
         const shadow = new THREE.Mesh(shadowGeo, shadowMat);
         shadow.scale.set(open ? 4.2 : GEM_W * 1.5, 1, 0.7);
         shadow.position.y = -y + 0.02;
         obj.add(shadow);
       }
-      const glow = new THREE.Sprite(this.glowMats[s]);
-      glow.scale.set(open ? 4.4 : 1.3, 0.7, 1);
+      const glow = new THREE.Sprite(accent ? this.accentGlowMats[s] : this.glowMats[s]);
+      glow.scale.set((open ? 4.4 : 1.3) * (accent ? 1.25 : 1), accent ? 1.0 : 0.7, 1);
       glow.position.z = -0.02;
       glow.renderOrder = -1;
       body.add(glow);
@@ -578,7 +686,6 @@ export class Highway3D {
       const tags = [];
       if (note.flags.hopo) tags.push(prevOnString[s] && note.fret < prevOnString[s].fret ? 'P' : 'H');
       if (note.flags.palmMute) tags.push('PM');
-      if (note.flags.harmonic) tags.push('◆');
       if (note.flags.bend) tags.push('⤴');
       if (tags.length) {
         const sp = new THREE.Sprite(this.label(tags.join(' '), '#8b93a3'));
@@ -591,7 +698,7 @@ export class Highway3D {
       this.noteGroup.add(obj);
 
       // Sustain / slide tail in seconds (timeGroup), a ribbon at string height.
-      const sustain = (note.dur >= 0.5 || (note.flags.slide && note.dur > 0.15)) && !note.flags.dead && !note.flags.staccato;
+      const sustain = (note.dur >= 0.5 || (note.flags.slide && note.dur > 0.15) || (note.flags.bend && note.dur > 0.2)) && !note.flags.dead && !note.flags.staccato;
       if (sustain) {
         const toFret = note.flags.slide && note.flags.slide.toFret !== null && note.flags.slide.toFret !== undefined ? note.flags.slide.toFret : null;
         const x1 = open ? x : toFret !== null ? Math.max(0.5, toFret - 0.5) : x;
@@ -604,8 +711,31 @@ export class Highway3D {
             const a = k === 0 ? 0 : (k % 2 ? amp : -amp), b = k % 2 ? -amp : amp;
             tailQuads[s].push([x - hw + a, x + hw + a, t0, t1, y, x - hw + b, x + hw + b]);
           }
+        } else if (note.flags.bend && toFret === null) {
+          // Bend: the tail rises like the pitch (flat, then curving up).
+          const N = 10, rise = 0.34;
+          const lift = (u) => { const v = Math.max(0, Math.min(1, (u - 0.15) / 0.55)); return rise * v * v * (3 - 2 * v); };
+          for (let j = 0; j < N; j++) {
+            const t0 = note.t + note.dur * j / N, t1 = note.t + note.dur * (j + 1) / N;
+            tailQuads[s].push([x - hw, x + hw, t0, t1, y + lift(j / N), x - hw, x + hw, y + lift((j + 1) / N)]);
+          }
         } else {
           tailQuads[s].push([x - hw, x + hw, note.t, note.t + note.dur, y, x1 - hw, x1 + hw]);
+          // Slides: chevrons along the tail pointing where the hand goes.
+          if (toFret !== null && x1 !== x) {
+            const dir = x1 > x ? 1 : -1;
+            const key = `${s}|${dir}`;
+            if (!this.chevronMats.has(key)) {
+              this.chevronMats.set(key, new THREE.SpriteMaterial({ map: this.chevronTex[dir], color: new THREE.Color(colors[s]).lerp(new THREE.Color(0xffffff), 0.4), transparent: true, depthWrite: false, clippingPlanes: this.clipStrike }));
+            }
+            for (const u of note.dur > 0.6 ? [0.3, 0.65] : [0.5]) {
+              const sp = new THREE.Sprite(this.chevronMats.get(key));
+              sp.scale.set(0.72, 0.36, 1);
+              sp.position.set(x + (x1 - x) * u, y + 0.06, -(note.t + note.dur * u));
+              sp.renderOrder = 1;
+              this.timeGroup.add(sp);
+            }
+          }
         }
       }
       this.noteObjs.push({ note, obj, gem, body });
@@ -615,9 +745,9 @@ export class Highway3D {
       if (!q.length) return;
       this.timeGroup.add(mergedQuads(q, this.tailMats[s]));
       // A bright core line inside each tail, as on Rocksmith's sustains.
-      const core = q.map(([x0, x1, t0, t1, y, x0b = x0, x1b = x1]) => {
+      const core = q.map(([x0, x1, t0, t1, y, x0b = x0, x1b = x1, yb = y]) => {
         const c = (x0 + x1) / 2, cb = (x0b + x1b) / 2, w = 0.03;
-        return [c - w, c + w, t0, t1, y + 0.004, cb - w, cb + w];
+        return [c - w, c + w, t0, t1, y + 0.004, cb - w, cb + w, yb + 0.004];
       });
       this.timeGroup.add(mergedQuads(core, this.tailCoreMats[s]));
     });
@@ -679,6 +809,33 @@ export class Highway3D {
     return Math.exp(-age / 0.15) * (beats[b].downbeat ? 1 : 0.55);
   }
 
+  // Section light sweep: 0..1 while the band runs down the lane (~0.9 s real
+  // time after a section starts), otherwise -1.
+  sectionSweep(t, speed) {
+    const secs = this.chart.sections || [];
+    let last = null;
+    for (const sec of secs) { if (sec.t <= t) last = sec; else break; }
+    if (!last || last.t <= 0.01) return -1;
+    const age = (t - last.t) / speed;
+    return age >= 0 && age < 0.9 ? age / 0.9 : -1;
+  }
+
+  // Streak -> stage excitement (smoothed), milestone bursts and the dip when
+  // a streak of 10+ breaks. Returns true while something is still changing.
+  updateStage(streak, dt) {
+    const st = this.stage;
+    const n = Number.isFinite(streak) ? streak : 0;
+    if (n > st.streak && [10, 25, 50, 100, 150, 200, 300, 500].some((m) => st.streak < m && n >= m)) st.burst = 1;
+    if (n < st.streak && st.streak >= 10) st.dim = 1;
+    st.streak = n;
+    const target = Math.min(1, n / 40);
+    const before = st.excite;
+    st.excite += (target - st.excite) * Math.min(1, dt * 1.5);
+    st.burst = Math.max(0, st.burst - dt / 0.8);
+    st.dim = Math.max(0, st.dim - dt / 1.2);
+    return st.burst > 0 || st.dim > 0 || Math.abs(st.excite - before) > 1e-4;
+  }
+
   resize() {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     const dpr = Math.min(window.devicePixelRatio || 1, this.quality.maxDpr);
@@ -705,6 +862,8 @@ export class Highway3D {
     const chart = this.chart;
     const t = state.time;
     const speed = state.speed || 1;
+    const stageOn = this.options.stageFx !== false && this.theme().beams !== null;
+    const stageMoving = stageOn && this.updateStage(state.streak, dt);
     const look = this.options.lookahead * speed;   // song seconds visible
     const k = DEPTH / look;                        // world units per song second
 
@@ -756,7 +915,16 @@ export class Highway3D {
       }
       // ...and flashes briefly when a new section starts.
       const flash = this.sectionFlash(t, speed);
-      if (this.anchorMat) this.anchorMat.opacity = this.theme().laneBase + 0.1 * pulse + 0.22 * flash;
+      const ex = stageOn ? this.stage.excite : 0;
+      if (this.anchorMat) this.anchorMat.opacity = this.theme().laneBase * (1 + 0.35 * ex) + 0.1 * pulse + 0.22 * flash;
+      // ...and a band of light runs down the lane, away from you.
+      const sweepK = this.options.glow ? this.sectionSweep(t, speed) : -1;
+      this.sweep.visible = sweepK >= 0;
+      if (sweepK >= 0) {
+        this.sweep.position.set(MAX_FRET / 2, 0.02, -sweepK * DEPTH * 0.9);
+        this.sweep.material.opacity = 0.55 * Math.sin(Math.PI * Math.min(1, sweepK * 1.15));
+        this.sweep.material.color.set(this.theme().lane);
+      }
 
       // Camera frames the current passage (see core/camera-follow.js).
       this.follow.update(t, speed, dt);
@@ -791,7 +959,11 @@ export class Highway3D {
     this.particles.update(dt);
     const gemsAnimating = this.updateHitAnims(nowMs);        // (each must run every frame)
     const stringsAnimating = this.updateStringWaves(nowMs);
-    const animating = this.particles.active || gemsAnimating || stringsAnimating;
+    if (chart) this.updateRings(t, speed);
+    const dustOn = stageOn && this.quality.level !== 'low';
+    this.dust.visible = dustOn;
+    if (dustOn && (state.playing || stageMoving || !this.dustInit)) { this.updateDust(nowMs / 1000, camX); this.dustInit = true; }
+    const animating = this.particles.active || gemsAnimating || stringsAnimating || stageMoving || (this.sweep.visible && state.playing);
     const key = `${animating ? nowMs : ''}|${t.toFixed(4)}|${camX.toFixed(3)}|${camSpan.toFixed(3)}|${this.w}x${this.h}|${this.dpr}|${k.toFixed(4)}|${this.chart ? this.chart.notes.length : 0}`;
     if (!state.playing && key === this.lastRenderKey) return;
     this.lastRenderKey = key;
@@ -820,13 +992,21 @@ export class Highway3D {
       if (far.y > C.farNdc) hi = mid; else lo = mid;
     }
     place((lo + hi) / 2);
+    // Stage lights: livelier while your streak grows, a flash at streak
+    // milestones and a short dip when a long streak breaks.
+    const st = this.stage, ex = stageOn ? st.excite : 0;
+    const light = stageOn ? (1 + 1.6 * st.burst) * (1 - 0.55 * st.dim) : 1;
     this.horizon.position.set(camX, 3, -DEPTH - 6);
+    this.horizon.material.opacity = Math.min(1, 0.55 * (1 + 0.5 * ex) * light);
+    this.horizon.scale.set(70, 16 * (1 + 0.25 * ex + 0.3 * (stageOn ? st.burst : 0)), 1);
+    st.phase = (st.phase || 0) + dt * (1 + 1.4 * ex);
     for (const b of this.beams) {
-      const sway = Math.sin(nowMs / 4200 + b.userData.phase);
+      const sway = Math.sin(st.phase / 4.2 + b.userData.phase);
       b.position.set(camX + b.userData.x + sway * 3, 14, -DEPTH - 14);
       b.material.rotation = sway * 0.22 + (b.userData.x < 0 ? -0.25 : 0.25);
-      b.material.opacity = this.theme().beamOpacity * (1 + 0.45 * Math.sin(nowMs / 2600 + b.userData.phase * 2));
+      b.material.opacity = Math.min(0.9, this.theme().beamOpacity * (1 + 0.45 * Math.sin(st.phase / 2.6 + b.userData.phase * 2)) * (1 + 1.2 * ex) * light);
     }
+    if (this.dust.visible) this.dustMat.opacity = Math.min(0.9, (0.35 + 0.35 * ex) * light);
     // Fog is measured from the camera: keep it on the far part of the lane.
     const fog = this.scene.fog;
     fog.near = d0 + DEPTH * C.fogStart;

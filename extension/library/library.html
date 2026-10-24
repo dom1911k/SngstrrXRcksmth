@@ -3,65 +3,111 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bass Trainer: library</title>
+<title>Bass Trainer</title>
 <link rel="stylesheet" href="library.css">
 </head>
 <body>
 <header>
-  <div class="brand">Bass Trainer <span>library</span></div>
-  <input id="search" type="search" placeholder="Search songs…" autocomplete="off">
+  <div class="brand">Bass Trainer</div>
+  <input id="search" type="search" placeholder="Search your songs…  (press /)" autocomplete="off">
   <div class="spacer"></div>
-  <a class="btn primary" href="../search/search.html">Find songs</a>
-  <a class="btn" href="../player/player.html#drills">Drills</a>
-  <a class="btn" href="../player/player.html">Player</a>
-  <a class="small link" href="../updater/updater.html" target="_blank">Updates</a>
+  <a class="btn primary" href="../search/search.html">🔍 Find new songs</a>
 </header>
-<main>
-  <section id="setup" class="setup" hidden></section>
-  <section id="hero" class="hero" hidden></section>
-  <section id="tiles" class="tiles"></section>
-  <section id="wantBox" hidden>
-    <div class="head"><h2>Want to learn</h2><span class="small">Click a song to start learning it</span></div>
-    <div id="wantShelf" class="shelf"></div>
-  </section>
-  <section id="overview" class="overview"></section>
-  <section class="practice">
-    <div class="head"><h2>Practice, last 12 months</h2><span id="practiceNote" class="small"></span></div>
-    <div id="practiceChart" class="heat"></div>
-  </section>
-  <section id="dueBox" hidden>
-    <div class="head"><h2>Due today</h2><span id="dueNote" class="small"></span></div>
-    <div id="dueList" class="duelist"></div>
-  </section>
-  <section>
-    <div class="head"><h2>Setlists</h2><span class="small">Your own lists; ▶ Play runs them in order with a running score</span></div>
-    <div id="setlists" class="setlists"></div>
-  </section>
-  <section id="sessionsBox" hidden>
-    <div class="head"><h2>Recent sessions</h2></div>
-    <div id="sessions" class="sessions"></div>
-  </section>
-  <section id="songs">
-    <div class="head"><h2>Songs</h2><div id="viewToggle" class="chips"></div></div>
-    <div class="head">
-      <div id="filters" class="chips"></div>
-      <select id="group" title="Group the songs">
-        <option value="none">No grouping</option><option value="tuning">By tuning</option><option value="artist">By artist</option><option value="status">By status</option>
-      </select>
-      <label class="small">Sort
-        <select id="sort">
-          <option value="recent">Last played</option>
-          <option value="time">Most practised</option>
-          <option value="best">Best score</option>
-          <option value="added">Recently added</option>
-          <option value="title">Title</option>
-        </select>
-      </label>
+<div class="shell">
+  <nav id="nav" class="nav">
+    <a href="#home" data-view="home"><span class="i">⌂</span>Home<span class="badge-n" id="navDue" hidden></span></a>
+    <a href="#songs" data-view="songs"><span class="i">♫</span>Songs<span class="count" id="navSongs"></span></a>
+    <a href="#setlists" data-view="setlists"><span class="i">☰</span>Setlists<span class="count" id="navSetlists"></span></a>
+    <a href="#progress" data-view="progress"><span class="i">📈</span>Progress</a>
+    <div class="nav-sep"></div>
+    <a href="../search/search.html"><span class="i">🔍</span>Find songs</a>
+    <a href="../player/player.html#drills"><span class="i">🥁</span>Drills</a>
+    <a href="../player/player.html?drill=fretboard"><span class="i">🎯</span>Fretboard trainer</a>
+    <a href="../player/player.html"><span class="i">▶</span>Player</a>
+    <div class="nav-sep"></div>
+    <a href="../player/player.html#tuner"><span class="i">🎚</span>Tuner</a>
+    <a href="../player/player.html#calibrate"><span class="i">⏱</span>Calibrate</a>
+    <a href="../updater/updater.html" target="_blank"><span class="i">⬆</span>Updates</a>
+  </nav>
+  <main>
+    <!-- Home -->
+    <div class="view" data-view="home">
+      <div id="greeting" class="greeting"></div>
+      <section id="setup" class="setup" hidden></section>
+      <section id="hero" class="hero" hidden></section>
+      <section id="tiles" class="tiles"></section>
+      <div class="cols">
+        <div class="col-main">
+          <section id="dueBox" hidden>
+            <div class="head"><h2>Due today</h2><span id="dueNote" class="small"></span></div>
+            <div id="dueList" class="duelist"></div>
+          </section>
+          <section id="wantBox" hidden>
+            <div class="head"><h2>Want to learn</h2><a class="small link" href="../search/search.html">find more →</a></div>
+            <div id="wantShelf" class="shelf"></div>
+          </section>
+          <section id="homeEmpty" class="emptymsg" hidden></section>
+        </div>
+        <div class="col-side">
+          <section>
+            <div class="head"><h2>This week</h2><a class="small link" href="#progress">progress →</a></div>
+            <div id="overview" class="overview mini"></div>
+          </section>
+          <section id="sessionsBox" hidden>
+            <div class="head"><h2>Recent sessions</h2></div>
+            <div id="sessions" class="sessions"></div>
+          </section>
+        </div>
+      </div>
     </div>
-    <div id="list" class="list"></div>
-    <p id="empty" class="emptymsg" hidden></p>
-  </section>
-</main>
+    <!-- Songs -->
+    <div class="view" data-view="songs" hidden>
+      <section id="songs">
+        <div class="head"><h1>Songs</h1><div id="viewToggle" class="chips"></div></div>
+        <div class="head toolbar">
+          <div id="filters" class="chips"></div>
+          <div class="tools">
+            <select id="group" title="Group the songs">
+              <option value="none">No grouping</option><option value="tuning">By tuning</option><option value="artist">By artist</option><option value="status">By status</option>
+            </select>
+            <select id="sort" title="Sort">
+              <option value="recent">Last played</option>
+              <option value="time">Most practised</option>
+              <option value="best">Best score</option>
+              <option value="added">Recently added</option>
+              <option value="title">Title</option>
+            </select>
+          </div>
+        </div>
+        <div id="list" class="list"></div>
+        <p id="empty" class="emptymsg" hidden></p>
+      </section>
+    </div>
+    <!-- Setlists -->
+    <div class="view" data-view="setlists" hidden>
+      <section>
+        <div class="head"><h1>Setlists</h1><span class="small">Your own lists. ▶ Play runs them in order with a running score.</span></div>
+        <div id="setlists" class="setlists"></div>
+      </section>
+    </div>
+    <!-- Progress -->
+    <div class="view" data-view="progress" hidden>
+      <section><div class="head"><h1>Progress</h1></div><div id="overviewFull" class="overview"></div></section>
+      <section class="practice">
+        <div class="head"><h2>Practice, last 12 months</h2><span id="practiceNote" class="small"></span></div>
+        <div id="practiceChart" class="heat"></div>
+      </section>
+      <section>
+        <div class="head"><h2>Accuracy and practice time per week</h2><span class="small">last 12 weeks</span></div>
+        <div id="weekly" class="weekly"></div>
+      </section>
+      <section id="sessionsAllBox">
+        <div class="head"><h2>Sessions</h2></div>
+        <div id="sessionsAll" class="sessions"></div>
+      </section>
+    </div>
+  </main>
+</div>
 <aside id="detail" class="detail" hidden></aside>
 <script type="module" src="../src/library-main.js"></script>
 </body>

@@ -50,16 +50,16 @@ export function renderTiles(el, { entries, settings, openSong, setFilter }) {
     : 'not calibrated yet';
   const tile = (icon, title, sub, action, cls = '') => h(action.href ? 'a' : 'button', { class: `tile ${cls}`, href: action.href, onclick: action.onclick },
     h('span', { class: 'ico' }, icon), h('b', {}, title), h('span', { class: 'sub' }, sub));
-  el.replaceChildren(
-    last ? tile('▶', 'Continue', `${last.title}${last.stats.last !== null ? ` · last ${pct(last.stats.last)}` : ''}`, { onclick: () => openSong(last) }, 'hot')
-      : tile('▶', 'Start playing', 'Open a bass tab on Songsterr', { href: 'https://www.songsterr.com' }, 'hot'),
+  el.replaceChildren(...[
+    // (The "Now practising" card above already has Continue for the last song.)
+    last ? null : tile('▶', 'Start playing', 'Open a bass tab on Songsterr', { href: 'https://www.songsterr.com' }, 'hot'),
     tile('📅', 'Due today', due ? `${due} song${due === 1 ? '' : 's'} to revisit` : 'nothing due, nice', { onclick: () => setFilter('due') }),
     tile('🔍', 'Find songs', want ? `${want} on your Want-to-learn list` : 'search bass tabs with filters', { href: '../search/search.html' }),
     tile('🥁', 'Drills', bestDrill ? `${bestDrill.title.replace(/^Drill: /, '')}${bestDrill.stats.bestBpm ? ` · ${bestDrill.stats.bestBpm} BPM` : ''}` : 'warm-up & technique', { href: '../player/player.html#drills' }),
     tile('🎯', 'Fretboard trainer', fret && fret.stats.passes ? `last round ${pct(fret.stats.last)}` : 'learn the notes on the neck', { href: '../player/player.html?drill=fretboard' }),
     tile('🎚', 'Tuner', settings ? settings.tuningName : '', { href: '../player/player.html#tuner' }),
     tile('⏱', 'Calibrate', cal, { href: '../player/player.html#calibrate' }),
-  );
+  ].filter(Boolean));
 }
 
 // ---------- Want-to-learn shelf ----------

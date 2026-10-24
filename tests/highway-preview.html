@@ -16,10 +16,20 @@ const mod = style === '3d' ? await import('../extension/src/ui/highway3d.js') : 
 const Cls = style === '3d' ? mod.Highway3D : mod.Highway2D;
 const hw = new Cls(document.getElementById('c'));
 hw.setOptions({ lookahead: Number(q.get('look') || 4.5), invertStrings: q.has('invert'), theme: q.get('theme') || 'classic', largeNotes: q.has('large') });
+// ?fx: mark upcoming notes with techniques to preview their look.
+if (q.has('fx')) {
+  const kinds = ['accent', 'harmonic', 'palmMute', 'bend', 'slide', 'vibrato'];
+  chart.notes.filter((n) => n.t > Number(q.get('t') || 0) + 0.3 && n.fret > 0).slice(0, 18).forEach((n, i) => {
+    const k = kinds[i % kinds.length];
+    if (k === 'slide') { n.flags.slide = { toFret: n.fret + 3 }; n.dur = Math.max(n.dur, 0.8); }
+    else if (k === 'bend' || k === 'vibrato') { n.flags[k] = true; n.dur = Math.max(n.dur, 0.7); }
+    else n.flags[k] = true;
+  });
+}
 hw.setChart(chart);
 const t0 = Number(q.get('t') || 0);
 window.__hw = hw;
 let frames = 0;
-function loop() { hw.render({ time: t0 + (q.has('play') ? frames / 60 : 0), speed: 1, playing: true }); frames++; if (frames < 120) requestAnimationFrame(loop); else window.__done = true; }
+function loop() { hw.render({ time: t0 + (q.has('play') ? frames / 60 : 0), speed: 1, playing: true, streak: Number(q.get('streak') || 0) }); frames++; if (frames < 120) requestAnimationFrame(loop); else window.__done = true; }
 loop();
 </script></body></html>

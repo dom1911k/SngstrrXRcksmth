@@ -18,6 +18,8 @@ const CSS = (controlsGap) => `
 .wrap[hidden] { display: none; }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 canvas[hidden] { display: none; }
+.vignette { position: absolute; inset: 0; pointer-events: none; z-index: 0; background: radial-gradient(ellipse 75% 85% at 50% 58%, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%); }
+.vignette[hidden] { display: none; }
 .bar { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 4px; z-index: 2; }
 .bar button, .pill { background: rgba(30,33,40,.85); color: #c9ced8; border: 1px solid #3a3f49; border-radius: 6px;
   padding: 3px 9px; font: 600 12px system-ui, sans-serif; cursor: pointer; }
@@ -139,7 +141,8 @@ export function createOverlay(adapter, {
   }
   const grip = h('div', { class: 'grip', title: 'Drag to resize' });
   const msg = h('div', { class: 'msg', hidden: true });
-  const wrap = h('div', { class: 'wrap' }, canvas2d, canvas3d, hud, grip, msg, bar, debugEl, notice, warnBox, titleCard, pauseScreen);
+  const vignette = h('div', { class: 'vignette', hidden: true });
+  const wrap = h('div', { class: 'wrap' }, canvas2d, canvas3d, vignette, hud, grip, msg, bar, debugEl, notice, warnBox, titleCard, pauseScreen);
   const pill = h('button', { class: 'pill', hidden: true, onclick: () => updateSettings({ viewMode: 'both' }) }, '▲ Highway');
   root.append(wrap, pill);
   // Rocksmith-style end-of-song screen and session report.
@@ -194,6 +197,7 @@ export function createOverlay(adapter, {
     canvas3d.hidden = active !== highway3d;
     canvas2d.hidden = active !== highway2d;
     hud.hidden = active !== highway3d; // the 2D renderer draws its own HUD
+    vignette.hidden = active !== highway3d || !s.stageEffects || s.theme === 'minimal';
     wrap.hidden = mode === 'tab';
     pill.hidden = mode !== 'tab';
     grip.hidden = mode !== 'both';
@@ -207,7 +211,7 @@ export function createOverlay(adapter, {
     }
     const opts = { lookahead: s.lookahead, invertStrings: s.invertStrings, showDebug: s.showDebug };
     highway2d.setOptions(opts);
-    if (highway3d) highway3d.setOptions({ ...opts, showFretNumbers: s.gemFretNumbers, sparks: s.hitSparks, timingMarks: s.timingMarks, glow: s.glowEffects, theme: s.theme, largeNotes: s.largeNotes, quality: s.graphicsQuality });
+    if (highway3d) highway3d.setOptions({ ...opts, showFretNumbers: s.gemFretNumbers, sparks: s.hitSparks, timingMarks: s.timingMarks, approachRings: s.approachRings, stageFx: s.stageEffects, glow: s.glowEffects, theme: s.theme, largeNotes: s.largeNotes, quality: s.graphicsQuality });
   }
   onSettingsChange(layout);
   window.addEventListener('resize', () => layout());
@@ -291,6 +295,7 @@ export function createOverlay(adapter, {
     }
     active.render({ time, speed, playing, loop, message: active === highway2d ? message || waitMsg : message,
       heard: monitor && playing ? monitor.heardMidi() : null,
+      streak: session && playing && session.active ? ((session.stats() || {}).streak || 0) : 0,
       topInset: progressUI && progressUI.visible ? 18 : 0,
       debug: `sync err ${(adapter.clock.lastError * 1000).toFixed(1)} ms · snaps ${adapter.clock.snaps} · t ${time.toFixed(2)}s · ${st.playerType || ''}` });
     if (active === highway3d) {

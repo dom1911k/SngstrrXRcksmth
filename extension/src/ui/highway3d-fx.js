@@ -91,6 +91,75 @@ export function beamTexture() {
   return tex;
 }
 
+// Approach ring: a thin bright ring that closes in on a note's target.
+export function ringTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.strokeStyle = 'rgba(255,255,255,0.35)';
+  g.lineWidth = 14;
+  g.beginPath(); g.arc(64, 64, 52, 0, Math.PI * 2); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,1)';
+  g.lineWidth = 5;
+  g.beginPath(); g.arc(64, 64, 52, 0, Math.PI * 2); g.stroke();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Chevrons along a slide tail (dir 1 = up the neck, -1 = down).
+export function chevronTexture(dir) {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 64;
+  const g = c.getContext('2d');
+  g.translate(64, 32);
+  if (dir < 0) g.scale(-1, 1);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  for (const [w, col] of [[16, 'rgba(0,0,0,0.55)'], [8, 'rgba(255,255,255,1)']]) {
+    g.lineWidth = w; g.strokeStyle = col;
+    for (const dx of [-26, 6]) {
+      g.beginPath(); g.moveTo(dx - 10, -20); g.lineTo(dx + 12, 0); g.lineTo(dx - 10, 20); g.stroke();
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Diagonal hatching laid over palm-muted notes.
+export function hatchTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.strokeStyle = 'rgba(0,0,0,0.55)';
+  g.lineWidth = 7;
+  for (let i = -64; i < 128; i += 20) { g.beginPath(); g.moveTo(i, 64); g.lineTo(i + 64, 0); g.stroke(); }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Soft round dot (floating stage dust).
+export function dustTexture() {
+  return radialTexture([[0, 'rgba(255,255,255,0.9)'], [0.35, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']]);
+}
+
+// A bright band across the floor (section light sweep): brightest in the middle.
+export function sweepTexture() {
+  const c = document.createElement('canvas');
+  c.width = 16; c.height = 128;
+  const g = c.getContext('2d');
+  const v = g.createLinearGradient(0, 0, 0, 128);
+  v.addColorStop(0, 'rgba(255,255,255,0)');
+  v.addColorStop(0.5, 'rgba(255,255,255,1)');
+  v.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = v;
+  g.fillRect(0, 0, 16, 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // Wide text (section names): canvas 512x128.
 export function wideLabelTexture(text, color = '#dfe5ff') {
   const c = document.createElement('canvas');
