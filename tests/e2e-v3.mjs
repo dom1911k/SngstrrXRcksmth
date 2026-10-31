@@ -127,10 +127,11 @@ out.fixes.tiles = await lib.evaluate(() => [...document.querySelectorAll('.tile 
   await p2.setInputFiles('#openFiles', chartPath);
   await p2.waitForTimeout(800);
   out.kit.songRow = await rowFor();
-  const [download] = await Promise.all([
-    p2.waitForEvent('download'),
-    p2.evaluate(() => [...document.getElementById('bass-trainer-root').shadowRoot.querySelectorAll('button')].find((x) => /CDLC kit/.test(x.textContent)).click()),
-  ]);
+  // In the player the panel button opens the RS2014 kit card; its ZIP button downloads.
+  await p2.evaluate(() => [...document.getElementById('bass-trainer-root').shadowRoot.querySelectorAll('button')].find((x) => /CDLC kit/.test(x.textContent)).click());
+  await p2.waitForSelector('.kit:not([hidden])', { timeout: 5000 });
+  out.kit.card = await p2.locator('.kit .song').innerText();
+  const [download] = await Promise.all([p2.waitForEvent('download'), p2.locator('.kit button:has-text("Download kit")').click()]);
   out.kit.file = download.suggestedFilename();
   const zipPath = path.join(dir, 'kit.zip');
   await download.saveAs(zipPath);
@@ -144,7 +145,7 @@ const ok = /step 1\/3/.test(out.bar) && out.after.accuracy >= 0.85 && out.after.
   && /step 2\/3/.test(out.step2) && out.dialog.lessons === 9 && out.dialog.passedSteps >= 1
   && out.fixes.speed65 === '65' && out.fixes.lessonBarBefore && !out.fixes.lessonBarAfterOtherDrill
   && !/null|undefined/.test(out.fixes.greeting) && out.fixes.tiles.includes('Lessons')
-  && !out.kit.drillRow && out.kit.songRow && out.kit.file === 'Green Day - 21 Guns (RS2014 kit).zip'
+  && !out.kit.drillRow && out.kit.songRow && /21 Guns/.test(out.kit.card) && out.kit.file === 'Green Day - 21 Guns (RS2014 kit).zip'
   && out.kit.zip.includes('Green Day - 21 Guns/song.yaml') && out.kit.zip.includes('Green Day - 21 Guns/Green Day - 21 Guns.btchart.json');
 console.log(ok ? 'PASS' : 'FAIL');
 await ctx.close();

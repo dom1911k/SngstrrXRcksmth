@@ -2,18 +2,20 @@
 // (make_cdlc, https://github.com/dom1911k/RS2014converter):
 //
 //   Artist - Title/
-//     song.yaml                    title, artist, the tab file, 5-string / pick
+//     song.yaml                    title, artist, the tab file, 5-string / pick,
+//                                  and (from the player) the audio file and its offset
 //     Artist - Title.btchart.json  the bass chart (notes, rhythms, sections, techniques)
 //     README.txt                   what to do next
+//     <your audio file>            when made in the player (RS2014 kit card)
 //
-// You add the song's audio file and drag the folder onto drop_song_folder_here.bat.
+// Without the audio you add it yourself; then drag the folder onto drop_song_folder_here.bat.
 // The tuning is not written: the converter takes it from the chart and can
 // detect a recording that is tuned differently.
 
 const safeName = (s) => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Song';
 const yamlStr = (s) => JSON.stringify(String(s || ''));   // a JSON string is a valid YAML string
 
-export function kitFiles(chart, { title, artist, url = '' } = {}) {
+export function kitFiles(chart, { title, artist, url = '', audioName = '', offset = null } = {}) {
   const meta = chart.meta || {};
   const t = String(title || meta.title || 'Untitled').replace(/^Drill: /, '');
   const a = String(artist || meta.artist || 'Unknown artist');
@@ -30,6 +32,8 @@ export function kitFiles(chart, { title, artist, url = '' } = {}) {
     '# album: ""',
     '# year: 2000',
     `tab: ${yamlStr(tabName)}`,
+    audioName ? `audio: ${yamlStr(audioName)}` : null,
+    offset !== null && Number.isFinite(offset) ? `chart_offset: ${offset.toFixed(3)}   # audio time where the chart starts (set in the Bass Trainer player)` : null,
     strings !== 4 ? `strings: ${strings}` : null,
     picked ? 'bass_picked: true' : null,
     '',
@@ -37,9 +41,12 @@ export function kitFiles(chart, { title, artist, url = '' } = {}) {
   const readme = [
     `${a} - ${t}: Rocksmith 2014 CDLC kit`,
     '',
-    '1. Put the song\'s audio file in this folder (one you own: CD rip, purchased',
-    '   download...; FLAC, WAV, MP3, OGG or M4A). The same recording the tab was made',
-    '   for lines up best, but another version works too: the tab is aligned beat by beat.',
+    ...(audioName ? [`1. The audio file (${audioName}) is already in this folder, synced in the Bass Trainer player.`] : [
+      '1. Put the song\'s audio file in this folder (one you own: CD rip, purchased',
+      '   download...; FLAC, WAV, MP3, OGG or M4A). The same recording the tab was made',
+      '   for lines up best, but another version works too: the tab is aligned beat by beat.',
+      '   Tip: make the kit in the Bass Trainer player instead (open the song\'s audio there',
+      '   and press Auto-sync): the audio and its exact start are then included.']),
     '2. Optional: a cover image (cover.jpg) and album / year in song.yaml.',
     '3. Drag this folder onto drop_song_folder_here.bat in the RS2014converter folder.',
     '   The CDLC appears in the "output" folder; read report.txt and listen to',

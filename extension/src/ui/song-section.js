@@ -6,7 +6,7 @@ import { tuningName } from '../core/music.js';
 import { openIgnition } from '../core/ignition.js';
 import { kitFiles, zipFiles } from '../core/cdlc-kit.js';
 
-export function createSongSection(adapter, { onTabTuning, showSummary = null }) {
+export function createSongSection(adapter, { onTabTuning, showSummary = null, onKit = null }) {
   const s = getSettings();
   const statusEl = h('div', {}, 'Connecting to Songsterr…');
   const trackEl = h('div', { class: 'muted' });
@@ -17,7 +17,7 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
     h('button', { class: 'btn', title: 'Search CustomsForge Ignition for a Rocksmith CDLC of this song (the search text is also copied, paste it with Ctrl+V if the search box is empty)', onclick: () => {
       if (lastInfo) openIgnition(lastInfo.artist, lastInfo.title);
     } }, '🎸 CDLC on Ignition?'),
-    h('button', { class: 'btn', title: 'Download a song folder for RS2014converter (make_cdlc): the bass chart and song.yaml. Add the song\'s audio file and drag the folder onto drop_song_folder_here.bat', onclick: () => exportKit() }, '📦 RS2014 CDLC kit'));
+    h('button', { class: 'btn', title: 'Make a Rocksmith 2014 CDLC with RS2014converter: opens the RS2014 kit in the player (add your audio file, auto-sync, then build or download the kit)', onclick: () => exportKit() }, '📦 RS2014 CDLC kit'));
 
   const slider = (key, min, max, step, fmt) => {
     const val = h('span', { class: 'muted' }, fmt(s[key]));
@@ -123,6 +123,8 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
   function exportKit() {
     if (!lastInfo || !lastInfo.chart) return;
     const url = /songsterr\.com/.test(location.hostname) ? location.href.split('?')[0] : '';
+    // With the player (audio, auto-sync, one-click build) when available; else a plain ZIP.
+    if (onKit) { onKit({ chart: lastInfo.chart, title: lastInfo.title, artist: lastInfo.artist, url }); return; }
     const { folder, files } = kitFiles(lastInfo.chart, { title: lastInfo.title, artist: lastInfo.artist, url });
     download(new Blob([zipFiles(files)], { type: 'application/zip' }), `${folder} (RS2014 kit).zip`);
   }

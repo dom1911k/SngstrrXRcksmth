@@ -132,3 +132,25 @@ test('RS2014 kit: song folder files and a valid zip; Ignition search link', () =
   assert.equal(ignitionQuery('Muse', 'Hysteria'), 'Muse Hysteria');
   assert.equal(ignitionUrl('Guns N\' Roses', 'Sweet Child O\' Mine'), 'https://ignition4.customsforge.com/?search=Guns%20N\'%20Roses%20Sweet%20Child%20O\'%20Mine');
 });
+
+import { analyzeAudio, estimateOffset } from '../extension/src/core/auto-sync.js';
+
+test('auto-sync: finds where a repetitive chart starts in the audio (pitch beats rhythm)', () => {
+  // Octaves drill: the same rhythm in every bar; only the notes change (I–IV–V–I).
+  const chart = makeDrill('octaves', { bpm: 100, bars: 8, position: 3 });
+  const sr = 11025, offset = 3.217;
+  const y = new Float32Array(Math.ceil((chart.duration + offset + 2) * sr));
+  for (const n of chart.notes) {
+    const f0 = 440 * 2 ** ((n.midi - 69) / 12);
+    const a = Math.round((n.t + offset) * sr);
+    for (let i = 0; i < 0.3 * sr && a + i < y.length; i++) {
+      const env = Math.exp(-i / (0.15 * sr)) * Math.min(1, i / 40);
+      y[a + i] += env * (0.6 * Math.sin(2 * Math.PI * f0 * i / sr) + 0.3 * Math.sin(4 * Math.PI * f0 * i / sr) + 0.15 * Math.sin(6 * Math.PI * f0 * i / sr));
+    }
+  }
+  const r = estimateOffset(chart, analyzeAudio(y, sr), { range: 20 });
+  assert.ok(Math.abs(r.offset - offset) < 0.03, `found ${r.offset}`);
+  assert.ok(r.pitch > 0.8);
+  const near = estimateOffset(chart, analyzeAudio(y, sr), { center: offset + 0.1 });
+  assert.ok(Math.abs(near.offset - offset) < 0.03);
+});

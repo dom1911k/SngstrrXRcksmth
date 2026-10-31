@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **0.14.0**: Rocksmith 2014 helpers (§21). **0.13.1**: tidy-up (§20). **0.13.0**: sustain feel, phrases, detection tuning, lessons (§19). **0.12.1**: Rocksmith 2014 note look (§18). **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
+Status: **0.15.0**: RS2014 kit with auto-sync and one-click build (§22). **0.14.0**: Rocksmith 2014 helpers (§21). **0.13.1**: tidy-up (§20). **0.13.0**: sustain feel, phrases, detection tuning, lessons (§19). **0.12.1**: Rocksmith 2014 note look (§18). **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -723,3 +723,43 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
   squeezes the first bar) get the tab's or the typical tempo; the converter's
   alignment only uses quarter positions anyway. Song folders auto-detect
   `.btchart.json`.
+
+## 22. RS2014 kit: auto-sync and one-click build (0.15.0)
+
+* **Flow:** panel → *RS2014 CDLC kit* on Songsterr stores `{chart, title, artist, url}`
+  in `chrome.storage.local.rsKit` and opens `player.html#kit`; the player loads the
+  chart and opens the kit card (`ui/kit-ui.js`). In the player itself the panel button
+  opens the card directly (`createSongSection({ onKit })`).
+* **Auto-sync** (`core/auto-sync.js`): audio decoded with an `OfflineAudioContext`,
+  mixed to mono, downsampled to ~11 kHz. Features: a bass-band (<300 Hz) log-energy
+  rise curve (5 ms) and a 12-bin chroma of 38–300 Hz (FFT 4096 = 0.37 s, hop 20 ms;
+  each bin split between its two nearest semitones, since E1/F1 are closer than a bin).
+  Search: pitch score (mean chroma of each note's pitch class around its first 0.12 s)
+  every 20 ms over ±60 s; peaks within 0.08 of the best compete with a small onset
+  bonus; the winner is refined in 4 ms steps within its pitch plateau by the onsets.
+  Returns `{offset, pitch, margin, runnerUp}`; the card warns if `pitch ≤ 0.6` or the
+  margin is small. Offset = audio time of chart time 0 (= `LocalAdapter.offset` = the
+  converter's `chart_offset`). Synthetic tests: within 4 ms, also for a song with drift
+  and a riff repeated every bar.
+* **Kit files** (`core/cdlc-kit.js`): `song.yaml` gains `audio:` and `chart_offset:`;
+  the ZIP includes the audio file.
+* **One-click build** (`core/converter-link.js`): `chrome.runtime.connectNative(
+  'com.basstrainer.rs2014converter')` (manifest permission `nativeMessaging`; the
+  extension ID `gbbniikkcomblgdcdmbcanlcilmaeohh` is fixed by the manifest `key`).
+  `hello` → `begin {folder, files, audio}` → `chunk` (4 MB base64 each, acknowledged)
+  → `end` → `build` (`step`/`log` lines, then `done {ok, psarc, outDir, checks,
+  copiedTo, error}`); `open` shows the output or dlc folder. A `done {ok:false}` ends
+  any wait.
+* **Converter side** (RS2014converter): `native_host/bass_trainer_host.py` (+ `.bat`),
+  registered per user by `setup.ps1` step 7 for Chrome, Edge and Brave; saves songs
+  in `songs/<Artist - Title>/` (`bass_trainer.songs_folder`), runs `make_cdlc.py` in a
+  thread (so `cancel` works), only plain file names. `rs2014conv/chart_timing.py`:
+  offset from a histogram of (attack − note) over the stem's attacks
+  (`sync.attack_times`), candidates from the whole song and its first quarter, drift
+  by a line fit, chosen by share of notes on an attack plus a chroma pitch score;
+  used if ≥ 60 % of the plucked notes land on an attack (`tab.chart_timing_min_match`),
+  else the beat-by-beat DTW alignment. `chart_offset` from song.yaml narrows the
+  search to ±0.15 s.
+* Tests: `tests/e2e-kit.mjs` registers the real helper with the test browser
+  (`<profile>/NativeMessagingHosts/…json`) with a stand-in build; the converter's
+  `tests/test_units.py` covers the timing fit and the helper protocol.

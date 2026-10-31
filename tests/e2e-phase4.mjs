@@ -82,7 +82,7 @@ await page.locator('#bass-trainer-root >> css=button.btn:has-text("Start input")
 await page.waitForTimeout(2500);
 results.muteStatus = await page.evaluate(() => {
   const r = document.querySelector('#bass-trainer-root').shadowRoot;
-  const sec = [...r.querySelectorAll('section')].find((s) => s.innerText.startsWith('PRACTICE'));
+  const sec = [...r.querySelectorAll('section')].find((s) => s.innerText.startsWith('PLAYBACK'));
   return sec ? [...sec.querySelectorAll('div.muted')].map((d) => d.innerText).filter(Boolean)[0] : null;
 });
 results.songsterrCountIn = await page.evaluate(() => window.__st.get().player.isCountin);
@@ -95,6 +95,18 @@ await libPage.goto(`chrome-extension://${new URL((ctx.serviceWorkers()[0]).url()
 await libPage.waitForTimeout(1200);
 results.libraryRows = await libPage.evaluate(() => [...document.querySelectorAll('.row')].map((r) => r.querySelector('.title').innerText.replace(/\n/g, ' · ') + (r.querySelector('.fav.on') ? ' ★' : '')));
 await libPage.close();
+// 5. RS2014 CDLC kit: the panel button hands the bass chart to the player in a new tab.
+const kitTabP = ctx.waitForEvent('page');
+await page.evaluate(() => [...document.querySelector('#bass-trainer-root').shadowRoot.querySelectorAll('button')].find((b) => /CDLC kit/.test(b.textContent)).click());
+const kitTab = await kitTabP;
+await kitTab.waitForSelector('.kit:not([hidden])', { timeout: 15000 }).catch(() => {});
+results.kit = { url: kitTab.url().replace(/^.*\//, ''), song: await kitTab.locator('.kit .song').innerText().catch(() => null),
+  notes: await kitTab.evaluate(() => globalThis.bassTrainer.adapter.chart && globalThis.bassTrainer.adapter.chart.notes.length).catch(() => 0) };
+await kitTab.close();
 if (shot) await page.screenshot({ path: shot });
 console.log(JSON.stringify(results, null, 1));
 await ctx.close();
+const ok = results.muteStatus !== null && results.library === '★ Saved' && results.libraryRows.length > 0
+  && /#kit$/.test(results.kit.url) && /21 Guns/.test(results.kit.song || '') && results.kit.notes > 100;
+console.log(ok ? 'PASS' : 'FAIL');
+process.exit(ok ? 0 : 1);

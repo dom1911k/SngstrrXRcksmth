@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.14.0.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.15.0.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -464,15 +464,30 @@ artists, tracks with tuning, difficulty and views), nothing more.
   **Ctrl+V**. Ignition shows songs without an account; downloading needs a free
   CustomsForge login. (There is no automatic "found / not found" check: Ignition has
   no public API and quickly blocks automated requests.)
-- **📦 RS2014 CDLC kit** (panel → *Song & highway*, for the bass tab you have open):
-  downloads a ZIP with a song folder for
-  [RS2014converter](https://github.com/dom1911k/RS2014converter): `song.yaml` and
-  the tab as `Artist - Title.btchart.json` (notes, rhythms, sections, techniques).
-  Unzip it, put **the song's audio file** (one you own) in the folder and drag the
-  folder onto RS2014converter's `drop_song_folder_here.bat`. The converter lines the
-  tab up with the recording beat by beat, takes the tuning from the tab and builds
-  the `.psarc`. Such a CDLC is made from Songsterr's tab: keep it for yourself, don't
-  upload it.
+- **📦 RS2014 CDLC kit** (panel → *Song & highway*, for the bass tab you have open)
+  opens the player in a new tab with the **RS2014 CDLC kit** card:
+  1. **Audio:** *Choose audio file…*: the song's recording, one you own. The same
+     recording Songsterr uses fits best.
+  2. **Sync:** **🎯 Auto-sync** listens to the file (a few seconds) and finds where
+     the chart starts in it; the highway then plays in sync. Press **▶ Play from the
+     first note** and listen: the notes should cross the strings exactly when you
+     hear them. Nudge with −0.1 / −10ms / +10ms / +0.1 if needed. If Auto-sync isn't
+     sure (a riff that repeats a lot, a different version), it says so and names the
+     other possible start.
+  3. **Make the CDLC:** **⚡ Build CDLC** sends the song to
+     [RS2014converter](https://github.com/dom1911k/RS2014converter) on your PC and
+     shows its progress; when it's done you see the report's "please check" points and
+     can open the output folder (with `copy_to_folder` set in the converter's
+     `config.yaml`, the CDLC goes straight into Rocksmith's `dlc` folder). The button
+     appears once you have run the converter's `setup.bat` (it connects the converter
+     to Chrome; reload the extension afterwards). Without it, **📦 Download kit (ZIP)**
+     gives you the folder (chart, `song.yaml` with the sync, your audio) to drag onto
+     `drop_song_folder_here.bat`.
+
+  The converter uses Songsterr's own timing when your audio is the same recording
+  (very exact, and it corrects a slightly different speed), otherwise it lines the
+  tab up with the recording beat by beat. A CDLC made from Songsterr's tab is for
+  your own use: don't upload it.
 
 ### Lessons
 **Lessons** (player toolbar, the Library menu or its Home tile) are short courses,
@@ -654,6 +669,10 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.15.0:** RS2014 kit in the player: your audio, Auto-sync (finds where the chart
+  starts in the file), one-click *Build CDLC* through RS2014converter (connected by its
+  setup.bat), ZIP with audio and sync; the converter uses Songsterr's timing when the
+  audio is the same recording.
 - **0.14.0:** Rocksmith 2014: *CDLC on Ignition?* buttons (Find songs, Library,
   panel) and the *RS2014 CDLC kit* export for RS2014converter.
 - **0.13.1:** tidy-up: panel reordered (most used first, the rest folded), one-click
@@ -711,6 +730,7 @@ node tests/e2e-phase4.mjs /tmp/a.wav [shot.png]   # real Songsterr: count-in, sh
 node tests/e2e-v2.mjs [shot-prefix]               # takes, history + progress card, wait mode, riff repeater
 node tests/e2e-search.mjs [shot-prefix]           # Find songs against Songsterr's real search (needs network)
 node tests/e2e-v3.mjs [shot-prefix]               # lesson step played and passed, detection log, phrase loop
+node tests/e2e-kit.mjs ../rs2014converter [shot] # RS2014 kit: auto-sync, ZIP, one-click build via the converter's Chrome helper
 node tests/e2e-library.mjs [shot-prefix]          # drill scored + saved, ☆ Save, Library page, "practise these bars"
 npx http-server -p 8123                           # then open /tests/highway-preview.html?t=78&style=3d
 ```

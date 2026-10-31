@@ -13,6 +13,7 @@ import { createShortcutActions, installShortcuts } from './core/shortcuts.js';
 import { createPracticeTools } from './core/practice-tools.js';
 import { DRILLS, drillById, makeDrill } from './core/drills.js';
 import { createLessonsUI } from './ui/lessons-ui.js';
+import { createKitUI } from './ui/kit-ui.js';
 import { songStats } from './core/library.js';
 import { historyStore } from './core/history.js';
 import { getSettings } from './core/settings.js';
@@ -32,7 +33,12 @@ const engine = new AudioEngine();
 const adapter = new LocalAdapter();
 const session = new ScoringSession(engine, adapter);
 let panel, overlay;
-const songSection = createSongSection(adapter, { onTabTuning: (t) => panel && panel.setTabTuning(t), showSummary: () => overlay && overlay.scoreUI && overlay.scoreUI.showLast() });
+let kitUI = null;
+const songSection = createSongSection(adapter, {
+  onTabTuning: (t) => panel && panel.setTabTuning(t),
+  showSummary: () => overlay && overlay.scoreUI && overlay.scoreUI.showLast(),
+  onKit: (kit) => kitUI && kitUI.open(kit),
+});
 const autoMute = new AutoMute(engine, adapter);
 const practiceSection = createPracticeSection(adapter, autoMute);
 const notify = (t) => overlay && overlay.notify(t);
@@ -248,6 +254,18 @@ if (params.get('lesson')) {
 }
 if (location.hash === '#drills') openDrills();
 if (location.hash === '#lessons') lessons.open();
+
+// ---- RS2014 kit (from the Songsterr panel: the chart waits in storage) ----
+kitUI = createKitUI({ adapter, notify: (t) => status(t, true), onOffset: (s) => { $('offset').value = Math.round(s * 1000); } });
+if (location.hash === '#kit') {
+  (async () => {
+    const { rsKit } = await chrome.storage.local.get('rsKit');
+    if (!rsKit || !rsKit.chart || Date.now() - rsKit.at > 6 * 3600e3) { status('Open a bass tab on Songsterr and press "RS2014 CDLC kit" in the panel.'); return; }
+    adapter.setChart(rsKit.chart);
+    kitUI.open(rsKit);
+    await chrome.storage.local.remove('rsKit');
+  })();
+}
 // Library tiles: open the panel at a section.
 const PANEL_LINKS = { '#tuner': 'Tuner', '#calibrate': 'Latency calibration', '#input': 'Input' };
 if (PANEL_LINKS[location.hash]) setTimeout(() => panel.showSection(PANEL_LINKS[location.hash]), 300);

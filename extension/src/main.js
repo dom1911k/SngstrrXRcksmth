@@ -19,7 +19,15 @@ export async function start() {
   const adapter = new SongsterrAdapter();
   const session = new ScoringSession(engine, adapter);
   let panel, overlay;
-  const songSection = createSongSection(adapter, { onTabTuning: (t) => panel && panel.setTabTuning(t), showSummary: () => overlay && overlay.scoreUI && overlay.scoreUI.showLast() });
+  const songSection = createSongSection(adapter, {
+    onTabTuning: (t) => panel && panel.setTabTuning(t),
+    showSummary: () => overlay && overlay.scoreUI && overlay.scoreUI.showLast(),
+    // RS2014 kit: hand the chart to the player (audio, auto-sync, build).
+    onKit: async (kit) => {
+      await chrome.storage.local.set({ rsKit: { ...kit, at: Date.now() } });
+      chrome.runtime.sendMessage({ type: 'openPlayer', hash: '#kit' });
+    },
+  });
   const autoMute = new AutoMute(engine, adapter);
   const practiceSection = createPracticeSection(adapter, autoMute);
   const notify = (t) => overlay && overlay.notify(t);
