@@ -24,6 +24,7 @@ export const PANEL_CSS = `
   box-shadow: 0 8px 30px rgba(0,0,0,.5);
 }
 .panel[hidden] { display: none; }
+.row[hidden] { display: none; }
 header { display: flex; align-items: center; justify-content: space-between;
   padding: 10px 14px; border-bottom: 1px solid #2c2f36; position: sticky; top: 0; background: #15171c; z-index: 1; }
 header h1 { margin: 0; font-size: 15px; font-weight: 700; color: #f2c418; }

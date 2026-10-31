@@ -3,6 +3,8 @@
 import { h } from './dom.js';
 import { getSettings, updateSettings } from '../core/settings.js';
 import { tuningName } from '../core/music.js';
+import { openIgnition } from '../core/ignition.js';
+import { kitFiles, zipFiles } from '../core/cdlc-kit.js';
 
 export function createSongSection(adapter, { onTabTuning, showSummary = null }) {
   const s = getSettings();
@@ -10,6 +12,12 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
   const trackEl = h('div', { class: 'muted' });
   const warnEl = h('div', { class: 'warn' });
   const exportBtn = h('button', { class: 'btn', disabled: true, onclick: () => exportChart() }, 'Download chart (JSON)');
+  // Rocksmith 2014: look the song up on Ignition, or make a CDLC kit for RS2014converter.
+  const rsRow = h('div', { class: 'row', hidden: true },
+    h('button', { class: 'btn', title: 'Search CustomsForge Ignition for a Rocksmith CDLC of this song (the search text is also copied, paste it with Ctrl+V if the search box is empty)', onclick: () => {
+      if (lastInfo) openIgnition(lastInfo.artist, lastInfo.title);
+    } }, '🎸 CDLC on Ignition?'),
+    h('button', { class: 'btn', title: 'Download a song folder for RS2014converter (make_cdlc): the bass chart and song.yaml. Add the song\'s audio file and drag the folder onto drop_song_folder_here.bat', onclick: () => exportKit() }, '📦 RS2014 CDLC kit'));
 
   const slider = (key, min, max, step, fmt) => {
     const val = h('span', { class: 'muted' }, fmt(s[key]));
@@ -27,7 +35,7 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
 
   const section = h('section', {},
     h('h2', {}, 'Song & highway'),
-    statusEl, trackEl, warnEl,
+    statusEl, trackEl, warnEl, rsRow,
     h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Highway timing'),
       ...slider('visualDelayMs', -100, 300, 5, (v) => `${v} ms`)),
     h('div', { class: 'muted' }, 'Move until notes cross the strings exactly when you hear them (the wireless headset makes sound arrive later than the picture).'),
@@ -89,6 +97,8 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
   adapter.on('chart', (info) => {
     lastInfo = info;
     exportBtn.disabled = !info.chart;
+    const drill = info.chart && info.chart.meta && info.chart.meta.source && info.chart.meta.source.type === 'drill';
+    rsRow.hidden = !info.chart || !info.isBassLike || drill;
     if (info.error && !info.chart) {
       trackEl.textContent = info.error;
       return;
@@ -103,14 +113,25 @@ export function createSongSection(adapter, { onTabTuning, showSummary = null }) 
     if (c && info.isBassLike) onTabTuning(c.instrument.tuning);
   });
 
-  function exportChart() {
-    if (!lastInfo || !lastInfo.chart) return;
-    const c = lastInfo.chart;
-    const blob = new Blob([JSON.stringify(c, null, 1)], { type: 'application/json' });
-    const a = h('a', { href: URL.createObjectURL(blob), download: `${c.meta.artist} - ${c.meta.title} (bass chart).json`.replace(/[\\/:*?"<>|]/g, '_') });
+  function download(blob, name) {
+    const a = h('a', { href: URL.createObjectURL(blob), download: name });
     document.body.append(a);
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+
+  function exportKit() {
+    if (!lastInfo || !lastInfo.chart) return;
+    const url = /songsterr\.com/.test(location.hostname) ? location.href.split('?')[0] : '';
+    const { folder, files } = kitFiles(lastInfo.chart, { title: lastInfo.title, artist: lastInfo.artist, url });
+    download(new Blob([zipFiles(files)], { type: 'application/zip' }), `${folder} (RS2014 kit).zip`);
+  }
+
+  function exportChart() {
+    if (!lastInfo || !lastInfo.chart) return;
+    const c = lastInfo.chart;
+    download(new Blob([JSON.stringify(c, null, 1)], { type: 'application/json' }),
+      `${c.meta.artist} - ${c.meta.title} (bass chart).json`.replace(/[\\/:*?"<>|]/g, '_'));
   }
 
   return [section, scoringSection];

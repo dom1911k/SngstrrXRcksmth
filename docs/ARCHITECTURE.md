@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **0.13.1**: tidy-up (§20). **0.13.0**: sustain feel, phrases, detection tuning, lessons (§19). **0.12.1**: Rocksmith 2014 note look (§18). **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
+Status: **0.14.0**: Rocksmith 2014 helpers (§21). **0.13.1**: tidy-up (§20). **0.13.0**: sustain feel, phrases, detection tuning, lessons (§19). **0.12.1**: Rocksmith 2014 note look (§18). **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -698,3 +698,28 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
   so conditional children there use `''`.
 * Checks: `node --check` did not flag a syntax error in an ES module here; use
   `node --input-type=module --check < file.js`.
+
+## 21. Rocksmith 2014 helpers (0.14.0)
+
+* **Ignition** (`core/ignition.js`): `ignitionUrl(artist, title)` =
+  `https://ignition4.customsforge.com/?search=<artist title>`; `openIgnition` also
+  copies the query to the clipboard (call it from a click). No automatic lookup:
+  Ignition (Laravel/Livewire) has no public search API and rate-limits hard (a few
+  page loads from one address got a 6-hour block during development).
+* **CDLC kit** (`core/cdlc-kit.js`): `kitFiles(chart, {title, artist, url})` →
+  `Artist - Title/` with `song.yaml` (title, artist, `tab:`, `strings` if not 4,
+  `bass_picked` if the track says pick; no tuning, so the converter takes it from
+  the chart and may detect a differently tuned recording), the chart as
+  `Artist - Title.btchart.json` and a README.txt. `zipFiles()` writes a stored
+  (uncompressed) ZIP with UTF-8 names and CRC-32. Panel → Song & highway, hidden
+  for drills and non-bass tracks.
+* **RS2014converter** (separate repo, branch `claude/bass-trainer-charts`):
+  `rs2014conv/tabs.py` reads `.btchart.json` (`is_btchart` sniffs `"bass-chart"`):
+  quarter-note positions per bar from the bar's start/end and time signature
+  (rounded to 1/240 q), sections → markers, hopo destination → `hammer_to_next` on
+  the previous note on that string, slide types `shift`/`legato`/`outDownwards`/
+  `outUpwards`, dead, ghost, palm mute, harmonic, vibrato, accent, bend (1 semitone).
+  Bars whose timing gives a tempo outside ½–2× the median (Songsterr sometimes
+  squeezes the first bar) get the tab's or the typical tempo; the converter's
+  alignment only uses quarter positions anyway. Song folders auto-detect
+  `.btchart.json`.

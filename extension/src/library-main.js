@@ -7,6 +7,7 @@ import { STATUSES, songStats, overallStats, setPending, dueInfo, goalProgress, g
 import { drillById } from './core/drills.js';
 import { accuracyColor } from './ui/progress-ui.js';
 import * as hub from './library-hub.js';
+import { openIgnition } from './core/ignition.js';
 import { LESSONS, lessonState, nextLesson, loadLessonProgress } from './core/lessons.js';
 
 const $ = (id) => document.getElementById(id);
@@ -481,6 +482,7 @@ function showDetail(e) {
     h('div', { class: 'bar-row' },
       h('button', { class: 'btn primary', onclick: () => openSong(e) }, e.kind === 'drill' ? `Play${st.bestBpm ? ` at ${st.bestBpm + 5} BPM` : ''}` : 'Open song'),
       h('button', { class: 'btn', onclick: () => setFav(e, !e.favorite).then(() => showDetail(e)) }, e.favorite ? '★ Favourite' : '☆ Add to favourites'),
+      e.kind !== 'drill' ? h('button', { class: 'btn', title: 'Search CustomsForge Ignition for a Rocksmith CDLC of this song (the search text is also copied)', onclick: () => openIgnition(e.artist, e.title) }, '🎸 CDLC on Ignition?') : null,
       e.kind !== 'drill' ? h('label', { class: 'small' }, 'Status ', status) : null),
     h('div', { class: 'grid' },
       h('div', {}, h('b', {}, st.passes), h('span', { class: 'small' }, 'passes')),

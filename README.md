@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.13.1.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.14.0.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -456,6 +456,24 @@ artists, tracks with tuning, difficulty and views), nothing more.
 - Few results after filtering? It searches further pages automatically, or press
   *Search further*. Your last search and filters are remembered.
 
+### Rocksmith 2014: find a CDLC, or make one
+- **CDLC on Ignition?** (Find songs: the **CDLC?** button on each result; the
+  Library's song details; the panel → *Song & highway*): opens CustomsForge
+  **Ignition**'s search for the song (artist + title) in a new tab and copies the
+  same text to the clipboard. If Ignition's search box is empty, click it and press
+  **Ctrl+V**. Ignition shows songs without an account; downloading needs a free
+  CustomsForge login. (There is no automatic "found / not found" check: Ignition has
+  no public API and quickly blocks automated requests.)
+- **📦 RS2014 CDLC kit** (panel → *Song & highway*, for the bass tab you have open):
+  downloads a ZIP with a song folder for
+  [RS2014converter](https://github.com/dom1911k/RS2014converter): `song.yaml` and
+  the tab as `Artist - Title.btchart.json` (notes, rhythms, sections, techniques).
+  Unzip it, put **the song's audio file** (one you own) in the folder and drag the
+  folder onto RS2014converter's `drop_song_folder_here.bat`. The converter lines the
+  tab up with the recording beat by beat, takes the tuning from the tab and builds
+  the `.psarc`. Such a CDLC is made from Songsterr's tab: keep it for yourself, don't
+  upload it.
+
 ### Lessons
 **Lessons** (player toolbar, the Library menu or its Home tile) are short courses,
 one technique each: Find the beat, One finger per fret, Roots and fifths, Octaves,
@@ -636,6 +654,8 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.14.0:** Rocksmith 2014: *CDLC on Ignition?* buttons (Find songs, Library,
+  panel) and the *RS2014 CDLC kit* export for RS2014converter.
 - **0.13.1:** tidy-up: panel reordered (most used first, the rest folded), one-click
   *Start input* on the highway, in lessons and the fretboard trainer; player header
   simplified (one *Open…*, a ⋯ menu) with a start screen, and a speed menu that

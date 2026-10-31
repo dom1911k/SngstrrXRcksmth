@@ -110,3 +110,25 @@ test('new drills: hammer-ons are legato, muted groove has dead notes', () => {
   assert.equal(mg.notes.filter((n) => n.flags.dead).length, mg.notes.length / 2);
   assert.ok(DRILLS.length >= 10);
 });
+
+import { kitFiles, zipFiles, crc32 } from '../extension/src/core/cdlc-kit.js';
+import { ignitionUrl, ignitionQuery } from '../extension/src/core/ignition.js';
+
+test('RS2014 kit: song folder files and a valid zip; Ignition search link', () => {
+  const chart = load('enter-sandman-bass');
+  const { folder, files } = kitFiles(chart, { title: 'Enter Sandman', artist: 'Metallica', url: 'https://www.songsterr.com/a/wsa/x' });
+  assert.equal(folder, 'Metallica - Enter Sandman');
+  assert.deepEqual(files.map((f) => f.name), ['Metallica - Enter Sandman/song.yaml', 'Metallica - Enter Sandman/Metallica - Enter Sandman.btchart.json', 'Metallica - Enter Sandman/README.txt']);
+  const yaml = files[0].text;
+  assert.match(yaml, /^title: "Enter Sandman"$/m);
+  assert.match(yaml, /^tab: "Metallica - Enter Sandman.btchart.json"$/m);
+  assert.doesNotMatch(yaml, /^tuning:/m);                      // the converter reads it from the chart
+  assert.equal(JSON.parse(files[1].text).notes.length, chart.notes.length);
+  assert.equal(kitFiles(chart, { title: 'A/B: "C"?', artist: 'X' }).folder, 'X - A_B_ _C__');
+  assert.equal(crc32(new TextEncoder().encode('123456789')), 0xcbf43926);
+  const zip = zipFiles(files);
+  assert.equal(new DataView(zip.buffer).getUint32(0, true), 0x04034b50);
+  assert.equal(new DataView(zip.buffer).getUint32(zip.length - 22, true), 0x06054b50);
+  assert.equal(ignitionQuery('Muse', 'Hysteria'), 'Muse Hysteria');
+  assert.equal(ignitionUrl('Guns N\' Roses', 'Sweet Child O\' Mine'), 'https://ignition4.customsforge.com/?search=Guns%20N\'%20Roses%20Sweet%20Child%20O\'%20Mine');
+});

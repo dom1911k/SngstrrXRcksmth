@@ -4,6 +4,7 @@ import { h } from './ui/dom.js';
 import { idbHistory, idbLibrary } from './core/history-db.js';
 import { songStats, setPending, coverOf, STATUSES } from './core/library.js';
 import { searchSongs, bassResults, filterResults, sortResults, TUNING_CHOICES, PLAY_STYLES, levelFrom } from './core/song-search.js';
+import { openIgnition } from './core/ignition.js';
 
 const $ = (id) => document.getElementById(id);
 const PAGE = 100;
@@ -156,6 +157,7 @@ function render() {
       h('div', { class: 'acts' },
         h('button', { class: `btn small${e && e.favorite ? ' on' : ''}`, title: 'Favourite', onclick: () => patchEntry(r, { favorite: !(e && e.favorite) }) }, e && e.favorite ? '★' : '☆'),
         h('button', { class: `btn small${want ? ' on' : ''}`, title: 'Add to your library as "Want to learn"', onclick: () => patchEntry(r, { status: want ? 'new' : 'want' }) }, want ? '✓ Want' : '+ Want'),
+        h('button', { class: 'btn small ign', title: 'Is it on Ignition? Searches CustomsForge Ignition for a Rocksmith CDLC of this song (the search text is also copied)', onclick: () => openIgnition(r.artist, r.title) }, 'CDLC?'),
         h('button', { class: 'btn small primary', title: 'Open the bass tab on Songsterr', onclick: () => open(r) }, 'Open')));
   }));
   const anyMore = cursors.some((c) => !c.done);

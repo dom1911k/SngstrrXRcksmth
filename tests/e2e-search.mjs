@@ -62,6 +62,13 @@ const popup = await popupP;
 out.openUrl = popup.url();
 await popup.close();
 out.pending = await page.evaluate(async () => (await chrome.storage.local.get('libraryPending')).libraryPending);
+// "CDLC?" opens Ignition's search for the song (artist + title).
+const ignP = ctx.waitForEvent('page');
+await page.locator('.srow >> nth=0 >> button.ign').click();
+const ign = await ignP;
+await ign.waitForURL(/ignition4\.customsforge\.com/, { waitUntil: 'commit', timeout: 15000 }).catch(() => {});
+out.ignition = decodeURIComponent(ign.url());
+await ign.close();
 // Quick: Drop D songs, sorted by views.
 await page.click('[data-quick="drop"]');
 await page.waitForTimeout(3500);
@@ -73,6 +80,6 @@ await ctx.close();
 const ok = out.popular > 10 && out.greenDay.length >= 3 && out.dropD.n > 0 && out.dropD.allDrop && out.easy.n > 0 && out.easy.ok
   && out.want && out.want.status === 'want' && /songsterr\.com\/a\/wsa\/.*-bass-tab-s\d+t\d+/.test(out.want.url)
   && /songsterr\.com/.test(out.openUrl) && out.pending && out.pending.switchPart !== undefined
-  && out.quickDrop.n > 0 && out.quickDrop.allDrop && !errors.length;
+  && out.quickDrop.n > 0 && out.quickDrop.allDrop && out.ignition.includes(`?search=`) && out.ignition.includes(first.title) && !errors.length;
 if (!ok) { console.error('FAIL'); process.exit(1); }
 console.log('PASS');

@@ -108,12 +108,44 @@ await lib.goto(`chrome-extension://${id}/library/library.html`);
 await lib.waitForTimeout(1200);
 out.fixes.greeting = await lib.locator('#greeting').innerText();
 out.fixes.tiles = await lib.evaluate(() => [...document.querySelectorAll('.tile b')].map((x) => x.textContent));
+// RS2014 kit + Ignition button in the panel for a song chart (not for drills).
+{
+  const { songsterrToChart } = await import('../extension/src/adapters/songsterr/to-chart.js');
+  const { readFileSync, writeFileSync } = await import('node:fs');
+  const { chart: song } = songsterrToChart(JSON.parse(readFileSync(new URL('./fixtures/21-guns-bass.json', import.meta.url))));
+  const chartPath = path.join(dir, '21guns.json');
+  writeFileSync(chartPath, JSON.stringify(song));
+  const p2 = await ctx.newPage();
+  await p2.goto(`chrome-extension://${id}/player/player.html?drill=octaves`);
+  await p2.waitForTimeout(1000);
+  const rowFor = () => p2.evaluate(() => {
+    const r = document.getElementById('bass-trainer-root').shadowRoot;
+    const b = [...r.querySelectorAll('button')].find((x) => /CDLC kit/.test(x.textContent));
+    return !b.closest('.row').hidden;
+  });
+  out.kit = { drillRow: await rowFor() };
+  await p2.setInputFiles('#openFiles', chartPath);
+  await p2.waitForTimeout(800);
+  out.kit.songRow = await rowFor();
+  const [download] = await Promise.all([
+    p2.waitForEvent('download'),
+    p2.evaluate(() => [...document.getElementById('bass-trainer-root').shadowRoot.querySelectorAll('button')].find((x) => /CDLC kit/.test(x.textContent)).click()),
+  ]);
+  out.kit.file = download.suggestedFilename();
+  const zipPath = path.join(dir, 'kit.zip');
+  await download.saveAs(zipPath);
+  const { execFileSync } = await import('node:child_process');
+  out.kit.zip = execFileSync('python3', ['-m', 'zipfile', '-l', zipPath]).toString().split('\n').slice(1).map((l) => l.replace(/\s+\d{4}-\d\d-\d\d .*$/, '').trim()).filter(Boolean);
+  await p2.close();
+}
 console.log(JSON.stringify(out, null, 1));
 const ok = /step 1\/3/.test(out.bar) && out.after.accuracy >= 0.85 && out.after.progress && out.after.progress.passed.includes(0)
   && out.after.nextVisible && out.after.heard > 0 && out.panel.detection && out.panel.loop && out.panel.loop[1] > out.panel.loop[0]
   && /step 2\/3/.test(out.step2) && out.dialog.lessons === 9 && out.dialog.passedSteps >= 1
   && out.fixes.speed65 === '65' && out.fixes.lessonBarBefore && !out.fixes.lessonBarAfterOtherDrill
-  && !/null|undefined/.test(out.fixes.greeting) && out.fixes.tiles.includes('Lessons');
+  && !/null|undefined/.test(out.fixes.greeting) && out.fixes.tiles.includes('Lessons')
+  && !out.kit.drillRow && out.kit.songRow && out.kit.file === 'Green Day - 21 Guns (RS2014 kit).zip'
+  && out.kit.zip.includes('Green Day - 21 Guns/song.yaml') && out.kit.zip.includes('Green Day - 21 Guns/Green Day - 21 Guns.btchart.json');
 console.log(ok ? 'PASS' : 'FAIL');
 await ctx.close();
 process.exit(ok ? 0 : 1);
