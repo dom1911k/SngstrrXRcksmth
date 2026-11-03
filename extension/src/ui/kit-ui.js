@@ -9,7 +9,7 @@
 import { h } from './dom.js';
 import { kitFiles, zipFiles } from '../core/cdlc-kit.js';
 import { analyzeAudio, estimateOffset } from '../core/auto-sync.js';
-import { converterInfo, buildWithConverter, openConverterFolder, INSTALL_COMMAND } from '../core/converter-link.js';
+import { converterInfo, buildWithConverter, openConverterFolder, INSTALL_COMMAND, lastConverterError } from '../core/converter-link.js';
 
 const fmtOff = (s) => `${s >= 0 ? '+' : '−'}${Math.abs(s).toFixed(3)} s`;
 
@@ -33,6 +33,11 @@ export const KIT_CSS = `
 .kit progress { width: 100%; }
 .kit .install { background: #0e1014; border: 1px solid #2c2f36; border-radius: 8px; padding: 8px 10px; margin-top: 6px; }
 .kit .install ol { margin: 4px 0 6px 18px; padding: 0; color: #c9cdd4; }
+.kit .conn { border-radius: 8px; padding: 7px 10px; margin: 0 0 8px; font-size: 12px; }
+.kit .conn.ok { background: #10291a; color: #5fd38d; border: 1px solid #1d4a2e; }
+.kit .conn.no { background: #2b2410; color: #f2c418; border: 1px solid #4a3d12; }
+.kit .conn .why { color: #c9cdd4; margin-top: 3px; }
+.kit .conn .raw { color: #8b919c; font-size: 11px; margin-top: 3px; }
 `;
 
 export function createKitUI({ adapter, notify = () => {}, onOffset = () => {} }) {
@@ -70,6 +75,8 @@ export function createKitUI({ adapter, notify = () => {}, onOffset = () => {} })
   const logEl = h('div', { class: 'log', hidden: true });
   const resultEl = h('div', {});
   const steps = [h('div', { class: 'step' }), h('div', { class: 'step' }), h('div', { class: 'step' })];
+  // Always visible: is RS2014converter connected, and if not, why.
+  const connEl = h('div', { class: 'conn no', 'data-role': 'conn' }, 'Checking for RS2014converter…');
   steps[0].append(h('div', {}, h('b', { class: 'n' }, '1'), h('b', {}, 'Audio')),
     h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => audioInput.click() }, 'Choose audio file…'), audioName, audioInput),
     h('div', { class: 'small' }, 'The song\'s recording, one you own (FLAC, WAV, MP3, OGG, M4A). The same recording Songsterr uses fits best.'));
@@ -81,7 +88,7 @@ export function createKitUI({ adapter, notify = () => {}, onOffset = () => {} })
     h('div', { class: 'row' }, buildBtn, zipBtn), buildInfo, installBox, progress, logEl, resultEl);
   const card = h('div', { class: 'kit', hidden: true },
     h('h3', {}, 'RS2014 CDLC kit', h('button', { title: 'Close', onclick: () => { card.hidden = true; } }, '×')),
-    songEl, ...steps);
+    songEl, connEl, ...steps);
   document.body.append(card);
 
   function refresh() {
@@ -217,8 +224,31 @@ export function createKitUI({ adapter, notify = () => {}, onOffset = () => {} })
     }
   }
 
+  const WHY = {
+    'no-permission': 'This version of the Bass Trainer can\'t talk to programs on your PC yet. Click Updates in the extension (0.15.0 or newer), then reload this page.',
+    'not-found': 'Chrome doesn\'t know the converter. Its installer registers it at the end (step 7/8): run the install command again, let it finish, then click Check again. Still nothing: close Chrome completely and open it again.',
+    forbidden: 'The converter is registered for a different extension. Run the install command again; if that doesn\'t help, tell Claude this extension ID: ' + (typeof chrome !== 'undefined' && chrome.runtime ? chrome.runtime.id : '?'),
+    crashed: 'Chrome finds the converter, but it stops right away (its Python environment may be incomplete). Run the install command again: it repairs it.',
+    'no-answer': 'The converter didn\'t answer in time. Click Check again; if it keeps happening, run the install command again.',
+  };
+
+  function showConnection(info) {
+    if (info) {
+      connEl.className = 'conn ok';
+      connEl.replaceChildren(h('b', {}, '✓ Connected to RS2014converter'), h('div', { class: 'why' }, `Songs are saved in ${info.songsDir}`));
+      return;
+    }
+    const e = lastConverterError || { code: 'no-answer', detail: '' };
+    connEl.className = 'conn no';
+    const version = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '?';
+    connEl.replaceChildren(h('b', {}, '✗ Not connected to RS2014converter'), h('div', { class: 'why' }, WHY[e.code] || WHY['no-answer']),
+      h('div', { class: 'raw' }, `Chrome says: ${e.detail || '–'} · extension ${version}`),
+      h('div', { class: 'row' }, h('button', { class: 'btn small', onclick: () => { connEl.replaceChildren('Checking…'); checkConverter(); } }, 'Check again')));
+  }
+
   async function checkConverter() {
     const info = await converterInfo();
+    showConnection(info);
     buildBtn.hidden = !info;
     buildInfo.className = 'small';
     installBox.hidden = !!info;

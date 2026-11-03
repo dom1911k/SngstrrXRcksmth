@@ -86,6 +86,7 @@ await page.waitForSelector('.kit:not([hidden])', { timeout: 10000 });
 await page.waitForTimeout(1500);
 out.buildVisible = await page.evaluate(() => [...document.querySelectorAll('.kit button')].some((b) => /Build CDLC/.test(b.textContent) && !b.hidden));
 out.helper = await page.locator('.kit [data-role=build]').innerText();
+out.conn = await page.locator('.kit [data-role=conn]').innerText();
 await page.setInputFiles('.kit input[type=file]', wav);
 await page.waitForTimeout(500);
 await page.locator('.kit button:has-text("Auto-sync")').click();
@@ -111,7 +112,7 @@ out.saved = existsSync(songDir) ? { yaml: readFileSync(path.join(songDir, 'song.
 if (shot) await page.screenshot({ path: `${shot}-kit.png` });
 console.log(JSON.stringify(out, null, 1));
 await ctx.close();
-const ok = out.extensionId === ID && out.buildVisible && Math.abs(out.offset - OFFSET) < 0.03 && Number(out.offsetInput) === Math.round(out.offset * 1000)
+const ok = out.extensionId === ID && out.buildVisible && /Connected to RS2014converter/.test(out.conn) && Math.abs(out.offset - OFFSET) < 0.03 && Number(out.offsetInput) === Math.round(out.offset * 1000)
   && /starts at/.test(out.sync) && out.zip.some((f) => f.endsWith('/Love Thats Gone.wav')) && out.zip.some((f) => f.endsWith('/song.yaml'))
   && /Done!/.test(out.build) && out.checks.includes('Listen at 1:02.') && /Reading tab/.test(out.log)
   && out.saved && out.saved.audioOk && /chart_offset: 2\.3\d\d/.test(out.saved.yaml) && /audio: "Love Thats Gone.wav"/.test(out.saved.yaml);

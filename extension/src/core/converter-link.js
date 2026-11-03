@@ -53,14 +53,32 @@ function session() {
   };
 }
 
+// Why the last converterInfo() found nothing: { code, detail } (null after success).
+//   code: 'no-permission' (this extension version can't talk to programs) | 'not-found'
+//   (helper not registered with Chrome) | 'forbidden' (registered for another extension ID)
+//   | 'crashed' (the helper starts but stops) | 'no-answer'
+export let lastConverterError = null;
+
+function classify(message) {
+  if (/not found/i.test(message)) return 'not-found';
+  if (/forbidden/i.test(message)) return 'forbidden';
+  if (/exited|communicating|stopped/i.test(message)) return 'crashed';
+  return 'no-answer';
+}
+
 // Is the converter installed (and its helper registered)? -> hello info or null.
 export async function converterInfo() {
+  lastConverterError = null;
   const s = session();
-  if (!s) return null;
+  if (!s) {
+    lastConverterError = { code: 'no-permission', detail: 'chrome.runtime.connectNative is not available' };
+    return null;
+  }
   try {
     s.send({ type: 'hello' });
     return await s.next('hello', 4000);
-  } catch {
+  } catch (err) {
+    lastConverterError = { code: classify(err.message), detail: err.message };
     return null;
   } finally {
     s.close();

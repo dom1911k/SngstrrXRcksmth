@@ -133,6 +133,7 @@ out.fixes.tiles = await lib.evaluate(() => [...document.querySelectorAll('.tile 
   out.kit.card = await p2.locator('.kit .song').innerText();
   await p2.waitForTimeout(4500);   // the converter check times out: not installed here
   out.kit.install = await p2.locator('.kit [data-role=install]').isVisible();
+  out.kit.conn = await p2.locator('.kit [data-role=conn]').innerText();
   const [download] = await Promise.all([p2.waitForEvent('download'), p2.locator('.kit button:has-text("Download kit")').click()]);
   out.kit.file = download.suggestedFilename();
   const zipPath = path.join(dir, 'kit.zip');
@@ -147,7 +148,7 @@ const ok = /step 1\/3/.test(out.bar) && out.after.accuracy >= 0.85 && out.after.
   && /step 2\/3/.test(out.step2) && out.dialog.lessons === 9 && out.dialog.passedSteps >= 1
   && out.fixes.speed65 === '65' && out.fixes.lessonBarBefore && !out.fixes.lessonBarAfterOtherDrill
   && !/null|undefined/.test(out.fixes.greeting) && out.fixes.tiles.includes('Lessons')
-  && !out.kit.drillRow && out.kit.songRow && /21 Guns/.test(out.kit.card) && out.kit.install && out.kit.file === 'Green Day - 21 Guns (RS2014 kit).zip'
+  && !out.kit.drillRow && out.kit.songRow && /21 Guns/.test(out.kit.card) && out.kit.install && /Not connected/.test(out.kit.conn) && /doesn.t know the converter/.test(out.kit.conn) && out.kit.file === 'Green Day - 21 Guns (RS2014 kit).zip'
   && out.kit.zip.includes('Green Day - 21 Guns/song.yaml') && out.kit.zip.includes('Green Day - 21 Guns/Green Day - 21 Guns.btchart.json');
 console.log(ok ? 'PASS' : 'FAIL');
 await ctx.close();

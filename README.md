@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.15.1.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.15.2.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -672,6 +672,8 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.15.2:** the RS2014 kit card shows at the top whether RS2014converter is connected,
+  and if not, why (with Chrome's own message) and what to do.
 - **0.15.1:** RS2014 kit card: one-line install of RS2014converter (copy the command,
   Win+R, paste) when it isn't installed; the converter now installs without admin
   rights and has its own app, the RS2014 CDLC Maker.
