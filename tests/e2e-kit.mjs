@@ -36,7 +36,12 @@ writeWav(wav, y, sr);
 const songs = path.join(dir, 'songs');
 const fake = path.join(dir, 'fake_make.py');
 writeFileSync(fake, `import sys, pathlib
+sys.path.insert(0, ${JSON.stringify(converter)})
+import yaml
+from rs2014conv.tabs import read_tab
 song = pathlib.Path(sys.argv[1]); y = (song / 'song.yaml').read_text()
+tab = read_tab(song / yaml.safe_load(y)['tab'])   # the real reader on the file Chrome sent
+print('  READ TAB: %d bars, %d notes' % (len(tab.measures), sum(len(m.notes) for m in tab.measures)))
 out = song / 'output' / 'Band - Song'; out.mkdir(parents=True, exist_ok=True)
 print('== Reading tab'); print('  ' + ' | '.join(l for l in y.splitlines() if l and not l.startswith('#')))
 (out / 'report.txt').write_text('x\\nPLEASE CHECK:\\n  * Listen at 1:02.\\n\\n')
@@ -115,6 +120,7 @@ await ctx.close();
 const ok = out.extensionId === ID && out.buildVisible && /Connected to RS2014converter/.test(out.conn) && Math.abs(out.offset - OFFSET) < 0.03 && Number(out.offsetInput) === Math.round(out.offset * 1000)
   && /starts at/.test(out.sync) && out.zip.some((f) => f.endsWith('/Love Thats Gone.wav')) && out.zip.some((f) => f.endsWith('/song.yaml'))
   && /Done!/.test(out.build) && out.checks.includes('Listen at 1:02.') && /Reading tab/.test(out.log)
+  && new RegExp(`READ TAB: ${chart.bars.length} bars, ${chart.notes.length} notes`).test(out.log)
   && out.saved && out.saved.audioOk && /chart_offset: 2\.3\d\d/.test(out.saved.yaml) && /audio: "Love Thats Gone.wav"/.test(out.saved.yaml);
 rmSync(dir, { recursive: true, force: true });
 console.log(ok ? 'PASS' : 'FAIL');

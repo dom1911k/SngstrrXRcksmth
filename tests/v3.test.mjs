@@ -124,6 +124,9 @@ test('RS2014 kit: song folder files and a valid zip; Ignition search link', () =
   assert.match(yaml, /^tab: "Metallica - Enter Sandman.btchart.json"$/m);
   assert.doesNotMatch(yaml, /^tuning:/m);                      // the converter reads it from the chart
   assert.equal(JSON.parse(files[1].text).notes.length, chart.notes.length);
+  // "format" comes first even when the chart's keys were sorted (chrome.storage does that).
+  const sorted = Object.fromEntries(Object.entries(chart).sort(([a], [b]) => a.localeCompare(b)));
+  assert.ok(kitFiles(sorted, { title: 'x', artist: 'y' }).files[1].text.indexOf('"format"') < 20);
   assert.equal(kitFiles(chart, { title: 'A/B: "C"?', artist: 'X' }).folder, 'X - A_B_ _C__');
   assert.equal(crc32(new TextEncoder().encode('123456789')), 0xcbf43926);
   const zip = zipFiles(files);

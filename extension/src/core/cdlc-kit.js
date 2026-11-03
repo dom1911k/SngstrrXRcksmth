@@ -59,7 +59,8 @@ export function kitFiles(chart, { title, artist, url = '', audioName = '', offse
     folder,
     files: [
       { name: `${folder}/song.yaml`, text: yaml },
-      { name: `${folder}/${tabName}`, text: JSON.stringify(chart, null, 1) },
+      // "format" first (the chart may come back from chrome.storage with its keys sorted).
+      { name: `${folder}/${tabName}`, text: JSON.stringify({ format: chart.format, version: chart.version, ...chart }, null, 1) },
       { name: `${folder}/README.txt`, text: readme },
     ],
   };
