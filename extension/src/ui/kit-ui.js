@@ -202,8 +202,11 @@ export function createKitUI({ adapter, notify = () => {}, onOffset = () => {} })
       const done = await building.promise;
       progress.hidden = true;
       if (done.ok) {
-        buildInfo.className = 'small ok';
-        buildInfo.textContent = done.copiedTo ? `Done! The CDLC is in your Rocksmith dlc folder: start Rocksmith.` : `Done! ${done.psarc}`;
+        // Everything made, but maybe not the .psarc (Wwise missing / never started).
+        buildInfo.className = done.psarc ? 'small ok' : 'small warn';
+        buildInfo.textContent = !done.psarc
+          ? 'Made everything except the .psarc (the Rocksmith file). Fix what\'s listed below, then open the RS2014 CDLC Maker, click this song and press "⟳ Build the .psarc again" (takes seconds).'
+          : done.copiedTo ? 'Done! The CDLC is in your Rocksmith dlc folder: start Rocksmith.' : `Done! ${done.psarc}`;
         resultEl.replaceChildren(
           done.checks && done.checks.length ? h('div', {}, h('b', {}, 'Please check (from report.txt):'), h('ul', { class: 'checks' }, ...done.checks.map((c) => h('li', {}, c)))) : h('div', { class: 'small ok' }, 'Nothing to check in the report.'),
           h('div', { class: 'row' },
