@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.15.0.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.15.1.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -477,12 +477,15 @@ artists, tracks with tuning, difficulty and views), nothing more.
   3. **Make the CDLC:** **⚡ Build CDLC** sends the song to
      [RS2014converter](https://github.com/dom1911k/RS2014converter) on your PC and
      shows its progress; when it's done you see the report's "please check" points and
-     can open the output folder (with `copy_to_folder` set in the converter's
-     `config.yaml`, the CDLC goes straight into Rocksmith's `dlc` folder). The button
-     appears once you have run the converter's `setup.bat` (it connects the converter
-     to Chrome; reload the extension afterwards). Without it, **📦 Download kit (ZIP)**
-     gives you the folder (chart, `song.yaml` with the sync, your audio) to drag onto
-     `drop_song_folder_here.bat`.
+     can open the output folder (the CDLC goes straight into Rocksmith's `dlc` folder
+     when the converter found it). The button appears once RS2014converter is
+     installed. If it isn't yet, the card shows **📋 Copy install command**: press
+     **Win+R**, paste it (Ctrl+V), press Enter, and when the window says "Done" click
+     **Check again** (no admin rights needed; 10–30 minutes the first time; then
+     install Wwise once, the installer shows you how). The converter also comes with
+     its own window, **RS2014 CDLC Maker** (desktop / Start menu), where the songs
+     you built from here are listed too. **📦 Download kit (ZIP)** gives you the
+     folder (chart, `song.yaml` with the sync, your audio) to build there instead.
 
   The converter uses Songsterr's own timing when your audio is the same recording
   (very exact, and it corrects a slightly different speed), otherwise it lines the
@@ -669,6 +672,9 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.15.1:** RS2014 kit card: one-line install of RS2014converter (copy the command,
+  Win+R, paste) when it isn't installed; the converter now installs without admin
+  rights and has its own app, the RS2014 CDLC Maker.
 - **0.15.0:** RS2014 kit in the player: your audio, Auto-sync (finds where the chart
   starts in the file), one-click *Build CDLC* through RS2014converter (connected by its
   setup.bat), ZIP with audio and sync; the converter uses Songsterr's timing when the

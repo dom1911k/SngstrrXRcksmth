@@ -12,6 +12,8 @@
 //   | log {line} | step {text} | done {ok, psarc, outDir, checks[], copiedTo, error}
 
 export const HOST = 'com.basstrainer.rs2014converter';
+// Installs RS2014converter (no admin rights): Win+R, paste, Enter.
+export const INSTALL_COMMAND = 'powershell -NoExit -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/dom1911k/RS2014converter/refs/heads/claude/elegant-brown-1ku0ek/install.ps1 | iex"';
 const CHUNK = 4 * 1024 * 1024;   // bytes of audio per message (Chrome allows 64 MB to the helper)
 
 function connect() {

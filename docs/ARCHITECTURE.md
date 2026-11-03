@@ -1,6 +1,6 @@
 # Bass Trainer for Songsterr: Architecture Proposal
 
-Status: **0.15.0**: RS2014 kit with auto-sync and one-click build (§22). **0.14.0**: Rocksmith 2014 helpers (§21). **0.13.1**: tidy-up (§20). **0.13.0**: sustain feel, phrases, detection tuning, lessons (§19). **0.12.1**: Rocksmith 2014 note look (§18). **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
+Status: **0.15.1**: one-line converter install from the kit card (§22). **0.15.0**: RS2014 kit with auto-sync and one-click build (§22). **0.14.0**: Rocksmith 2014 helpers (§21). **0.13.1**: tidy-up (§20). **0.13.0**: sustain feel, phrases, detection tuning, lessons (§19). **0.12.1**: Rocksmith 2014 note look (§18). **0.12.0**: library redesign and stage effects (§18). **0.11.0**: library hub and graphics (§17). **0.10.0**: song search (§16). **0.9.0**: reports, goals, spaced repetition, trainer, themes (§15). **0.8.0**: library and drills (§14). **0.7.0**: input check and Rocksmith-style effects (§13). **V2 built (0.6.x)**: riff repeater, wait mode, practice history with
 weak spots and a section strip, takes (see §12). **Phase 4 (0.5.x)**: auto bass muting (`core/auto-mute.js`, Songsterr's
 `controls/mute`), count-in (Songsterr's own count-in; the player's own clicks),
 configurable shortcuts (`core/shortcuts.js`, window capture phase, `KeyboardEvent.code`
@@ -763,3 +763,12 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
 * Tests: `tests/e2e-kit.mjs` registers the real helper with the test browser
   (`<profile>/NativeMessagingHosts/…json`) with a stand-in build; the converter's
   `tests/test_units.py` covers the timing fit and the helper protocol.
+* **0.15.1:** `INSTALL_COMMAND` (core/converter-link.js) is RS2014converter's one-line
+  installer (`irm …/install.ps1 | iex` in a `powershell -NoExit` window). The kit card
+  shows it with a copy button when `converterInfo()` finds no helper; *Check again*
+  re-asks (Chrome reads the helper registration on each `connectNative`, so no reload
+  is needed). The converter side: `install.ps1` (download/update into
+  `%LOCALAPPDATA%\RS2014converter`, keeps settings/songs/cache/.venv), `setup.ps1`
+  (no admin: per-user Python, local .NET SDK, self-contained packager, Steam dlc
+  detection, shortcuts), `settings.yaml` for your settings, and the tkinter app
+  `app/cdlc_maker.pyw`.

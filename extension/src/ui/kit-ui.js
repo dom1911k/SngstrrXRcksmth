@@ -9,7 +9,7 @@
 import { h } from './dom.js';
 import { kitFiles, zipFiles } from '../core/cdlc-kit.js';
 import { analyzeAudio, estimateOffset } from '../core/auto-sync.js';
-import { converterInfo, buildWithConverter, openConverterFolder } from '../core/converter-link.js';
+import { converterInfo, buildWithConverter, openConverterFolder, INSTALL_COMMAND } from '../core/converter-link.js';
 
 const fmtOff = (s) => `${s >= 0 ? '+' : '−'}${Math.abs(s).toFixed(3)} s`;
 
@@ -31,6 +31,8 @@ export const KIT_CSS = `
 .kit .log { background: #0e1014; border-radius: 6px; padding: 6px 8px; font: 11px/1.4 ui-monospace, Consolas, monospace; color: #aeb5c4; max-height: 140px; overflow: auto; white-space: pre-wrap; }
 .kit .checks { margin: 6px 0 0 16px; padding: 0; color: #ffb347; }
 .kit progress { width: 100%; }
+.kit .install { background: #0e1014; border: 1px solid #2c2f36; border-radius: 8px; padding: 8px 10px; margin-top: 6px; }
+.kit .install ol { margin: 4px 0 6px 18px; padding: 0; color: #c9cdd4; }
 `;
 
 export function createKitUI({ adapter, notify = () => {}, onOffset = () => {} }) {
@@ -53,6 +55,17 @@ export function createKitUI({ adapter, notify = () => {}, onOffset = () => {} })
   const buildBtn = h('button', { class: 'btn primary', hidden: true, onclick: () => build() }, '⚡ Build CDLC');
   const zipBtn = h('button', { class: 'btn', onclick: () => downloadZip() }, '📦 Download kit (ZIP)');
   const buildInfo = h('div', { class: 'small', 'data-role': 'build' });
+  // Not installed yet: the one-line installer.
+  const copyBtn = h('button', { class: 'btn small primary', onclick: async () => {
+    try { await navigator.clipboard.writeText(INSTALL_COMMAND); copyBtn.textContent = '✓ Copied'; } catch { copyBtn.textContent = 'Copy failed'; }
+    setTimeout(() => { copyBtn.textContent = '📋 Copy install command'; }, 2500);
+  } }, '📋 Copy install command');
+  const installBox = h('div', { class: 'install', hidden: true, 'data-role': 'install' },
+    h('b', {}, 'One-click building: install RS2014converter (once)'),
+    h('ol', {}, h('li', {}, 'Copy the install command.'), h('li', {}, 'Press Win+R, paste it (Ctrl+V) and press Enter.'),
+      h('li', {}, 'When it says "Done", click Check again.')),
+    h('div', { class: 'small' }, 'No admin rights needed; about 15 GB and 10–30 minutes the first time. Afterwards install Wwise once (the installer shows you how).'),
+    h('div', { class: 'row' }, copyBtn, h('button', { class: 'btn small', onclick: () => checkConverter() }, 'Check again')));
   const progress = h('progress', { max: 1, value: 0, hidden: true });
   const logEl = h('div', { class: 'log', hidden: true });
   const resultEl = h('div', {});
@@ -65,7 +78,7 @@ export function createKitUI({ adapter, notify = () => {}, onOffset = () => {} })
     h('div', { class: 'row' }, nudge(-0.1), nudge(-0.01), offEl, nudge(0.01), nudge(0.1)),
     syncMsg);
   steps[2].append(h('div', {}, h('b', { class: 'n' }, '3'), h('b', {}, 'Make the CDLC')),
-    h('div', { class: 'row' }, buildBtn, zipBtn), buildInfo, progress, logEl, resultEl);
+    h('div', { class: 'row' }, buildBtn, zipBtn), buildInfo, installBox, progress, logEl, resultEl);
   const card = h('div', { class: 'kit', hidden: true },
     h('h3', {}, 'RS2014 CDLC kit', h('button', { title: 'Close', onclick: () => { card.hidden = true; } }, '×')),
     songEl, ...steps);
@@ -208,9 +221,10 @@ export function createKitUI({ adapter, notify = () => {}, onOffset = () => {} })
     const info = await converterInfo();
     buildBtn.hidden = !info;
     buildInfo.className = 'small';
+    installBox.hidden = !!info;
     buildInfo.textContent = info
-      ? `RS2014converter found (${info.songsDir}).${info.dlcFolder ? ' The CDLC goes straight into your Rocksmith dlc folder.' : ''}${info.wwise === false ? ' Wwise was not found: the build will stop before the .psarc.' : ''}`
-      : 'For one-click building, run RS2014converter\'s setup.bat once (it connects the converter to Chrome), then reopen this page. Until then: download the kit and drag the folder onto drop_song_folder_here.bat.';
+      ? `RS2014converter found (${info.songsDir}).${info.dlcFolder ? ' The CDLC goes straight into your Rocksmith dlc folder.' : ''}${info.wwise === false ? ' Wwise is not installed yet: the build stops before the .psarc (the CDLC Maker app shows how to install it).' : ''}`
+      : 'Or download the kit and build it with the RS2014 CDLC Maker / drop_song_folder_here.bat.';
   }
 
   return {
