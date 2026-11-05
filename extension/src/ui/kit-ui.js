@@ -40,7 +40,7 @@ export const KIT_CSS = `
 .kit .conn .raw { color: #8b919c; font-size: 11px; margin-top: 3px; }
 `;
 
-export function createKitUI({ adapter, notify = () => {}, onOffset = () => {} }) {
+export function createKitUI({ adapter, notify = () => {}, onOffset = () => {}, onTest = null }) {
   document.head.append(h('style', {}, KIT_CSS));
   let kit = null;        // { chart, title, artist, url }
   let audioFile = null;
@@ -210,6 +210,7 @@ export function createKitUI({ adapter, notify = () => {}, onOffset = () => {} })
         resultEl.replaceChildren(
           done.checks && done.checks.length ? h('div', {}, h('b', {}, 'Please check (from report.txt):'), h('ul', { class: 'checks' }, ...done.checks.map((c) => h('li', {}, c)))) : h('div', { class: 'small ok' }, 'Nothing to check in the report.'),
           h('div', { class: 'row' },
+            onTest ? h('button', { class: 'btn small primary', 'data-role': 'test', title: 'Play the finished CDLC chart with its audio on the highway, before starting Rocksmith', onclick: () => { card.hidden = true; onTest(folder); } }, '▶ Test it on the highway') : null,
             h('button', { class: 'btn small', onclick: () => openConverterFolder(folder, 'output') }, 'Open output folder'),
             done.copiedTo ? h('button', { class: 'btn small', onclick: () => openConverterFolder(folder, 'dlc') }, 'Open dlc folder') : null));
         notify('CDLC built ✓');

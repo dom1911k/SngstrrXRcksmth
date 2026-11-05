@@ -127,3 +127,34 @@ export async function openConverterFolder(folder, what = 'output') {
   if (!s) return;
   try { s.send({ type: 'open', folder, what }); await s.next('opened', 4000); } catch { /* ignore */ } finally { s.close(); }
 }
+
+// The finished CDLC of a song folder, to try on the highway before installing it:
+// { xml (Rocksmith arrangement), title, audio (File, the audio the chart is timed to) }.
+// Needs a helper from RS2014converter with protocol version 2.
+export async function fetchTestSong(folder, onProgress = () => {}) {
+  const s = session();
+  if (!s) throw new Error('Chrome can\'t reach RS2014converter (is it installed?)');
+  try {
+    s.send({ type: 'hello' });
+    const hello = await s.next('hello', 4000);
+    if ((hello.version || 1) < 2) throw new Error('Update RS2014converter first ("Check for updates" in the CDLC Maker)');
+    s.send({ type: 'test', folder });
+    const head = await s.next('test-chart', 15000);
+    const parts = [];
+    let got = 0;
+    for (;;) {
+      const m = await s.next(['test-audio', 'test-end'], 30000);
+      if (m.type === 'test-end') break;
+      const bin = atob(m.data);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      parts.push(bytes);
+      got += bytes.length;
+      onProgress(got, head.size);
+    }
+    const type = /\.ogg$/i.test(head.audioName) ? 'audio/ogg' : /\.flac$/i.test(head.audioName) ? 'audio/flac' : 'audio/wav';
+    return { xml: head.xml, title: head.title, audio: new File(parts, head.audioName, { type }) };
+  } finally {
+    s.close();
+  }
+}

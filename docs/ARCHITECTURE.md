@@ -772,3 +772,26 @@ player); UI in `ui/training-section.js` (panel) and `ui/progress-ui.js` (overlay
   (no admin: per-user Python, local .NET SDK, self-contained packager, Steam dlc
   detection, shortcuts), `settings.yaml` for your settings, and the tkinter app
   `app/cdlc_maker.pyw`.
+
+## 23. Testing a finished CDLC (0.16.0)
+
+* `core/rsxml.js`: Rocksmith arrangement XML → chart. Regex-based (no DOMParser, so it
+  runs in Node tests too). Reads the level with the most notes (the full chart; the
+  hardest one with dynamic difficulty), `<note>` and `<chordNote>`s, the per-string
+  tuning offsets (bass E1 A1 D2 G2, guitar E2…E4) and capo, merges `linkNext` ties,
+  maps techniques to chart flags (mute → dead, ignore → ghost, hammerOn/pullOff →
+  hopo, slideTo / slideUnpitchTo, bend, harmonic, palmMute, accent, vibrato), bars
+  from `<ebeats>` (measure ≥ 0 starts a bar), sections from `<sections>`. Times stay
+  those of the CDLC's audio, so the player's offset is 0.
+* Player: `.xml` in *Open…* / drag & drop; `#test=<song folder>` (also on
+  `hashchange`) asks the converter helper (`fetchTestSong` in core/converter-link.js)
+  for the newest built project of that song: → `test {folder}` ← `test-chart {xml,
+  title, audioName, size}`, `test-audio {data}` × n (600 KB per message: Chrome takes
+  at most 1 MB from a host), `test-end`. Helper protocol version 2; an older helper
+  gets "update RS2014converter". `folder` is a name in the songs folder, or the full
+  path of a folder with `song.yaml` (songs opened from elsewhere in the CDLC Maker).
+* The kit card shows *▶ Test it on the highway* after a successful build; the CDLC
+  Maker's *▶ Test on the highway* starts Chrome / Edge / Brave (App Paths in the
+  registry) with `chrome-extension://<id>/player/player.html#test=<path>`.
+* Tests: `tests/rsxml.test.mjs`; `tests/e2e-kit.mjs` builds a stand-in project and
+  presses the test button (chart, tuning, hopo, bars, sections, audio via the helper).

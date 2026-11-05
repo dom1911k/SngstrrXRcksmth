@@ -46,6 +46,18 @@ out = song / 'output' / 'Band - Song'; out.mkdir(parents=True, exist_ok=True)
 print('== Reading tab'); print('  ' + ' | '.join(l for l in y.splitlines() if l and not l.startswith('#')))
 (out / 'report.txt').write_text('x\\nPLEASE CHECK:\\n  * Listen at 1:02.\\n\\n')
 (out / 'Song_v1_p.psarc').write_bytes(b'psarc')
+# A finished project, as the real build leaves it: chart XML + the audio it is timed to.
+import json, shutil
+proj = out / 'project'; proj.mkdir(exist_ok=True)
+beats = ''.join('<ebeat time="%.3f" measure="%d" />' % (0.5 * i, i // 4 + 1 if i % 4 == 0 else -1) for i in range(40))
+notes = ''.join('<note time="%.3f" string="%d" fret="%d" sustain="0.250"%s />' % (2.0 + 0.5 * i, i % 4, i % 5, ' hammerOn="1"' if i == 3 else '') for i in range(24))
+(proj / 'arr_bass_RS2.xml').write_text('<?xml version="1.0"?><song version="8"><title>Song</title><arrangement>Bass</arrangement>'
+    '<songLength>20.000</songLength><tuning string0="-2" string1="0" string2="0" string3="0" string4="0" string5="0" /><capo>0</capo>'
+    '<artistName>Band</artistName><ebeats count="40">' + beats + '</ebeats><sections count="1"><section name="verse" number="1" startTime="2.000" /></sections>'
+    '<levels count="1"><level difficulty="0"><notes count="24">' + notes + '</notes><chords count="0" /></level></levels></song>')
+shutil.copy(next(song.glob('*.wav')), proj / 'audio.wav')
+(proj / 'Band_Song.rs2dlc').write_text(json.dumps({'ArtistName': {'Value': 'Band'}, 'Title': {'Value': 'Song'}, 'AudioFile': {'Path': 'audio.wav'},
+    'Arrangements': [{'Case': 'Instrumental', 'Fields': [{'XML': 'arr_bass_RS2.xml'}]}]}))
 `);
 const runner = path.join(dir, 'host.py');
 writeFileSync(runner, `import sys
@@ -112,6 +124,17 @@ await page.waitForFunction(() => /Done!|failed|stopped/.test(document.querySelec
 out.build = await page.locator('.kit [data-role=build]').innerText();
 out.checks = await page.evaluate(() => [...document.querySelectorAll('.kit .checks li')].map((x) => x.textContent));
 out.log = await page.locator('.kit .log').innerText();
+// Test the finished CDLC on the highway (chart XML + audio from the helper).
+out.testButton = await page.locator('.kit [data-role=test]').count();
+await page.locator('.kit [data-role=test]').click();
+await page.waitForFunction(() => /Testing the CDLC|Couldn't load/.test(document.getElementById('status').textContent), null, { timeout: 30000 });
+out.testStatus = await page.locator('#status').innerText();
+out.testChart = await page.evaluate(() => {
+  const a = globalThis.bassTrainer.adapter;
+  return { notes: a.chart.notes.length, tuning: a.chart.instrument.tuning, hopo: a.chart.notes[3].flags.hopo, sections: a.chart.sections.map((x) => x.name), bars: a.chart.bars.length, audio: a.audioName, offset: a.offset };
+});
+await page.waitForFunction(() => Number.isFinite(globalThis.bassTrainer.adapter.audio.duration), null, { timeout: 10000 });
+out.testAudioDuration = await page.evaluate(() => globalThis.bassTrainer.adapter.audio.duration);
 const songDir = path.join(songs, "Band - Love That's Gone");
 out.saved = existsSync(songDir) ? { yaml: readFileSync(path.join(songDir, 'song.yaml'), 'utf8'), audioOk: statSync(path.join(songDir, 'Love Thats Gone.wav')).size === statSync(wav).size } : null;
 if (shot) await page.screenshot({ path: `${shot}-kit.png` });
@@ -121,6 +144,9 @@ const ok = out.extensionId === ID && out.buildVisible && /Connected to RS2014con
   && /starts at/.test(out.sync) && out.zip.some((f) => f.endsWith('/Love Thats Gone.wav')) && out.zip.some((f) => f.endsWith('/song.yaml'))
   && /Done!/.test(out.build) && out.checks.includes('Listen at 1:02.') && /Reading tab/.test(out.log)
   && new RegExp(`READ TAB: ${chart.bars.length} bars, ${chart.notes.length} notes`).test(out.log)
+  && out.testButton === 1 && /Testing the CDLC/.test(out.testStatus) && out.testChart.notes === 24 && out.testChart.hopo
+  && out.testChart.tuning.join() === '26,33,38,43' && out.testChart.bars === 10 && out.testChart.sections[0] === 'Verse'
+  && out.testChart.audio === 'audio.wav' && out.testChart.offset === 0 && out.testAudioDuration > 1
   && out.saved && out.saved.audioOk && /chart_offset: 2\.3\d\d/.test(out.saved.yaml) && /audio: "Love Thats Gone.wav"/.test(out.saved.yaml);
 rmSync(dir, { recursive: true, force: true });
 console.log(ok ? 'PASS' : 'FAIL');

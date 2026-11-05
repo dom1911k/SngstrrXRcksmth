@@ -5,7 +5,7 @@ A Rocksmith-style practice tool for bass that runs inside Chrome on top of
 Rocksmith Real Tone Cable, and (when finished) shows a note highway for the
 song and scores what you play.
 
-**Current version: 0.15.4.** Rocksmith 2014-style **3D note highway** in sync with
+**Current version: 0.16.0.** Rocksmith 2014-style **3D note highway** in sync with
 Songsterr's player, **scoring** of what you play (accuracy, streak, summary),
 **practice tools** (riff repeater with automatic speed-up, wait mode, practice
 history with your weak spots, recording takes and listening back, automatic bass
@@ -486,6 +486,11 @@ artists, tracks with tuning, difficulty and views), nothing more.
      its own window, **RS2014 CDLC Maker** (desktop / Start menu), where the songs
      you built from here are listed too. **📦 Download kit (ZIP)** gives you the
      folder (chart, `song.yaml` with the sync, your audio) to build there instead.
+  4. **Test it:** once it's built, **▶ Test it on the highway** loads the finished
+     CDLC's chart with its audio into the player: exactly the notes and timing
+     Rocksmith will show, before you start the game. The same button is in the CDLC
+     Maker (*▶ Test on the highway*). Any Rocksmith arrangement can also be opened by
+     hand: **Open…** → the CDLC's `project\arr_bass_RS2.xml` plus `project\audio.ogg`.
 
   The converter uses Songsterr's own timing when your audio is the same recording
   (very exact, and it corrects a slightly different speed), otherwise it lines the
@@ -672,6 +677,9 @@ for detection.
   playing them back with the song. Highway: chord frames, vibrato tails, horizon glow.
   0.6.1: flatter camera, Esc leaves the full highway, more forgiving timing
   windows (±140 ms), beat pulse, vibrating strings, fix for flickering floor lines.
+- **0.16.0:** test a finished CDLC on the highway before playing it in Rocksmith
+  (*▶ Test it on the highway* on the kit card and in the CDLC Maker); the player opens
+  Rocksmith arrangement files (`.xml`) too.
 - **0.15.4:** the RS2014 kit's chart file starts with its format again (it came back from
   Chrome's storage with sorted keys, and the converter took it for a text tab).
 - **0.15.3:** the kit card no longer says "Done!" when the .psarc couldn't be made; it

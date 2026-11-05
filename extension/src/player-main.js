@@ -21,6 +21,8 @@ import { TUNINGS } from './core/music.js';
 import { NoteTrainer } from './core/note-trainer.js';
 import { createNoteTrainerUI } from './ui/note-trainer-ui.js';
 import { createTrainingSections, panelOrder } from './ui/training-section.js';
+import { isRocksmithXml, parseRocksmithXml } from './core/rsxml.js';
+import { fetchTestSong } from './core/converter-link.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (t) => {
@@ -73,8 +75,20 @@ async function openFile(file) {
   } else if (file.type.startsWith('audio/') || /\.(mp3|ogg|oga|opus|wav|m4a|aac|flac|webm)$/i.test(file.name)) {
     adapter.loadAudioFile(file);
     status(`Audio loaded: ${file.name}`, true);
+  } else if (/\.xml$/i.test(file.name)) {
+    // A Rocksmith arrangement (e.g. project\arr_bass_RS2.xml of a CDLC): its times are those
+    // of the CDLC's audio (project\audio.ogg), so no offset.
+    try {
+      const xml = await file.text();
+      if (!isRocksmithXml(xml)) throw new Error(`${file.name} is not a Rocksmith arrangement.`);
+      adapter.setChart(parseRocksmithXml(xml, file.name));
+      setOffset(0);
+      status(`Rocksmith chart loaded: ${file.name}. Open its audio too (project\\audio.ogg).`, true);
+    } catch (err) {
+      status(err.message);
+    }
   } else {
-    status(`${file.name}: not a chart (.json) or audio file.`);
+    status(`${file.name}: not a chart (.json / Rocksmith .xml) or audio file.`);
   }
 }
 
@@ -83,7 +97,7 @@ for (const b of document.querySelectorAll('#empty [data-open]')) {
   b.addEventListener('click', () => (b.dataset.open === 'lessons' ? lessons.open() : openDrills()));
 }
 $('openFiles').addEventListener('change', async (e) => {
-  const files = [...e.target.files].sort((a) => (/\.json$/i.test(a.name) ? -1 : 1)); // chart first
+  const files = [...e.target.files].sort((a) => (/\.(json|xml)$/i.test(a.name) ? -1 : 1)); // chart first
   e.target.value = '';
   for (const f of files) await openFile(f);
 });
@@ -100,7 +114,7 @@ window.addEventListener('drop', async (e) => {
   e.preventDefault();
   dragDepth = 0;
   $('drop').hidden = true;
-  const files = [...e.dataTransfer.files].sort((a) => (/\.json$/i.test(a.name) ? -1 : 1));
+  const files = [...e.dataTransfer.files].sort((a) => (/\.(json|xml)$/i.test(a.name) ? -1 : 1));
   for (const f of files) await openFile(f);
 });
 
@@ -256,7 +270,7 @@ if (location.hash === '#drills') openDrills();
 if (location.hash === '#lessons') lessons.open();
 
 // ---- RS2014 kit (from the Songsterr panel: the chart waits in storage) ----
-kitUI = createKitUI({ adapter, notify: (t) => status(t, true), onOffset: (s) => { $('offset').value = Math.round(s * 1000); } });
+kitUI = createKitUI({ adapter, notify: (t) => status(t, true), onOffset: (s) => { $('offset').value = Math.round(s * 1000); }, onTest: (folder) => testCdlc(folder) });
 if (location.hash === '#kit') {
   (async () => {
     const { rsKit } = await chrome.storage.local.get('rsKit');
@@ -266,6 +280,27 @@ if (location.hash === '#kit') {
     await chrome.storage.local.remove('rsKit');
   })();
 }
+// ---- Test a finished CDLC (from the kit card, or "Test on the highway" in the CDLC Maker) ----
+function setOffset(s) { adapter.setOffset(s); $('offset').value = Math.round(s * 1000); }
+async function testCdlc(folder) {
+  status('Getting the CDLC from RS2014converter…', true);
+  try {
+    const song = await fetchTestSong(folder, (got, total) => status(`Loading the CDLC's audio… ${Math.round((100 * got) / Math.max(1, total))}%`, true));
+    const chart = parseRocksmithXml(song.xml, 'arr_bass_RS2.xml');
+    if (song.title) { chart.meta.title = chart.meta.title || song.title; }
+    adapter.setChart(chart);
+    adapter.loadAudioFile(song.audio);
+    setOffset(0);
+    $('empty').hidden = true;
+    status(`Testing the CDLC: ${song.title}. This is exactly the chart and timing Rocksmith will show.`, true);
+  } catch (err) {
+    status(`Couldn't load the CDLC: ${err.message}`);
+  }
+}
+globalThis.bassTrainerTestCdlc = testCdlc;
+if (location.hash.startsWith('#test=')) testCdlc(decodeURIComponent(location.hash.slice(6)));
+window.addEventListener('hashchange', () => { if (location.hash.startsWith('#test=')) testCdlc(decodeURIComponent(location.hash.slice(6))); });
+
 // Library tiles: open the panel at a section.
 const PANEL_LINKS = { '#tuner': 'Tuner', '#calibrate': 'Latency calibration', '#input': 'Input' };
 if (PANEL_LINKS[location.hash]) setTimeout(() => panel.showSection(PANEL_LINKS[location.hash]), 300);
